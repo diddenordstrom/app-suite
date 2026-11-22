@@ -33,7 +33,7 @@ export function AppShell({ title, logo: Logo, nav, header, footer, action, mainC
   children: ReactNode;
 }) {
   const link = ({ isActive }: { isActive: boolean }) =>
-    cn("flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium", isActive ? "bg-accent text-accent-foreground shadow-[inset_3px_0_0_var(--signature)]" : "text-muted-foreground hover:bg-accent");
+    cn("flex items-center gap-3 rounded-md px-3 py-2 text-sm font-medium", isActive ? "relative bg-accent text-accent-foreground before:absolute before:inset-y-1.5 before:left-0 before:w-[3px] before:rounded-full before:[background:var(--horizon-v)]" : "text-muted-foreground hover:bg-accent");
   const tab = ({ isActive }: { isActive: boolean }) =>
     cn("relative flex flex-1 flex-col items-center gap-0.5 py-2 text-[11px] leading-tight font-medium", isActive ? "text-primary before:absolute before:top-0 before:h-0.5 before:w-6 before:rounded-full before:bg-signature" : "text-muted-foreground");
   const desktop = useDesktop();

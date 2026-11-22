@@ -4,7 +4,6 @@
  * Components reference only semantic token names, never literal colours.
  */
 @import "@homelab/ui/skymning.css";
-@import "@fontsource-variable/nunito";
 
 :root {
   --signature: light-dark(#2f9a6d, #6fd3a5);
@@ -21,5 +20,4 @@
   --list-blue: light-dark(#dbe7f8, #232f45);
   --list-purple: light-dark(#e7dffa, #322948);
   --list-pink: light-dark(#f9e0ec, #432639);
-  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

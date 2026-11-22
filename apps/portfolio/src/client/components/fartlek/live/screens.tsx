@@ -80,7 +80,7 @@ export function WeekScreen() {
         <div className="flex flex-wrap items-center gap-5">
           <Ring value={week.actualKm} goal={data.ringGoal} size={116}>
             <div>
-              <div className="text-xl font-semibold tabular-nums">{fmt.num(week.actualKm)}</div>
+              <div className="font-display text-3xl leading-none font-medium tabular-nums">{fmt.num(week.actualKm)}</div>
               <div className="text-xs text-muted-foreground">{data.ringGoal ? ft("home.ofGoal", { goal: fmt.num(data.ringGoal), unit: fmt.unit }) : fmt.unit}</div>
             </div>
           </Ring>

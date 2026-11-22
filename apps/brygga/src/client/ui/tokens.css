@@ -1,10 +1,9 @@
 /*
- * Brygga's look on top of the suite palette (@homelab/ui/skymning.css): Nunito and a fjord
+ * Brygga's look on top of the suite palette (@homelab/ui/skymning.css): a fjord
  * blue signature for the bridge period. The timeline's three phases get their own tokens.
  * Components reference only semantic token names, never literal colours.
  */
 @import "@homelab/ui/skymning.css";
-@import "@fontsource-variable/nunito";
 
 :root {
   --signature: light-dark(#2f6fa8, #7fb3e3);
@@ -19,5 +18,4 @@
   --phase-pension: light-dark(#d5ecdf, #1f3d2e);
   --phase-pension-foreground: light-dark(#205a3a, #a9e2c2);
 
-  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

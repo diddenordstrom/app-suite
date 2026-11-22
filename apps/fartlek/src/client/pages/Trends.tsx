@@ -99,7 +99,7 @@ export function Trends() {
         <LineChart height={220}
           xFormat={dayLabel} yFormat={(v) => `${Math.round(v)}`}
           series={[
-            { key: "ctl", label: t("load.fitness"), color: "var(--chart-1)", points: series.map((p) => ({ x: ms(p.date), y: p.ctl })), dashedFrom: projFrom },
+            { key: "ctl", label: t("load.fitness"), color: "var(--chart-1)", area: true, points: series.map((p) => ({ x: ms(p.date), y: p.ctl })), dashedFrom: projFrom },
             { key: "atl", label: t("load.fatigue"), color: "var(--chart-2)", points: series.map((p) => ({ x: ms(p.date), y: p.atl })), dashedFrom: projFrom },
             { key: "tsb", label: t("load.form"), color: "var(--chart-3)", points: series.map((p) => ({ x: ms(p.date), y: p.tsb })), dashedFrom: projFrom },
           ]} />

@@ -35,7 +35,7 @@ function useLabel() {
 export function TodayCard({ data, onChanged, signals, checkin }: { data: HomeData; onChanged: () => void; signals: ReactNode; checkin: ReactNode }) {
   const [showSignals, setShowSignals] = useState(false);
   return (
-    <Card data-tour="home-form" className="flex flex-col gap-4 md:col-span-2 lg:col-span-3">
+    <Card horizon data-tour="home-form" className="flex flex-col gap-4 md:col-span-2 lg:col-span-3">
       <CardTitle>{t("today.title")}</CardTitle>
       <Score data={data} />
       <Sessions data={data} />
@@ -69,8 +69,8 @@ export function Score({ data }: { data: HomeData }) {
   return (
     <div className="space-y-2">
       <div className="flex items-baseline gap-3">
-        <span className={`text-5xl font-semibold tabular-nums ${uncertain ? "text-muted-foreground" : ""}`}>{score}{uncertain && "*"}<span className="text-lg font-normal text-muted-foreground">{t("form.outOf")}</span></span>
-        <span className={`text-xl font-semibold ${tone}`}>{t(`form.${verdict}`)}</span>
+        <span className={`font-display text-6xl leading-none font-medium tracking-tight tabular-nums ${uncertain ? "text-muted-foreground" : ""}`}>{score}{uncertain && "*"}<span className="text-lg font-normal text-muted-foreground">{t("form.outOf")}</span></span>
+        <span className={`font-display text-2xl italic ${tone}`}>{t(`form.${verdict}`)}</span>
         <span className="ml-auto self-center">
           <InfoTip label={t("today.why", { score })}>
             <span className="block font-semibold">{t("today.whyTitle", { score })}</span>

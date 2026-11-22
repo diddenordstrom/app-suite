@@ -66,7 +66,7 @@ export function CoachPanel({ coach, baseValue, onApply, undo, onUndo }: {
           </span>
         </div>
         <div className="flex flex-wrap items-baseline gap-3">
-          <span className="text-4xl font-semibold tabular-nums">{signed(coach.value)}</span>
+          <span className="font-display text-4xl font-medium tabular-nums">{signed(coach.value)}</span>
           {coach.value != null && <span className={cn("rounded-full px-2.5 py-0.5 text-sm font-semibold", STATE_STYLE[coach.state])}>{stateText}</span>}
           {baseValue != null && baseValue !== coach.value && <span className="text-sm tabular-nums text-muted-foreground">{t("coach.from", { value: signed(baseValue) })}</span>}
         </div>

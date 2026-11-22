@@ -1,4 +1,4 @@
-import type { ButtonHTMLAttributes, ComponentProps, HTMLAttributes, ReactNode } from "react";
+import { useId, type ButtonHTMLAttributes, type ComponentProps, type HTMLAttributes, type ReactNode } from "react";
 import { Spinner } from "./forms";
 import { InfoTip } from "./InfoTip";
 import { cn } from "./cn";
@@ -20,9 +20,12 @@ export function Button({ variant = "primary", className, ...p }: ButtonHTMLAttri
   );
 }
 
-export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
+export function Card({ className, horizon, ...p }: HTMLAttributes<HTMLDivElement> & { /** A thin dusk line along the top: for the page's one hero card. */ horizon?: boolean }) {
   // A clickable card lifts on hover, so the shadow hints that it can be pressed.
-  return <div className={cn("rounded-lg border border-card-edge bg-card p-4 shadow-card", p.onClick && "cursor-pointer transition-shadow hover:shadow-card-hover", className)} {...p} />;
+  return (
+    <div className={cn("rounded-lg border border-card-edge bg-card p-4 shadow-card", p.onClick && "cursor-pointer transition-shadow hover:shadow-card-hover",
+      horizon && "relative overflow-hidden before:absolute before:inset-x-0 before:top-0 before:h-[3px] before:[background:var(--horizon)]", className)} {...p} />
+  );
 }
 
 export function Input({ className, ...p }: ComponentProps<"input">) {
@@ -71,6 +74,7 @@ export function Ring({ value, goal, size = 132, segments, children }: {
 }) {
   const r = size / 2 - 9;
   const c = 2 * Math.PI * r;
+  const gid = svgId(useId());
   const share = goal ? Math.min(value / goal, 1) : 0;
   const arc = (key: string, from: number, len: number, color: string, cap: "round" | "butt") => (
     <circle key={key} cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={10} strokeLinecap={cap}
@@ -79,7 +83,7 @@ export function Ring({ value, goal, size = 132, segments, children }: {
   const parts = segments?.filter((s) => s.value > 0) ?? [];
   let arcs: ReactNode = null;
   if (goal && share > 0) {
-    if (parts.length < 2) arcs = arc("all", 0, c * share, parts[0]?.color ?? "var(--signature)", "round");
+    if (parts.length < 2) arcs = arc("all", 0, c * share, parts[0]?.color ?? `url(#${gid})`, "round");
     else {
       const gap = 3;
       let at = 0;
@@ -94,6 +98,8 @@ export function Ring({ value, goal, size = 132, segments, children }: {
   return (
     <div className="relative grid place-items-center" style={{ width: size, height: size }}>
       <svg width={size} height={size} className="-rotate-90" aria-hidden>
+        {/* The svg is turned a quarter, so a top-to-bottom gradient runs left to right on screen. */}
+        <defs><HorizonGradient id={gid} x2="0" y2="1" /></defs>
         <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke="var(--muted)" strokeWidth={10} />
         {arcs}
       </svg>
@@ -107,8 +113,32 @@ export function Stat({ label, value, sub, tone, info }: { label: string; value: 
   return (
     <div>
       <div className="flex items-center gap-1 text-xs text-muted-foreground">{label}{info && <InfoTip label={label}>{info}</InfoTip>}</div>
-      <div className={cn("text-lg font-semibold tabular-nums", tone === "warning" && "text-warning")}>{value}</div>
+      <div className={cn("font-display text-2xl leading-tight font-medium tabular-nums", tone === "warning" && "text-warning")}>{value}</div>
       {sub && <div className="text-xs text-muted-foreground">{sub}</div>}
     </div>
+  );
+}
+
+/** useId() gives ids like ":r1:", which break inside url(#…). */
+export const svgId = (id: string) => `h${id.replace(/[^a-zA-Z0-9_-]/g, "")}`;
+
+/** The horizon (skymning.css) as an SVG gradient: lavender into `to`, the app's signature by default. */
+export function HorizonGradient({ id, to = "var(--horizon-end)", x2 = "1", y2 = "1" }: { id: string; to?: string; x2?: string; y2?: string }) {
+  return (
+    <linearGradient id={id} x1="0" y1="0" x2={x2} y2={y2}>
+      <stop offset="0" style={{ stopColor: "var(--brand)" }} />
+      <stop offset="1" style={{ stopColor: to }} />
+    </linearGradient>
+  );
+}
+
+/** The tile behind every app mark: the horizon from top left to bottom right. Draw the mark on top. */
+export function MarkTile({ rx = 9, accent }: { rx?: number; /** The app's signature; defaults to the current app's. */ accent?: string }) {
+  const id = svgId(useId());
+  return (
+    <>
+      <defs><HorizonGradient id={id} to={accent ? `color-mix(in oklab, ${accent} 78%, var(--brand))` : undefined} /></defs>
+      <rect width="32" height="32" rx={rx} fill={`url(#${id})`} />
+    </>
   );
 }

@@ -1,15 +1,13 @@
 /*
- * Autarki's look on top of the suite palette (@homelab/ui/skymning.css): Nunito, and moss
+ * Autarki's look on top of the suite palette (@homelab/ui/skymning.css): and moss
  * green as its signature (leaves, harvest, "today"). Components reference only semantic
  * token names, never literal colours.
  */
 @import "@homelab/ui/skymning.css";
-@import "@fontsource-variable/nunito";
 
 :root {
   /* Garden is a light-or-dark-by-system app: no theme switcher, so the OS decides. */
   --signature: light-dark(#4f7a24, #a9cf6e);
   --signature-soft: light-dark(#e2eecf, #2e3c1f);
   --signature-foreground: light-dark(#38591a, #cfe6a8);
-  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
