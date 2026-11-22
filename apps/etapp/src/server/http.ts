@@ -114,3 +114,12 @@ export function optBool(b: Body, key: string): boolean | undefined {
   if (typeof v !== "boolean") throw badRequest(`${key} must be true or false`);
   return v;
 }
+
+/** An http(s) URL, at most 1000 characters; anything else is a 400. Keeps javascript: and data: links out of the plan. */
+export function httpUrl(b: Body, key: string): string {
+  const v = str(b, key, 1000);
+  let u: URL;
+  try { u = new URL(v); } catch { throw badRequest(`${key} must be a link`); }
+  if (u.protocol !== "https:" && u.protocol !== "http:") throw badRequest(`${key} must be an http(s) link`);
+  return u.toString();
+}

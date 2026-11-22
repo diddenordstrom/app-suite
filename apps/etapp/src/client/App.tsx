@@ -2,10 +2,13 @@ import { Link, Route, Routes } from "react-router-dom";
 import { AppShell, Badge, DemoBanner, Logo, type NavItem } from "./ui";
 import { TripProvider, useMe, useTrip } from "./trip";
 import { ErrorNotice, SyncStatus, TripSwitcher } from "./components/common";
-import { DaysIcon, GearIcon, MapIcon, PackIcon } from "./components/icons";
+import { DaysIcon, GearIcon, IdeaIcon, MapIcon, PackIcon, PlusIcon } from "./components/icons";
+import { AddSheet } from "./components/AddSheet";
+import { openAdd } from "./addSheet";
 import { ErrorScreen, LoadingScreen, Welcome } from "./pages/Welcome";
 import { Join } from "./pages/Join";
 import { Days } from "./pages/Days";
+import { Ideas } from "./pages/Ideas";
 import { MapPage } from "./pages/MapPage";
 import { Pack } from "./pages/Pack";
 import { Settings } from "./pages/Settings";
@@ -14,6 +17,7 @@ import { api, clearCache } from "./api";
 
 const nav: NavItem[] = [
   { to: "/", label: t("nav.days"), icon: <DaysIcon /> },
+  { to: "/ideas", label: t("nav.ideas"), icon: <IdeaIcon /> },
   { to: "/map", label: t("nav.map"), icon: <MapIcon /> },
   { to: "/pack", label: t("nav.pack"), icon: <PackIcon /> },
   { to: "/settings", label: t("nav.settings"), icon: <GearIcon />, desktopOnly: true },
@@ -51,6 +55,7 @@ function Shell() {
       title="Etapp"
       logo={Logo}
       nav={nav}
+      action={{ label: t("shell.add"), icon: <PlusIcon />, onClick: () => openAdd(location.pathname === "/ideas" ? "idea" : "stop") }}
       header={<><SyncStatus /><TripSwitcher /><Link to="/settings" aria-label={t("nav.settings")} className="inline-flex size-9 items-center justify-center rounded-full text-muted-foreground hover:bg-accent md:hidden"><GearIcon /></Link></>}
       footer={
         <div className="space-y-1 text-xs text-muted-foreground">
@@ -65,11 +70,13 @@ function Shell() {
       <ErrorNotice />
       <Routes>
         <Route path="/" element={<Days />} />
+        <Route path="/ideas" element={<Ideas />} />
         <Route path="/map" element={<MapPage />} />
         <Route path="/pack" element={<Pack />} />
         <Route path="/settings" element={<Settings />} />
         <Route path="*" element={<Days />} />
       </Routes>
+      <AddSheet />
     </AppShell>
   );
 }

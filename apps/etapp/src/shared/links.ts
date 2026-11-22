@@ -93,3 +93,42 @@ export function weatherLink(plan: Plan, di: number): { kind: "yr" | "search"; ur
   if (!name) return null;
   return { kind: "search", url: `https://www.google.com/search?q=${encodeURIComponent(`väder ${name}${plan.area ? ` ${plan.area}` : ""}`)}` };
 }
+
+/**
+ * "Find around here" on a stop: sights and nature, not only services. Google Maps searches work by name or position;
+ * the others need a position and open the service's own map there. None needs an API key: they are plain links.
+ */
+export const DISCOVER = [
+  { key: "sights", query: "sevärdheter" },
+  { key: "viewpoints", query: "utsiktsplats" },
+  { key: "hikes" },
+  { key: "birds" },
+  { key: "food", query: "restaurang kafé" },
+  { key: "tent" },
+] as const;
+export type DiscoverKey = (typeof DISCOVER)[number]["key"];
+
+/** Links for a place; entries that need a position are left out when it has none. */
+export function discoverLinks(place: { lat?: number | null; lon?: number | null; name: string }, area: string): { key: DiscoverKey; url: string }[] {
+  const out: { key: DiscoverKey; url: string }[] = [];
+  const ll = hasCoords(place) ? { lat: place.lat!.toFixed(4), lon: place.lon!.toFixed(4) } : null;
+  for (const d of DISCOVER) {
+    if ("query" in d) out.push({ key: d.key, url: nearbyUrl(d.query, place, area, 12) });
+    else if (!ll) continue;
+    else if (d.key === "hikes") out.push({ key: d.key, url: `https://ut.no/kart#12/${ll.lat}/${ll.lon}` });
+    else if (d.key === "birds") out.push({ key: d.key, url: `https://ebird.org/hotspots?env.lat=${ll.lat}&env.lon=${ll.lon}&env.zoom=11` });
+    else if (d.key === "tent") out.push({ key: d.key, url: `https://park4night.com/en/search?lat=${ll.lat}&lng=${ll.lon}&z=12` });
+  }
+  return out;
+}
+
+/** Which service a saved inspiration link points at, for its icon and label. */
+export function linkSource(url: string): "youtube" | "reddit" | "instagram" | "maps" | "web" {
+  let host: string;
+  try { host = new URL(url).hostname.replace(/^www\./, ""); } catch { return "web"; }
+  if (host === "youtu.be" || host.endsWith("youtube.com")) return "youtube";
+  if (host.endsWith("reddit.com") || host === "redd.it") return "reddit";
+  if (host.endsWith("instagram.com")) return "instagram";
+  if (host.startsWith("maps.") || host === "goo.gl" || /google\.[a-z.]+$/.test(host) && url.includes("/maps")) return "maps";
+  return "web";
+}

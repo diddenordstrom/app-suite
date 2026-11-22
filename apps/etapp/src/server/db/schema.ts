@@ -52,22 +52,42 @@ export const days = sqliteTable("days", {
   sleepNote: text("sleep_note").notNull().default(""),
   /** Cover photo file name under the uploads dir, or null. */
   photo: text("photo"),
+  /** Driving time for the day in minutes, typed in from Google Maps; null when not given. */
+  driveMinutes: integer("drive_minutes"),
   createdAt: integer("created_at").notNull(),
 }, (t) => [index("days_trip_idx").on(t.tripId)]);
 
+/**
+ * A place on the trip. `kind` "stop" is somewhere you explore (todos, links, photo); "via" is a point that only steers
+ * the route. A stop with dayId null is an idea in the trip's idea bank, not yet on a day.
+ */
 export const stops = sqliteTable("stops", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   tripId: integer("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
-  dayId: integer("day_id").notNull().references(() => days.id, { onDelete: "cascade" }),
+  dayId: integer("day_id").references(() => days.id, { onDelete: "cascade" }),
   position: real("position").notNull(),
+  kind: text("kind", { enum: ["stop", "via"] }).notNull().default("stop"),
   name: text("name").notNull(),
   lat: real("lat"),
   lon: real("lon"),
   note: text("note").notNull().default(""),
   openFrom: integer("open_from"),
   openTo: integer("open_to"),
+  /** Photo file name under the uploads dir ("what the place looks like"), or null. */
+  photo: text("photo"),
   createdAt: integer("created_at").notNull(),
 }, (t) => [index("stops_day_idx").on(t.dayId), index("stops_trip_idx").on(t.tripId)]);
+
+/** Inspiration saved on a stop or idea: a video, thread or post, with a note of what to look for. */
+export const stopLinks = sqliteTable("stop_links", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  tripId: integer("trip_id").notNull().references(() => trips.id, { onDelete: "cascade" }),
+  stopId: integer("stop_id").notNull().references(() => stops.id, { onDelete: "cascade" }),
+  position: real("position").notNull(),
+  url: text("url").notNull(),
+  note: text("note").notNull().default(""),
+  createdAt: integer("created_at").notNull(),
+}, (t) => [index("stop_links_stop_idx").on(t.stopId), index("stop_links_trip_idx").on(t.tripId)]);
 
 export const todos = sqliteTable("todos", {
   id: integer("id").primaryKey({ autoIncrement: true }),

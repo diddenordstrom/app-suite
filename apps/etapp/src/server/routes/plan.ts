@@ -2,19 +2,23 @@
 import { Hono, type Context } from "hono";
 import { eq } from "drizzle-orm";
 import type { Db } from "../db";
-import { days, packItems, stops, todos, trips } from "../db/schema";
+import { days, packItems, stopLinks, stops, todos, trips } from "../db/schema";
 import type { EventBus } from "../events";
-import { badRequest, idParam, notFound, oneOf, optBool, optDate, optLatLon, optMonth, optText, readBody, str, type Body } from "../http";
+import { badRequest, httpUrl, idParam, int, notFound, oneOf, optBool, optDate, optLatLon, optMonth, optText, readBody, str, type Body } from "../http";
 import type { AppEnv } from "../viewer";
 import {
-  applyQuick, countDays, createDay, createPackItems, createStop, createTodo, dayOf, loadPlan, moveDay, moveStop, packOf, stopOf, todoOf,
+  applyQuick, countDays, createDay, createLink, createPackItems, createStop, createTodo, dayOf, linkOf, loadPlan, moveDay, moveStop, packOf,
+  setStopDay, stopOf, todoOf,
 } from "../planStore";
 import { PACK_GROUPS, STARTER_PACK } from "../../shared/packing";
-import { CATEGORIES, SLEEP_TYPES, START_MODES } from "../../shared/plan";
-import { parseQuick, summarize } from "../../shared/quick";
+import { CATEGORIES, SLEEP_TYPES, START_MODES, STOP_KINDS } from "../../shared/plan";
+import { parseQuick, parseTodo, summarize } from "../../shared/quick";
 import type { QuickResponse } from "../../shared/api";
 import type { PhotoStore } from "../photos";
 
+
+/** "fika Bakeriet, se kyrkan" → todos, as in quick entry. */
+const todoList = (b: Body) => (optText(b, "todos", 2000) ?? "").split(",").map((x) => x.trim()).filter(Boolean).slice(0, 50).map(parseTodo);
 
 const dir = (b: Body): -1 | 1 => {
   if (b.dir !== -1 && b.dir !== 1) throw badRequest("dir must be -1 or 1");
@@ -66,6 +70,7 @@ export function planRoutes(db: Db, bus: EventBus, photos: PhotoStore) {
     if (note !== undefined) set.sleepNote = note;
     const pos = optLatLon(b, "sleepLat", "sleepLon");
     if (pos) { set.sleepLat = pos.lat; set.sleepLon = pos.lon; }
+    if (b.driveMinutes !== undefined) set.driveMinutes = b.driveMinutes === null ? null : Math.min(int(b.driveMinutes, "driveMinutes"), 48 * 60);
     if (Object.keys(set).length) db.update(days).set(set).where(eq(days.id, d.id)).run();
     return ok(c);
   });
@@ -80,21 +85,33 @@ export function planRoutes(db: Db, bus: EventBus, photos: PhotoStore) {
   app.delete("/days/:id", (c) => {
     const d = day(c);
     const tid = c.get("tid");
+    const stopPhotos = db.select({ photo: stops.photo }).from(stops).where(eq(stops.dayId, d.id)).all();
     db.delete(days).where(eq(days.id, d.id)).run();
     photos.remove(d.photo);
+    for (const s of stopPhotos) photos.remove(s.photo);
     if (countDays(db, tid) === 0) createDay(db, tid);
     return ok(c);
   });
 
   // ---- stops ----
-  app.post("/days/:id/stops", async (c) => {
-    const d = day(c);
+  /** A new stop on a day or idea in the bank: name, kind, position, note, todos and a first link in one request. */
+  const addStop = async (c: Context<AppEnv>, dayId: number | null) => {
     const b = await readBody(c);
     const pos = optLatLon(b) ?? { lat: null, lon: null };
-    const row = createStop(db, c.get("tid"), d.id, { name: str(b, "name", 120), ...pos, note: optText(b, "note", 1000) ?? "" });
+    const kind = b.kind === undefined ? "stop" : oneOf(b.kind, "kind", STOP_KINDS);
+    const url = b.url === undefined || b.url === "" ? null : httpUrl(b, "url");
+    const tid = c.get("tid");
+    const row = db.transaction((tx) => {
+      const r = createStop(tx, tid, dayId, { name: str(b, "name", 120), kind, ...pos, note: optText(b, "note", 1000) ?? "" }, kind === "via" ? [] : todoList(b));
+      if (url) createLink(tx, tid, r.id, url);
+      return r;
+    });
     changed(c);
     return c.json({ id: row.id });
-  });
+  };
+
+  app.post("/days/:id/stops", (c) => addStop(c, day(c).id));
+  app.post("/ideas", (c) => addStop(c, null));
 
   app.patch("/stops/:id", async (c) => {
     const s = stop(c);
@@ -108,7 +125,18 @@ export function planRoutes(db: Db, bus: EventBus, photos: PhotoStore) {
     const from = optMonth(b, "openFrom"), to = optMonth(b, "openTo");
     if (from !== undefined) set.openFrom = from;
     if (to !== undefined) set.openTo = to;
-    if (Object.keys(set).length) db.update(stops).set(set).where(eq(stops.id, s.id)).run();
+    if (b.kind !== undefined) set.kind = oneOf(b.kind, "kind", STOP_KINDS);
+    let target: number | null | undefined;
+    if (b.dayId === null) target = null;
+    else if (b.dayId !== undefined) {
+      const d = typeof b.dayId === "number" ? dayOf(db, c.get("tid"), b.dayId) : undefined;
+      if (!d) throw notFound("day not found");
+      target = d.id;
+    }
+    db.transaction((tx) => {
+      if (Object.keys(set).length) tx.update(stops).set(set).where(eq(stops.id, s.id)).run();
+      if (target !== undefined && target !== s.dayId) setStopDay(tx, c.get("tid"), s.id, target);
+    });
     return ok(c);
   });
 
@@ -121,6 +149,35 @@ export function planRoutes(db: Db, bus: EventBus, photos: PhotoStore) {
   app.delete("/stops/:id", (c) => {
     const s = stop(c);
     db.delete(stops).where(eq(stops.id, s.id)).run();
+    photos.remove(s.photo);
+    return ok(c);
+  });
+
+  // ---- inspiration links ----
+  app.post("/stops/:id/links", async (c) => {
+    const s = stop(c);
+    const b = await readBody(c);
+    const row = createLink(db, c.get("tid"), s.id, httpUrl(b, "url"), optText(b, "note", 300) ?? "");
+    changed(c);
+    return c.json({ id: row.id });
+  });
+
+  app.patch("/links/:id", async (c) => {
+    const l = linkOf(db, c.get("tid"), idParam(c, "id"));
+    if (!l) throw notFound("link not found");
+    const b = await readBody(c);
+    const set: Partial<typeof stopLinks.$inferInsert> = {};
+    if (b.url !== undefined) set.url = httpUrl(b, "url");
+    const note = optText(b, "note", 300);
+    if (note !== undefined) set.note = note;
+    if (Object.keys(set).length) db.update(stopLinks).set(set).where(eq(stopLinks.id, l.id)).run();
+    return ok(c);
+  });
+
+  app.delete("/links/:id", (c) => {
+    const l = linkOf(db, c.get("tid"), idParam(c, "id"));
+    if (!l) throw notFound("link not found");
+    db.delete(stopLinks).where(eq(stopLinks.id, l.id)).run();
     return ok(c);
   });
 

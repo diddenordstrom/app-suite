@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseQuick, parseTodo, summarize } from "./quick";
+import { parsePlace, parseQuick, parseTodo, summarize } from "./quick";
 
 describe("parseTodo", () => {
   it("a leading category word picks the category and is dropped", () => {
@@ -21,8 +21,8 @@ describe("parseQuick", () => {
     const r = parseQuick("Huskvarna, fika Kroatorpet, handla ICA\nGränna, se polkagrisbutiken\nnatt tält Vättern");
     expect(r.warnings).toEqual([]);
     expect(r.commands).toEqual([
-      { kind: "stop", name: "Huskvarna", lat: null, lon: null, todos: [{ text: "Kroatorpet", category: "fika" }, { text: "Handla ICA", category: "fixa" }] },
-      { kind: "stop", name: "Gränna", lat: null, lon: null, todos: [{ text: "Polkagrisbutiken", category: "se" }] },
+      { kind: "stop", stopKind: "stop", name: "Huskvarna", lat: null, lon: null, todos: [{ text: "Kroatorpet", category: "fika" }, { text: "Handla ICA", category: "fixa" }] },
+      { kind: "stop", stopKind: "stop", name: "Gränna", lat: null, lon: null, todos: [{ text: "Polkagrisbutiken", category: "se" }] },
       { kind: "night", sleepType: "tent", name: "Vättern", lat: null, lon: null },
     ]);
   });
@@ -31,13 +31,13 @@ describe("parseQuick", () => {
     const r = parseQuick("dag Gudbrandsdalen\nstopp lom stavkyrkje");
     expect(r.commands).toEqual([
       { kind: "day", title: "Gudbrandsdalen" },
-      { kind: "stop", name: "Lom stavkyrkje", lat: null, lon: null, todos: [] },
+      { kind: "stop", stopKind: "stop", name: "Lom stavkyrkje", lat: null, lon: null, todos: [] },
     ]);
   });
 
   it("takes coordinates off a line before splitting on commas", () => {
     const r = parseQuick("Pollfossen 61.9056, 7.9583, se fallet");
-    expect(r.commands[0]).toEqual({ kind: "stop", name: "Pollfossen", lat: 61.9056, lon: 7.9583, todos: [{ text: "Fallet", category: "se" }] });
+    expect(r.commands[0]).toEqual({ kind: "stop", stopKind: "stop", name: "Pollfossen", lat: 61.9056, lon: 7.9583, todos: [{ text: "Fallet", category: "se" }] });
   });
 
   it("reads a long Google Maps link", () => {
@@ -69,6 +69,18 @@ describe("parseQuick", () => {
   });
 
   it("summarizes what a paste adds", () => {
-    expect(summarize(parseQuick("dag A\nX, fika, mat\nY\nnatt Z"))).toEqual({ days: 1, stops: 2, todos: 2, nights: 1 });
+    expect(summarize(parseQuick("dag A\nX, fika, mat\nY\nnatt Z"))).toEqual({ days: 1, stops: 2, vias: 0, todos: 2, nights: 1 });
+  });
+});
+
+describe("via lines and parsePlace", () => {
+  it("makes a via from a 'via' line, with a position when given", () => {
+    expect(parseQuick("via Kongsvinger 60.1903, 11.9977").commands[0]).toEqual({ kind: "stop", stopKind: "via", name: "Kongsvinger", lat: 60.1903, lon: 11.9977, todos: [] });
+  });
+
+  it("reads a name and an optional position from one field", () => {
+    expect(parsePlace("lom stavkyrkje, 61.8381, 8.5672")).toEqual({ name: "Lom stavkyrkje", lat: 61.8381, lon: 8.5672, warning: null });
+    expect(parsePlace("Pollfossen")).toEqual({ name: "Pollfossen", lat: null, lon: null, warning: null });
+    expect(parsePlace("https://maps.app.goo.gl/abc").warning).toBe("shortLink");
   });
 });

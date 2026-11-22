@@ -1,12 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { alongTheWay, dayRouteUrl, directionsUrl, legUrl, nearbyUrl, placeSearchUrl, tripRouteUrl, weatherLink } from "./links";
+import { alongTheWay, dayRouteUrl, discoverLinks, linkSource, directionsUrl, legUrl, nearbyUrl, placeSearchUrl, tripRouteUrl, weatherLink } from "./links";
 import { dayPoints, type Day, type Home, type Plan, type Stop } from "./plan";
 
 let nextId = 1;
 const stop = (name: string, lat: number | null = null, lon: number | null = null): Stop =>
-  ({ id: nextId++, name, lat, lon, note: "", openFrom: null, openTo: null, todos: [] });
+  ({ id: nextId++, kind: "stop", name, lat, lon, note: "", openFrom: null, openTo: null, todos: [], links: [], photoUrl: null });
 const day = (stops: Stop[], sleep: Partial<Day["sleep"]> = {}): Day =>
-  ({ id: nextId++, title: "", stops, sleep: { type: "tent", name: "", lat: null, lon: null, note: "", ...sleep } });
+  ({ id: nextId++, title: "", driveMinutes: null, stops, sleep: { type: "tent", name: "", lat: null, lon: null, note: "", ...sleep } });
 const plan = (days: Day[], p: Partial<Plan> = {}): Plan =>
   ({ area: "Norge", startMode: "home", startText: "", startDate: null, days, ...p });
 const home: Home = { label: "Jönköping", lat: 57.7826, lon: 14.1618 };
@@ -84,5 +84,23 @@ describe("weatherLink", () => {
   it("searches by name without positions, nothing for an empty day", () => {
     expect(weatherLink(plan([day([stop("Lom")])]), 0)).toEqual({ kind: "search", url: "https://www.google.com/search?q=v%C3%A4der%20Lom%20Norge" });
     expect(weatherLink(plan([day([])]), 0)).toBeNull();
+  });
+});
+
+describe("discover and link sources", () => {
+  it("offers Google searches by name and the map services only with a position", () => {
+    expect(discoverLinks({ name: "Lom" }, "Norge").map((l) => l.key)).toEqual(["sights", "viewpoints", "food"]);
+    const all = discoverLinks({ name: "Lom", lat: 61.8381, lon: 8.5672 }, "Norge");
+    expect(all.map((l) => l.key)).toEqual(["sights", "viewpoints", "hikes", "birds", "food", "tent"]);
+    expect(all.find((l) => l.key === "birds")!.url).toContain("61.8381");
+  });
+
+  it("recognises where an inspiration link points", () => {
+    expect(linkSource("https://youtu.be/abc")).toBe("youtube");
+    expect(linkSource("https://www.youtube.com/watch?v=1")).toBe("youtube");
+    expect(linkSource("https://old.reddit.com/r/Norway")).toBe("reddit");
+    expect(linkSource("https://www.instagram.com/p/x")).toBe("instagram");
+    expect(linkSource("https://example.com")).toBe("web");
+    expect(linkSource("not a url")).toBe("web");
   });
 });

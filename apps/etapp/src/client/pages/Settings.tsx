@@ -1,7 +1,7 @@
 import { useState, type FormEvent, type ReactNode } from "react";
 import type { Member, PlanResponse, UpdateMeBody, UpdatePlanBody, UpdateTripBody } from "@/shared/api";
 import { formatLatLon } from "@/shared/geo";
-import { readPosition } from "../components/StopItem";
+import { readPosition } from "../components/bits";
 import { usePlan } from "../plan";
 import { api, clearCache } from "../api";
 import { useAction } from "../hooks";

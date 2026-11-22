@@ -1,14 +1,14 @@
 import { describe, expect, it } from "vitest";
 import {
-  closedMonth, dayDate, dayPoints, dayStart, dayStats, firstStopNumber, placeQuery, sleepPoint, startPoint, todayIndex, tripStats,
+  closedMonth, dayDate, formatDuration, parseDuration, stopNumbers, dayPoints, dayStart, dayStats, firstStopNumber, placeQuery, sleepPoint, startPoint, todayIndex, tripStats,
   type Day, type Home, type Plan, type Stop,
 } from "./plan";
 
 let nextId = 1;
 const stop = (name: string, lat: number | null = null, lon: number | null = null, extra: Partial<Stop> = {}): Stop =>
-  ({ id: nextId++, name, lat, lon, note: "", openFrom: null, openTo: null, todos: [], ...extra });
+  ({ id: nextId++, kind: "stop", name, lat, lon, note: "", openFrom: null, openTo: null, todos: [], links: [], photoUrl: null, ...extra });
 const day = (stops: Stop[], sleep: Partial<Day["sleep"]> = {}): Day =>
-  ({ id: nextId++, title: "", stops, sleep: { type: "tent", name: "", lat: null, lon: null, note: "", ...sleep } });
+  ({ id: nextId++, title: "", driveMinutes: null, stops, sleep: { type: "tent", name: "", lat: null, lon: null, note: "", ...sleep } });
 const plan = (days: Day[], p: Partial<Plan> = {}): Plan =>
   ({ area: "Norge", startMode: "home", startText: "", startDate: null, days, ...p });
 const home: Home = { label: "Jönköping", lat: 57.7826, lon: 14.1618 };
@@ -117,5 +117,27 @@ describe("closedMonth", () => {
   it("never warns without a season or a date", () => {
     expect(closedMonth({ openFrom: null, openTo: null }, new Date())).toBeNull();
     expect(closedMonth(strynefjell, null)).toBeNull();
+  });
+});
+
+describe("vias and drive time", () => {
+  it("numbers only real stops, through the whole trip", () => {
+    const p = plan([day([stop("A"), stop("v", null, null, { kind: "via" }), stop("B")]), day([stop("w", null, null, { kind: "via" }), stop("C")])]);
+    expect(stopNumbers(p, 0)).toEqual([1, null, 2]);
+    expect(stopNumbers(p, 1)).toEqual([null, 3]);
+    expect(firstStopNumber(p, 1)).toBe(3);
+    expect(tripStats(p, null).stops).toBe(3);
+  });
+
+  it("reads drive times the way Google Maps and people write them", () => {
+    expect(parseDuration("10:20")).toBe(620);
+    expect(parseDuration("10 tim 20 min")).toBe(620);
+    expect(parseDuration("10h")).toBe(600);
+    expect(parseDuration("45 min")).toBe(45);
+    expect(parseDuration("90")).toBe(90);
+    expect(parseDuration("")).toBeNull();
+    expect(parseDuration("långt")).toBeUndefined();
+    expect(formatDuration(620)).toBe("10:20");
+    expect(formatDuration(null)).toBe("");
   });
 });

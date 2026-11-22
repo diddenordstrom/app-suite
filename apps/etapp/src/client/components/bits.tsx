@@ -1,7 +1,8 @@
 /** Small planner building blocks: the brown road-sign number, link/toggle chips, the category tag. */
-import type { ReactNode } from "react";
+import { useState, type ComponentProps, type ReactNode } from "react";
+import { parseLatLon } from "@/shared/geo";
 import type { Category } from "@/shared/plan";
-import { cn } from "../ui";
+import { cn, Input } from "../ui";
 import { t } from "../i18n";
 
 /** Brown Norwegian tourist-road sign with a light inner rule: the one place Etapp leaves the suite palette. */
@@ -55,4 +56,31 @@ export function CategoryTag({ category }: { category: Category }) {
 /** Small uppercase label above a group. */
 export function Eyebrow({ children, className }: { children: ReactNode; className?: string }) {
   return <p className={cn("text-xs font-semibold uppercase tracking-wider text-muted-foreground", className)}>{children}</p>;
+}
+
+/** "61.8, 8.5" → position, "" → none, anything else → error. */
+export function readPosition(text: string): { lat: number | null; lon: number | null } | "invalid" {
+  if (!text.trim()) return { lat: null, lon: null };
+  return parseLatLon(text) ?? "invalid";
+}
+
+/**
+ * A text field that saves itself: on blur (or Enter) when the value changed. No Save button. When another traveller
+ * changes the value on the server, the field follows it unless you are typing in it.
+ */
+export function AutoInput({ value, onSave, className, ...p }: { value: string; onSave: (v: string) => void } & Omit<ComponentProps<"input">, "value" | "onChange">) {
+  const [v, setV] = useState(value);
+  const [seen, setSeen] = useState(value);
+  const [focused, setFocused] = useState(false);
+  if (value !== seen && !focused) { setSeen(value); setV(value); }
+  const commit = () => { if (v.trim() !== value) onSave(v.trim()); };
+  return (
+    <Input
+      {...p} className={className} value={v}
+      onChange={(e) => setV(e.target.value)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => { setFocused(false); commit(); }}
+      onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); (e.target as HTMLInputElement).blur(); } }}
+    />
+  );
 }

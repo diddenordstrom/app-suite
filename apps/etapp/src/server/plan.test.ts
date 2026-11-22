@@ -149,7 +149,7 @@ describe("plan api", () => {
       dayId: d1,
       text: "Huskvarna, fika Kroatorpet, handla ICA\nnatt tält Vättern\ndag Lom\nLom stavkyrkje 61.8395, 8.5658\nStryn https://maps.app.goo.gl/abc",
     });
-    expect(r.added).toEqual({ days: 1, stops: 3, todos: 2, nights: 1 });
+    expect(r.added).toEqual({ days: 1, stops: 3, vias: 0, todos: 2, nights: 1 });
     expect(r.warnings).toEqual([{ line: 5, code: "shortLink" }]);
     const p = await plan();
     expect(r.dayId).toBe(p.days[1].id);
@@ -214,6 +214,72 @@ describe("plan api", () => {
     expect(buf).toContain(JSON.stringify({ scope: ["plan"] }));
     ac.abort();
     await reader.cancel();
+  });
+});
+
+describe("vias, ideas, links and drive time", () => {
+  let app: App;
+  beforeAll(() => { app = createApp(createDb(":memory:"), config); });
+
+  async function newTrip() {
+    const admin = client(app);
+    const { id: tid } = await admin.post<{ id: number }>("/trips", { name: "Norge" });
+    const plan = () => admin.get<PlanResponse>(`/t/${tid}/plan`);
+    const p = await plan();
+    return { admin, tid, plan, base: `/t/${tid}`, dayId: p.days[0].id };
+  }
+
+  it("creates a stop with todos and a link in one request, and a via without todos", async () => {
+    const { admin, base, plan, dayId } = await newTrip();
+    await admin.post(`${base}/days/${dayId}/stops`, { name: "Hamar", kind: "via", todos: "fika X" });
+    await admin.post(`${base}/days/${dayId}/stops`, { name: "Lom", todos: "fika Bakeriet, se kyrkan", url: "https://youtu.be/abc" });
+    const [via, lom] = (await plan()).days[0].stops;
+    expect(via).toMatchObject({ kind: "via", name: "Hamar", todos: [] });
+    expect(lom).toMatchObject({ kind: "stop", todos: [{ text: "Bakeriet", category: "fika" }, { text: "Kyrkan", category: "se" }], links: [{ url: "https://youtu.be/abc", note: "" }] });
+  });
+
+  it("refuses links that are not http(s)", async () => {
+    const { admin, base, dayId } = await newTrip();
+    const { id } = await admin.post<{ id: number }>(`${base}/days/${dayId}/stops`, { name: "Lom" });
+    await admin.post(`${base}/stops/${id}/links`, { url: "javascript:alert(1)" }, 400);
+    await admin.post(`${base}/ideas`, { name: "X", url: "data:text/html,hi" }, 400);
+  });
+
+  it("moves stops between a day and the idea bank", async () => {
+    const { admin, base, plan, dayId } = await newTrip();
+    const { id } = await admin.post<{ id: number }>(`${base}/ideas`, { name: "Trollstigen", url: "https://www.reddit.com/r/Norway" });
+    let p = await plan();
+    expect(p.ideas.map((s) => s.name)).toEqual(["Trollstigen"]);
+    expect(p.days[0].stops).toEqual([]);
+    await admin.patch(`${base}/stops/${id}`, { dayId });
+    p = await plan();
+    expect(p.ideas).toEqual([]);
+    expect(p.days[0].stops[0]).toMatchObject({ name: "Trollstigen", links: [{ url: "https://www.reddit.com/r/Norway" }] });
+    await admin.patch(`${base}/stops/${id}`, { dayId: null, kind: "via" });
+    p = await plan();
+    expect(p.ideas[0]).toMatchObject({ name: "Trollstigen", kind: "via" });
+    await admin.patch(`${base}/stops/${id}`, { dayId: 999_999 }, 404);
+  });
+
+  it("edits and deletes links, and saves the day's drive time", async () => {
+    const { admin, base, plan, dayId } = await newTrip();
+    const { id: stopId } = await admin.post<{ id: number }>(`${base}/days/${dayId}/stops`, { name: "Lom" });
+    const { id } = await admin.post<{ id: number }>(`${base}/stops/${stopId}/links`, { url: "https://youtu.be/x", note: "utsikten vid 4:30" });
+    await admin.patch(`${base}/links/${id}`, { note: "vid 5:00" });
+    expect((await plan()).days[0].stops[0].links).toEqual([{ id, url: "https://youtu.be/x", note: "vid 5:00" }]);
+    await admin.del(`${base}/links/${id}`);
+    expect((await plan()).days[0].stops[0].links).toEqual([]);
+    await admin.patch(`${base}/days/${dayId}`, { driveMinutes: 620 });
+    expect((await plan()).days[0].driveMinutes).toBe(620);
+    await admin.patch(`${base}/days/${dayId}`, { driveMinutes: null });
+    expect((await plan()).days[0].driveMinutes).toBeNull();
+  });
+
+  it("quick entry understands via lines", async () => {
+    const { admin, base, plan, dayId } = await newTrip();
+    const r = await admin.post<QuickResponse>(`${base}/quick`, { dayId, text: "via Karlstad\nLom, fika Bakeriet" });
+    expect(r.added).toMatchObject({ stops: 1, vias: 1 });
+    expect((await plan()).days[0].stops.map((s) => [s.kind, s.name])).toEqual([["via", "Karlstad"], ["stop", "Lom"]]);
   });
 });
 

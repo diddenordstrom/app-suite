@@ -20,3 +20,6 @@ export const GearIcon = (p: P) => <Icon {...p}><circle cx="12" cy="12" r="3" /><
 export const CheckIcon = (p: P) => <Icon {...p}><path d="M5 12l5 5L20 7" /></Icon>;
 export const CopyIcon = (p: P) => <Icon {...p}><rect x="9" y="9" width="12" height="12" rx="2" /><path d="M5 15H4a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1h10a1 1 0 0 1 1 1v1" /></Icon>;
 export const CloudOffIcon = (p: P) => <Icon {...p}><path d="M3 3l18 18M8 6.3A6 6 0 0 1 17.7 10H18a4 4 0 0 1 2.2 7.3M17 18H7a5 5 0 0 1-1.8-9.7" /></Icon>;
+/** A light bulb: the idea bank. */
+export const IdeaIcon = (p: P) => <Icon {...p}><path d="M9 18h6M10 21h4" /><path d="M12 3a6 6 0 0 0-4 10.5c.8.8 1 1.5 1 2.5h6c0-1 .2-1.7 1-2.5A6 6 0 0 0 12 3z" /></Icon>;
+export const PlusIcon = (p: P) => <Icon {...p}><path d="M12 5v14M5 12h14" /></Icon>;
