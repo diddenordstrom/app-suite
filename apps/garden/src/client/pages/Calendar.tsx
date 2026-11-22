@@ -157,7 +157,7 @@ export function Calendar() {
         ))}
       </div>
 
-      <div data-testid="filter-bar" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-border bg-card px-4 py-2 text-sm">
+      <div data-testid="filter-bar" className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-card-edge bg-card shadow-card px-4 py-2 text-sm">
         <div className="inline-flex items-center gap-2">
           <span className="text-muted-foreground">{t("calendar.filters.type")}</span>
           <Select data-testid="filter-type" triggerClassName="h-8 min-w-32 px-2" value={filterType} aria-label={t("calendar.filters.type")}

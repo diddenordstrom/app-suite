@@ -192,7 +192,7 @@ export function Dashboard() {
           [data.locations.length, t("dashboard.summary.locations")],
           [storageKg, t("dashboard.summary.storageKg")],
         ].map(([n, label]) => (
-          <div key={String(label)} className="flex min-w-[120px] flex-1 items-center gap-2 rounded-lg border border-border bg-card px-4 py-3">
+          <div key={String(label)} className="flex min-w-[120px] flex-1 items-center gap-2 rounded-lg border border-card-edge bg-card shadow-card px-4 py-3">
             <span className="text-2xl font-bold tracking-tight tabular-nums">{n}</span>
             <span className="text-sm text-muted-foreground">{label}</span>
           </div>

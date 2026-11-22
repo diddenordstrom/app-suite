@@ -208,7 +208,7 @@ function RowMenu({ n, first, last, onMove, onDuplicate, onRemove }: { n: number;
         <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><circle cx="12" cy="5" r="1.6" /><circle cx="12" cy="12" r="1.6" /><circle cx="12" cy="19" r="1.6" /></svg>
       </button>
       {open && (
-        <div role="menu" className="absolute right-0 top-[calc(100%+4px)] z-30 w-44 rounded-lg border border-border bg-card p-1 shadow-lg">
+        <div role="menu" className="absolute right-0 top-[calc(100%+4px)] z-30 w-44 rounded-lg border border-card-edge bg-card shadow-card p-1 shadow-lg">
           {item(t("builder.up"), () => onMove(-1), first)}
           {item(t("builder.down"), () => onMove(1), last)}
           {item(t("builder.duplicate"), onDuplicate)}

@@ -48,7 +48,7 @@ export function History() {
       ) : groups.map((g) => (
         <section key={g.label} className="space-y-2">
           <h2 className="text-xs font-semibold text-muted-foreground uppercase">{g.label}</h2>
-          <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+          <ul className="divide-y divide-border rounded-lg border border-card-edge bg-card shadow-card">
             {g.items.map((a) => <Row key={`${a.kind}-${idOf(a)}`} a={a} onOpen={() => setOpen({ mode: "activity", a })} />)}
           </ul>
         </section>

@@ -67,7 +67,7 @@ function RouteSvg({ seq, onPick }: { seq: Pt[]; onPick: (target: string) => void
   const line = seq.map((p) => `${X(p.lon).toFixed(1)},${Y(p.lat).toFixed(1)}`).join(" ");
 
   return (
-    <div className="overflow-x-auto rounded-lg border border-border bg-card">
+    <div className="overflow-x-auto rounded-lg border border-card-edge bg-card shadow-card">
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={t("map.title")} className="block h-auto w-full min-w-80">
         {lats.map((a) => (
           <g key={`la${a}`}>

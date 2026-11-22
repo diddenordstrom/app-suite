@@ -55,7 +55,7 @@ export function GiftLog() {
               <h2 className="text-sm font-semibold">{monthTitle(ym)}</h2>
               <span className="text-xs text-muted-foreground">{tn("treats", rows.length)}</span>
             </div>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-lg border border-card-edge bg-card shadow-card">
               {rows.map((g) => <GiftRow key={g.id} g={g} />)}
             </ul>
           </section>

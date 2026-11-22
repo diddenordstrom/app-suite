@@ -57,7 +57,7 @@ function BalancesTab() {
 
           <section className="space-y-2">
             <h2 className="text-sm font-semibold">{t("balances.netsTitle")}</h2>
-            <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+            <ul className="divide-y divide-border rounded-lg border border-card-edge bg-card shadow-card">
               {[...data.totals].sort((a, b) => h.walletName(a.memberId).localeCompare(h.walletName(b.memberId), locale)).map((m) => {
                 const outside = data.plan.outside.includes(m.memberId);
                 return (
@@ -76,7 +76,7 @@ function BalancesTab() {
           {!data.plan.inside && (
             <section className="space-y-2">
               <h2 className="text-sm font-semibold">{t("balances.paymentsTitle")}</h2>
-              <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+              <ul className="divide-y divide-border rounded-lg border border-card-edge bg-card shadow-card">
                 {data.plan.payments.map((p) => (
                   <li key={`${p.from}:${p.to}`} className="flex items-center gap-3 px-4 py-3">
                     <span className="min-w-0 flex-1 text-sm">
@@ -97,7 +97,7 @@ function BalancesTab() {
           )}
 
           {data.pairs.length > 0 && (
-            <details className="rounded-lg border border-border bg-card">
+            <details className="rounded-lg border border-card-edge bg-card shadow-card">
               <summary className="cursor-pointer px-4 py-3 text-sm font-medium">{t("balances.allDebts")}</summary>
               <ul className="divide-y divide-border border-t border-border">
                 {[...data.pairs].sort((a, b) => Number(involves(b)) - Number(involves(a))).map((p) => (

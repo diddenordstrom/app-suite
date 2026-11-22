@@ -5,10 +5,10 @@ import { cn } from "./cn";
 
 export type Variant = "primary" | "outline" | "ghost" | "danger";
 const variants: Record<Variant, string> = {
-  primary: "bg-primary text-primary-foreground hover:opacity-90",
-  outline: "border border-border bg-background hover:bg-accent",
+  primary: "bg-primary text-primary-foreground shadow-primary hover:opacity-90",
+  outline: "border border-card-edge bg-control shadow-control hover:bg-accent",
   ghost: "hover:bg-accent",
-  danger: "bg-danger text-white hover:opacity-90",
+  danger: "bg-danger text-white shadow-control hover:opacity-90",
 };
 
 export function Button({ variant = "primary", className, ...p }: ButtonHTMLAttributes<HTMLButtonElement> & { variant?: Variant }) {
@@ -21,7 +21,8 @@ export function Button({ variant = "primary", className, ...p }: ButtonHTMLAttri
 }
 
 export function Card({ className, ...p }: HTMLAttributes<HTMLDivElement>) {
-  return <div className={cn("rounded-lg border border-border bg-card p-4", className)} {...p} />;
+  // A clickable card lifts on hover, so the shadow hints that it can be pressed.
+  return <div className={cn("rounded-lg border border-card-edge bg-card p-4 shadow-card", p.onClick && "cursor-pointer transition-shadow hover:shadow-card-hover", className)} {...p} />;
 }
 
 export function Input({ className, ...p }: ComponentProps<"input">) {

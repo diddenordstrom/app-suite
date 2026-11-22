@@ -8,7 +8,7 @@ import { ConfirmDialog } from "../dialogs";
 
 /** Bottom centre on phones, top left on larger screens; the toolbar and the pending actions share the spot. */
 const slot = "absolute bottom-4 left-1/2 z-20 -translate-x-1/2 md:bottom-auto md:left-4 md:top-4 md:translate-x-0";
-const bar = "flex gap-1 rounded-lg border border-border bg-card p-1 shadow-lg";
+const bar = "flex gap-1 rounded-lg border border-card-edge bg-card shadow-card p-1 shadow-lg";
 const pill = (on: boolean) => cn("h-8 px-3", !on && "bg-transparent text-foreground hover:bg-accent");
 
 export const MODES: { value: GardenMode; key: MsgKey }[] = [

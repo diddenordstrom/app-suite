@@ -29,6 +29,19 @@
   --color-chart-4: var(--chart-4);
   --color-chart-5: var(--chart-5);
   --color-overlay: var(--overlay);
+  --color-card-edge: var(--card-edge);
+  --color-control: var(--control);
+  /* Skymning's depth steps (skymning.css). Tailwind's own shadow-sm/md/lg/xl map onto them, so
+     menus, toasts and popovers written with those get the suite's shadows too. */
+  --shadow-card: var(--shadow-card);
+  --shadow-card-hover: var(--shadow-card-hover);
+  --shadow-control: var(--shadow-control);
+  --shadow-primary: var(--shadow-primary);
+  --shadow-pop: var(--shadow-pop);
+  --shadow-sm: var(--shadow-control);
+  --shadow-md: var(--shadow-pop);
+  --shadow-lg: var(--shadow-pop);
+  --shadow-xl: var(--shadow-pop);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
   --font-sans: var(--font-sans);

@@ -466,7 +466,7 @@ function Stats({ seed, ev }: { seed: WeekSeed; ev: WeekEval }) {
   return (
     <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
       {tiles.map((x) => (
-        <div key={x.label} className="space-y-0.5 rounded-lg border border-border bg-card p-3">
+        <div key={x.label} className="space-y-0.5 rounded-lg border border-card-edge bg-card shadow-card p-3">
           <div className="text-xs text-muted-foreground">{x.label}</div>
           <div className="flex flex-wrap items-baseline gap-2">
             <span className="text-xl font-semibold tabular-nums">{x.value}</span>
@@ -507,7 +507,7 @@ function Charts({ seed, ev }: { seed: WeekSeed; ev: WeekEval }) {
   const cap = growthBase(seed.kmBefore).base * COACH.weekGrowth;
   const fit = weeks.map((w) => w.ctl), fat = weeks.map((w) => w.atl), form = weeks.map((w) => formPct(w.ctl - w.atl, w.ctl));
   const last = n - 1;
-  const card = "space-y-1 rounded-lg border border-border bg-card p-3";
+  const card = "space-y-1 rounded-lg border border-card-edge bg-card shadow-card p-3";
   return (
     <div className="grid gap-2 md:grid-cols-3">
       <figure className={card}>

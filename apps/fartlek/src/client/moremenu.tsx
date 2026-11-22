@@ -22,7 +22,7 @@ export function MoreMenu({ items, className }: { items: { label: string; to?: st
         <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" /></svg>
       </Button>
       {open && (
-        <div role="menu" className="absolute right-0 top-10 z-30 w-60 rounded-lg border border-border bg-card p-1 shadow-lg">
+        <div role="menu" className="absolute right-0 top-10 z-30 w-60 rounded-lg border border-card-edge bg-card shadow-card p-1 shadow-lg">
           {items.map((it) => it.to
             ? <Link key={it.label} role="menuitem" to={it.to} className={cls} onClick={() => setOpen(false)}>{it.label}</Link>
             : <button key={it.label} type="button" role="menuitem" className={cls} onClick={() => { setOpen(false); it.onClick?.(); }}>{it.label}</button>)}

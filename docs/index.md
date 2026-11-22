@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-22 · decision · Skymning depth: soft cards and controls ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-20 · decision · Fartlek: one engine and one way of training for every goal ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek Mål till plan: Garmin required, phases first, beside Skapa block ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · note · Fartlek: Mål till plan planned, morning notification scale on the roadmap ([log/2026-11.md](log/2026-11.md))
-- 2026-11-20 · decision · Fartlek: morning notification with today's session and form ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -64,6 +64,7 @@
 - [Portfolio is a static app in the suite](decisions/portfolio-app.md): apps/portfolio presents the apps and links to <app>.didrik.dev and blog.didrik.dev; it shows the apps, not the source _(decision · accepted · 2026-11-20)_
 - [Test the release, not only the code, before it reaches main](decisions/release-testing.md): Proposed CI gates now that Dependabot merges weekly and the apps have real users - image smoke test on PRs, checked deploys, E2E smoke per app, migrations against old data _(decision · open · 2026-11-11)_
 - [runplan plans in training blocks](decisions/runplan-training-blocks.md): Blocks replace phases; the plan is written, edited as text and judged per block; races are reminders with taper suggestions _(decision · accepted · 2026-11-09)_
+- [Skymning depth: soft cards and controls, big shadow only for floating things](decisions/skymning-depth.md): The three shadow steps every app shares, why cards stay soft, and how dark mode gets depth _(decision · accepted · 2026-11-22)_
 - [Web Push is shared: server-kit sends, packages/ui subscribes](decisions/web-push.md): How every app can send notifications to the installed PWA (iOS home screen included): VAPID keys made on first use, one subscription per device, the app decides what and when _(decision · accepted · 2026-11-20)_
 - [What's new popup and "Show me" tours](decisions/whats-new.md): A short Swedish note shown once after a release that changes how an app is used, with an optional spotlight tour behind "Visa mig"; stored like tours, shared by all apps _(decision · accepted · 2026-11-11)_
 

@@ -178,7 +178,7 @@ export function Finances() {
           {filtered.length > 0 ? (
             <ul data-testid="expense-list" className="space-y-2">
               {filtered.map((x) => (
-                <li key={x.id} data-testid="expense-item" className="flex items-center gap-3 rounded-lg border border-border bg-card px-4 py-3">
+                <li key={x.id} data-testid="expense-item" className="flex items-center gap-3 rounded-lg border border-card-edge bg-card shadow-card px-4 py-3">
                   <span className="w-24 shrink-0 text-xs tabular-nums text-muted-foreground">{x.date}</span>
                   <span className="flex-1 truncate text-sm">{x.name}</span>
                   <div className="flex shrink-0 items-center gap-1.5">
