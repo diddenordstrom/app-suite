@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek: one engine and one way of training for every goal ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-20 · note · Fartlek: Mål till plan planned, morning notification scale on the roadmap ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek: morning notification with today's session and form ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Web Push shared by every app ([log/2026-11.md](log/2026-11.md))
-- 2026-11-18 · decision · Fartlek: no gym content suggestions; threshold avoids the day after gym ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -21,6 +21,7 @@
 - [Porting Autarki (garden) to the suite stack](decisions/autarki-port.md): Autarki moves from Nuxt/Vue/Nitro to Hono + server-kit + React in three steps, server first, without keeping any data _(decision · accepted · 2026-11-12)_
 - [How Fartlek charts are laid out](decisions/chart-layout.md): One y-axis per chart; stacked panels for a single activity's curves; a pill switch for related trends; no dual axes _(decision · accepted · 2026-11-14)_
 - [CI always audits production dependencies](decisions/ci-audit-gate.md): The audit job runs on every push and PR, independent of what changed, with the same gate as the garden repo _(decision · accepted · 2026-11-09)_
+- [CI starts every app's image on pull requests](decisions/ci-image-smoke.md): A smoke job builds each image and waits for /api/health, because tests run the source and never the production bundle _(decision · accepted · 2026-11-22)_
 - [Demo mode with a throwaway database per visitor](decisions/demo-mode.md): Portfolio visitors without an account try runplan, shopsplit and Etapp through /demo, each in their own capped, short-lived SQLite file _(decision · accepted · 2026-11-10)_
 - [Komodo deploys the stack from git; Traefik and a wildcard tunnel route the hostnames](decisions/deploy-komodo.md): Why a new app is now only a pull request (no ssh, no Cloudflare change), what replaced watchtower, and where secrets live _(decision · accepted · 2026-11-11)_
 - [The wiki lives in docs/ of the monorepo](decisions/docs-wiki-in-monorepo.md): Why notes and decisions are kept in this repo, how index and log work, and when to split them out _(decision · accepted · 2026-11-09)_

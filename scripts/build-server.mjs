@@ -4,8 +4,17 @@
 import { build } from "esbuild";
 import fs from "node:fs";
 
-const pkg = JSON.parse(fs.readFileSync("package.json", "utf8"));
-const external = Object.keys(pkg.dependencies ?? {})
+// The bundled workspace packages import npm packages of their own (server-kit pulls in web-push, for
+// one). Those are external too, or esbuild inlines them and their CommonJS code (debug's
+// require("tty")) crashes the ESM bundle at start. The image has them in node_modules.
+const readJson = (file) => JSON.parse(fs.readFileSync(file, "utf8"));
+const manifests = [
+  readJson("package.json"),
+  ...fs.readdirSync("../../packages").map((d) => readJson(`../../packages/${d}/package.json`)),
+];
+const external = [
+  ...new Set(manifests.flatMap((m) => [...Object.keys(m.dependencies ?? {}), ...Object.keys(m.peerDependencies ?? {})])),
+]
   .filter((d) => !d.startsWith("@homelab/"))
   .flatMap((d) => [d, `${d}/*`]);
 
