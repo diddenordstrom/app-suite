@@ -5,14 +5,14 @@ import { useAction } from "../hooks";
 import { queueCheck, usePendingChecks } from "../checkQueue";
 import { useTrip } from "../trip";
 import { usePlan } from "../plan";
-import { Button, Card, cn, ErrorText, IconButton, Input, Select, Spinner } from "../ui";
+import { Button, Card, cn, ErrorText, IconButton, Input, Select, PageSkeleton } from "../ui";
 import { Eyebrow } from "../components/bits";
 import { PageHeader } from "../components/common";
 import { t } from "../i18n";
 
 export function Pack() {
   const q = usePlan();
-  if (!q.data) return q.error ? <ErrorText>{q.error.message}</ErrorText> : <div className="grid place-items-center py-16"><Spinner /></div>;
+  if (!q.data) return q.error ? <ErrorText>{q.error.message}</ErrorText> : <PageSkeleton rows={6} />;
   return <PackList pack={q.data.pack} />;
 }
 

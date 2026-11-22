@@ -71,6 +71,17 @@ body::before {
 }
 @media print { body::before { display: none; } }
 
+/* Skeleton placeholders (skeleton.tsx): the muted tone with a slow light sweep. */
+.skeleton {
+  background-color: var(--muted);
+  background-image: linear-gradient(90deg, transparent 0%, light-dark(rgb(255 255 255 / 0.55), rgb(255 255 255 / 0.05)) 50%, transparent 100%);
+  background-size: 200% 100%;
+  background-repeat: no-repeat;
+  animation: skeleton-sweep 1.6s ease-in-out infinite;
+}
+@keyframes skeleton-sweep { from { background-position: 150% 0; } to { background-position: -50% 0; } }
+@media (prefers-reduced-motion: reduce) { .skeleton { animation: none; background-image: none; } }
+
 /* The shared components live outside each app's root; tell Tailwind to scan them. */
 @source "./";
 

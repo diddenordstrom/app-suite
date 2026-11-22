@@ -6,7 +6,7 @@ import { dayDate, PLACES, START_MODES, startPoint, tripStats, type Home, type St
 import { useAction } from "../hooks";
 import { useTrip } from "../trip";
 import { fmtDate, fmtKm, fmtShortDate, useCurrentDay, usePlan } from "../plan";
-import { Button, Card, cn, ErrorText, Field, Input, SegmentedControl, Spinner, Textarea } from "../ui";
+import { Button, Card, cn, ErrorText, Field, Input, SegmentedControl, Textarea, PageSkeleton } from "../ui";
 import { Eyebrow } from "../components/bits";
 import { DayCard } from "../components/DayCard";
 import { PageHeader } from "../components/common";
@@ -15,7 +15,7 @@ import { t, tn } from "../i18n";
 export function Days() {
   const { detail } = useTrip();
   const q = usePlan();
-  if (!q.data) return q.error ? <ErrorText>{q.error.message}</ErrorText> : <div className="grid place-items-center py-16"><Spinner /></div>;
+  if (!q.data) return q.error ? <ErrorText>{q.error.message}</ErrorText> : <PageSkeleton cards={3} columns="" />;
   return (
     <div className="space-y-4">
       <PageHeader title={detail.name} />

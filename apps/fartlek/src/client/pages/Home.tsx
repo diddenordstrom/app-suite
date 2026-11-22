@@ -5,7 +5,8 @@ import { Link } from "react-router-dom";
 import { api, useAction, useApi } from "../http";
 import { useReloadOnSync, useSync } from "../garminSync";
 import { useFmt } from "../prefs";
-import { Badge, BusyButton, Button, Card, CardTitle, Dialog, EmptyState, ErrorText, InfoTip, LineChart, Ring, SegmentedControl, Spinner, Stat, Sparkline } from "../ui";
+import { HomeSkeleton } from "../skeletons";
+import { Badge, BusyButton, Button, Card, CardTitle, Dialog, EmptyState, ErrorText, InfoTip, LineChart, Ring, SegmentedControl, Stat, Sparkline } from "../ui";
 import { EasyBadge, GearIcon, OutcomeBadge, StatusBadge, SyncIcon, fmtAgo, fmtCountdown, fmtDay, workoutText, painArea } from "../bits";
 import { locale, t, tm, tn } from "../i18n";
 import type { HomeData } from "../types";
@@ -33,7 +34,7 @@ export function Home() {
   const demo = useAction(() => api("/demo", { method: "POST" }), () => location.reload());
 
   if (error) return <ErrorText>{error}</ErrorText>;
-  if (!data) return <div className="flex items-center gap-2 text-muted-foreground"><Spinner /> {t("common.loading")}…</div>;
+  if (!data) return <HomeSkeleton />;
   const { week, garmin } = data;
 
   return (

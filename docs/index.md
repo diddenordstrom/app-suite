@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-22 · note · Skeletons instead of "Laddar…" ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Skymning look: Geist + Newsreader, horizon, chart areas, paper ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Skymning depth: soft cards and controls ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek: one engine and one way of training for every goal ([log/2026-11.md](log/2026-11.md))
-- 2026-11-20 · decision · Fartlek Mål till plan: Garmin required, phases first, beside Skapa block ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

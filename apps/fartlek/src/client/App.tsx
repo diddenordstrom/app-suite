@@ -28,7 +28,7 @@ const nav = (): NavItem[] => [
 
 export function App() {
   const { user, loading, devMode, demoMode, logout } = useAuth();
-  if (loading) return <div className="p-8 text-muted-foreground">{t("common.loading")}…</div>;
+  if (loading) return null; // a split second before sign-in is known; the page skeletons take over after
   if (!user) return <SignIn />;
   return (
     <SettingsProvider>

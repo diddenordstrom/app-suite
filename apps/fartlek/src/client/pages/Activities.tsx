@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { api, useAction, useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
+import { ActivityListSkeleton, ActivitySkeleton } from "../skeletons";
 import { Badge, BarChart, BusyButton, Button, Card, CardTitle, EmptyState, ErrorText, Field, Input, Select, Spinner, Stat, Textarea } from "../ui";
 import { EasyBadge, fmtDay, painArea } from "../bits";
 import { t } from "../i18n";
@@ -70,7 +71,7 @@ export function Activities() {
           </ul>
         </Card>
       )}
-      {loading && <div className="flex items-center gap-2 text-muted-foreground"><Spinner /> {t("common.loading")}…</div>}
+      {loading && (items.length ? <div className="flex items-center gap-2 text-muted-foreground"><Spinner /> {t("common.loading")}…</div> : <ActivityListSkeleton />)}
       {more && !loading && <Button variant="outline" onClick={() => load(items.length)}>{t("activities.loadMore")}</Button>}
     </div>
   );
@@ -86,7 +87,7 @@ export function ActivityPage() {
   const delPain = useAction((pid: number) => api(`/pain/${pid}`, { method: "DELETE" }), reload);
 
   if (error) return <ErrorText>{error}</ErrorText>;
-  if (!data) return <div className="flex items-center gap-2 text-muted-foreground"><Spinner /> {t("common.loading")}…</div>;
+  if (!data) return <ActivitySkeleton />;
   const a = data.activity;
   const pace = a.distanceM > 0 ? a.durationS / (a.distanceM / 1000) : null;
   const zs = data.metrics.zoneSecs;

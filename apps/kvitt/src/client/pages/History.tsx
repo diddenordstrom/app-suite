@@ -3,7 +3,7 @@ import type { Activity, Expense, Settlement, Trip } from "@/shared/api";
 import { useQuery } from "../api";
 import { useAction } from "../hooks";
 import { useHousehold } from "../household";
-import { Button, cn, Dialog, EmptyState, ErrorText, SegmentedControl, Spinner } from "../ui";
+import { Button, cn, Dialog, EmptyState, ErrorText, SegmentedControl, PageSkeleton } from "../ui";
 import { PageHeader, Rich } from "../components/common";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { categoryLabel } from "../components/treats";
@@ -43,7 +43,7 @@ export function History() {
         { value: "expense", label: t("history.expenses") },
         { value: "settlement", label: t("history.payments") },
       ]} />
-      {q.loading ? <Spinner /> : !q.data ? <ErrorText>{q.error?.message}</ErrorText> : items.length === 0 ? (
+      {q.loading ? <PageSkeleton header={false} rows={6} /> : !q.data ? <ErrorText>{q.error?.message}</ErrorText> : items.length === 0 ? (
         <EmptyState title={t("history.emptyTitle")}>{t("history.emptyText")}</EmptyState>
       ) : groups.map((g) => (
         <section key={g.label} className="space-y-2">

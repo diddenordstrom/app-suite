@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate } from "react-router-dom";
-import { Badge, Button, Card, Input } from "../ui";
+import { Badge, Button, Card, Input, PageSkeleton } from "../ui";
 import { api, get, useLoad } from "../api";
 import { useHousehold } from "../household";
 import { t } from "../i18n";
@@ -58,7 +58,7 @@ export function Locations() {
       </PageTitle>
 
       {loading && !data ? (
-        <p className="py-16 text-center text-sm text-muted-foreground">{t("common.loading")}</p>
+        <PageSkeleton header={false} cards={4} />
       ) : (
         <>
           {showForm && (

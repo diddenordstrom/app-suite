@@ -2,6 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
+import { TrendsSkeleton } from "../skeletons";
 import { Badge, BarChart, Button, Card, CardTitle, ErrorText, InfoTip, LineChart, SegmentedControl, Sparkline, Spinner, StackedBars, useAutoTour, useTour } from "../ui";
 import { trendsTour } from "../guide";
 import { SameSessionTrends } from "../samesession";
@@ -34,7 +35,7 @@ export function Trends() {
   useAutoTour(data ? trendsTour() : null, { after: "onboarding" });
 
   if (error) return <ErrorText>{error}</ErrorText>;
-  if (!data) return <div className="flex items-center gap-2 text-muted-foreground"><Spinner /> {t("common.loading")}…</div>;
+  if (!data) return <TrendsSkeleton />;
 
   const past = data.weekly.filter((w) => !w.future);
   const avg = past.length ? past.reduce((a, w) => a + w.actualKm, 0) / past.length : null;

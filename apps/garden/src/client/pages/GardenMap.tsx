@@ -2,6 +2,7 @@ import { useReducer, useRef, useState } from "react";
 import { ApiError, api, get, useLoad } from "../api";
 import { useHousehold } from "../household";
 import { t } from "../i18n";
+import { Skeleton, SkeletonPage } from "../ui";
 import { reportError } from "../toast";
 import { useGardenCanvas, type DecorativeType, type GardenMode } from "../hooks/useGardenCanvas";
 import { computePaintedAreaM2, getCellsForLocation, type Garden, type GardenLayout } from "../lib/gardenCanvas";
@@ -38,7 +39,7 @@ export function GardenMap() {
     return { garden, locations, plantings, kcal: dashboard?.byLocation ?? [] };
   }, [current.id]);
 
-  if (loading && !data) return <div className="flex h-[calc(100dvh-8rem)] items-center justify-center text-muted-foreground md:h-dvh">{t("common.loading")}</div>;
+  if (loading && !data) return <SkeletonPage><Skeleton className="h-[calc(100dvh-8rem)] w-full rounded-lg md:h-dvh" /></SkeletonPage>;
   if (!data) return null;
   if (!data.garden) {
     return (

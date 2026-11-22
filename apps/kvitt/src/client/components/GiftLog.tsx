@@ -2,7 +2,7 @@ import type { Expense, GiftsResponse } from "@/shared/api";
 import { CATEGORY_KEYS } from "@/shared/gifts";
 import { useQuery } from "../api";
 import { useHousehold } from "../household";
-import { ErrorText, Spinner } from "../ui";
+import { ErrorText, SkeletonRows } from "../ui";
 import { fmtDay } from "./format";
 import { categoryLabel } from "./treats";
 import { t, tn, locale, type MsgKey } from "../i18n";
@@ -27,7 +27,7 @@ const weekdayDate = (ymd: string) => new Date(`${ymd}T12:00:00`).toLocaleDateStr
 export function GiftLog() {
   const h = useHousehold();
   const res = useQuery<GiftsResponse>(`${h.base}/gifts`);
-  if (res.loading) return <Spinner />;
+  if (res.loading) return <SkeletonRows rows={3} />;
   if (!res.data) return <ErrorText>{res.error?.message}</ErrorText>;
   const { gifts, lastByMember, hint } = res.data;
   if (gifts.length === 0) return <p className="text-sm text-muted-foreground">{t("gifts.empty")}</p>;

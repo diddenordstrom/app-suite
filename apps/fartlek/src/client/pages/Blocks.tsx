@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { ApiError, api, useAction, useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
+import { BlocksSkeleton } from "../skeletons";
 import { Badge, BusyButton, Button, Card, ErrorText, Field, Input, Dialog, SegmentedControl, Select, Spinner, Textarea, cn } from "../ui";
 import { BLOCK_COLOR, StatusBadge, blockName, fmtDay } from "../bits";
 import { t, tm, tn } from "../i18n";
@@ -43,7 +44,7 @@ export function BlockView({ onOpenWeek, creating, onCreatingDone, initialSelecte
   }, [data, selected]);
 
   if (error) return <ErrorText>{error}</ErrorText>;
-  if (!data) return <div className="flex items-center gap-2 text-muted-foreground"><Spinner /> {t("common.loading")}…</div>;
+  if (!data) return <BlocksSkeleton />;
 
   const done = (id?: number) => { setEditing(null); onCreatingDone(); if (id) setSelected(id); void reload(); };
 
