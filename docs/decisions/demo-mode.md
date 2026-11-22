@@ -17,7 +17,7 @@ Visitors coming from the [portfolio](portfolio-app.md) who have no account can t
 - **2 hours without use**, then the file is deleted (sweep every 10 minutes and before each start; activity is the file's mtime, so it survives restarts). "End demo" deletes it at once. At most 20 demo databases are kept open; others are reopened on demand.
 - **5 new demos per IP per hour** (in memory; `cf-connecting-ip` from the Cloudflare tunnel).
 - **Nothing outside the file.** runplan can't connect Garmin in the demo; Etapp refuses photo uploads and its demo photo folder is never the real one.
-- Sign-in itself moved to `packages/server-kit` too (`createAuth`, `loadAuthConfig`, `authTables`): the apps' `auth.ts` files were identical copies, and with the demo user built in, a new app gets sign-in and the demo's auth side for free. The steps for a new app are under "Add an app" in the README.
+- Sign-in itself moved to `packages/server-kit` too (`createAuth`, `loadAuthConfig`, `authTables`): the apps' `auth.ts` files were identical copies, and with the demo user built in, a new app gets sign-in and the demo's auth side for free. The steps for a new app are under "Add an app" in [CONTRIBUTING.md](../../CONTRIBUTING.md).
 - The generic part (`createDemo`, `demoConfig`) is in `packages/server-kit`; `DemoBanner` and `DemoSignIn` are in `packages/ui` with shared strings. Each app adds only `openDemo` (open its app on a file, seed when fresh). Off by default in production; `DEMO_ENABLED=true` per app in `deploy/compose.yml`. `demo/` is left out of `backup.sh`.
 
 ## Reasons
