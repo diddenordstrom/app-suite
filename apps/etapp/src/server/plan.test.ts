@@ -283,6 +283,42 @@ describe("vias, ideas, links and drive time", () => {
   });
 });
 
+describe("quick entry on an empty day", () => {
+  it("a paste starting with 'dag' names the empty day instead of skipping it", async () => {
+    const app = createApp(createDb(":memory:"), config);
+    const admin = client(app);
+    const { id: tid } = await admin.post<{ id: number }>("/trips", { name: "Norge" });
+    const dayId = (await admin.get<PlanResponse>(`/t/${tid}/plan`)).days[0].id;
+    const text = "dag Transport norrut\nHjo, fika vid Vättern\nvia Kongsvinger\nnatt Elverum 60.8819, 11.5615\ndag Mot Jotunheimen\nLom, se kyrkan";
+    const r = await admin.post<QuickResponse>(`/t/${tid}/quick`, { dayId, text });
+    const p = await admin.get<PlanResponse>(`/t/${tid}/plan`);
+    expect(p.days.map((d) => d.title)).toEqual(["Transport norrut", "Mot Jotunheimen"]);
+    expect(p.days[0].stops.map((s) => [s.kind, s.name])).toEqual([["stop", "Hjo"], ["via", "Kongsvinger"]]);
+    expect(p.days[0].sleep).toMatchObject({ name: "Elverum", lat: 60.8819 });
+    expect(r.dayId).toBe(p.days[1].id);
+    // A day with something on it is left alone: "dag" starts a new one as before.
+    await admin.post(`/t/${tid}/quick`, { dayId, text: "dag Extra" });
+    expect((await admin.get<PlanResponse>(`/t/${tid}/plan`)).days.map((d) => d.title)).toEqual(["Transport norrut", "Mot Jotunheimen", "Extra"]);
+  });
+});
+
+describe("deleting a trip", () => {
+  it("only an admin can delete it; everything goes with it", async () => {
+    const app = createApp(createDb(":memory:"), config);
+    const admin = client(app);
+    const { id: tid } = await admin.post<{ id: number }>("/trips", { name: "Skräp" });
+    const dayId = (await admin.get<PlanResponse>(`/t/${tid}/plan`)).days[0].id;
+    await admin.post(`/t/${tid}/days/${dayId}/stops`, { name: "Lom", todos: "fika X", url: "https://youtu.be/x" });
+    const code = (await admin.get<TripDetail>(`/t/${tid}`)).inviteCode!;
+    const bob = anon(app);
+    await bob.post(`/join/${code}`, { name: "Bob" });
+    await bob.del(`/t/${tid}`, 403);
+    await admin.del(`/t/${tid}`);
+    await admin.get(`/t/${tid}/plan`, 403);
+    expect((await admin.get<{ trips: unknown[] }>("/me")).trips).toEqual([]);
+  });
+});
+
 describe("seedDemo", () => {
   it("creates the demo trip once, owned by the dev user", async () => {
     const db = createDb(":memory:");

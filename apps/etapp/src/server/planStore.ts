@@ -139,12 +139,18 @@ export function moveStop(db: Db, tripId: number, stopId: number, dir: -1 | 1): b
   return (sj >= 0 && sj < list.length) || !!ds[di + dir];
 }
 
-/** Apply parsed quick-entry commands, starting on `dayId`. Returns the day later lines landed on. */
+/**
+ * Apply parsed quick-entry commands, starting on `dayId`. Returns the day later lines landed on.
+ * A paste that starts with "dag Title" on an empty day names that day instead of leaving it empty behind a new one.
+ */
 export function applyQuick(db: Db, tripId: number, dayId: number, commands: QuickCommand[]): number {
   return db.transaction((tx) => {
     let current = dayId;
+    const d = tx.select().from(days).where(eq(days.id, dayId)).get();
+    let reuse = !!d && !d.title && !d.sleepName && d.sleepLat === null && !tx.select({ id: stops.id }).from(stops).where(eq(stops.dayId, dayId)).get();
     for (const c of commands) {
-      if (c.kind === "day") current = createDay(tx, tripId, c.title).id;
+      if (c.kind === "day" && reuse) tx.update(days).set({ title: c.title }).where(eq(days.id, current)).run();
+      else if (c.kind === "day") current = createDay(tx, tripId, c.title).id;
       else if (c.kind === "night") {
         const set: Partial<DayRow> = {};
         if (c.sleepType) set.sleepType = c.sleepType;
@@ -152,6 +158,7 @@ export function applyQuick(db: Db, tripId: number, dayId: number, commands: Quic
         if (c.lat !== null && c.lon !== null) { set.sleepLat = c.lat; set.sleepLon = c.lon; }
         if (Object.keys(set).length) tx.update(days).set(set).where(eq(days.id, current)).run();
       } else createStop(tx, tripId, current, { name: c.name, kind: c.stopKind, lat: c.lat, lon: c.lon }, c.todos);
+      reuse = false;
     }
     return current;
   });

@@ -36,7 +36,7 @@ export function createApp(db: Db, config: Config, bus = new EventBus(), photos =
 
   api.use("/t/:tid", tripMiddleware);
   api.use("/t/:tid/*", tripMiddleware);
-  for (const sub of [tripRoutes(db, config, bus), planRoutes(db, bus, photos), photoRoutes(db, bus, photos), eventRoutes(bus)]) {
+  for (const sub of [tripRoutes(db, config, bus, photos), planRoutes(db, bus, photos), photoRoutes(db, bus, photos), eventRoutes(bus)]) {
     api.route("/t/:tid", sub);
   }
 
