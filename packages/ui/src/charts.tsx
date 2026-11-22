@@ -1,5 +1,6 @@
 import { tShared } from "@homelab/i18n";
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { svgId } from "./components";
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "react";
 
 /*
  * Hand-rolled SVG charts. One y-axis per chart (never dual axis), 2px lines, recessive grid,
@@ -94,6 +95,8 @@ export interface LineSeries {
   dashedFrom?: number;
   /** Draw dots on each point (sparse data). */
   dots?: boolean;
+  /** Fill the area under the solid part with the series colour fading out (the main line of a chart). */
+  area?: boolean;
 }
 
 export function LineChart({
@@ -116,6 +119,7 @@ export function LineChart({
 }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
+  const areaId = svgId(useId());
   const all = series.flatMap((s) => s.points.filter((p) => p.y != null)) as { x: number; y: number }[];
   const xs = [...new Set(series.flatMap((s) => s.points.map((p) => p.x)))].sort((a, b) => a - b);
   const m = { l: 44, r: series.length > 1 && directLabels ? 52 : 12, t: 8, b: 22 };
@@ -218,6 +222,18 @@ export function LineChart({
               const last = [...s.points].reverse().find((p) => p.y != null);
               return (
                 <g key={s.key}>
+                  {s.area && (() => {
+                    const pts = solid.filter((p) => p.y != null);
+                    if (pts.length < 2) return null;
+                    const gid = `${areaId}-${s.key}`;
+                    const base = height - m.b;
+                    return (
+                      <>
+                        <defs><linearGradient id={gid} x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor={s.color} stopOpacity={0.28} /><stop offset="1" stopColor={s.color} stopOpacity={0} /></linearGradient></defs>
+                        <path d={`${path(pts)} L${geo.sx(pts.at(-1)!.x)},${base} L${geo.sx(pts[0].x)},${base} Z`} fill={`url(#${gid})`} />
+                      </>
+                    );
+                  })()}
                   <path d={path(solid)} fill="none" stroke={s.color} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
                   {dashed.length > 1 && <path d={path(dashed)} fill="none" stroke={s.color} strokeWidth={2} strokeDasharray="4 4" />}
                   {s.dots && s.points.map((p, i) => p.y != null && (

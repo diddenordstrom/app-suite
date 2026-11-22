@@ -1,6 +1,6 @@
 ---
 title: Skymning depth: soft cards and controls, big shadow only for floating things
-summary: The three shadow steps every app shares, why cards stay soft, and how dark mode gets depth
+summary: The suite look: soft depth, Geist + Newsreader, the dusk horizon in a few places, chart areas and paper grain
 type: decision
 status: accepted
 updated: 2026-11-22
@@ -26,3 +26,14 @@ Light mode tints the shadows plum (the foreground colour), not black, so they me
 - Hand-built panels in the apps that copied the card classes (`rounded-lg border border-border bg-card`) were switched to the same card depth so they match `Card`.
 
 Gradients are a separate, later step.
+
+## The rest of the look (same day)
+
+After the depth, two directions were mocked on the same canvas ("typsnitt + horisont" and "grafer + papper") and both were kept:
+
+- **Type:** Geist for text and UI, Newsreader (variable, with optical sizes) for page titles inside the app shell, `Stat` values, ring centres and the big Dagsform score; its italic for the verdict. Nunito is gone from every app; Etapp keeps Barlow Condensed for its road-sign numbers.
+- **The horizon** (`--horizon`, lavender into the app's signature) only in a few places: every app's logo tile (`MarkTile`), the top line of a hero card (`<Card horizon>`, used on Fartlek's Idag), the active nav marker and the arc of `Ring`.
+- **Charts:** `LineChart` series can take `area` (a fill fading out under the line), used for fitness on Fartlek's Home and Trends.
+- **Paper:** an almost invisible grain over the page in light mode, a faint glow at the top in dark mode (`--paper-grain`, `--paper-glow`).
+
+Passed over: glass effects, gradients on buttons and sparkle icons, which read as a generic AI product. The favicons (`public/icon.svg`) keep the flat lavender tile for now.

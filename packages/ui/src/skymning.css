@@ -7,8 +7,11 @@
  * Each token is `light-dark(light, dark)`. Which one applies follows `color-scheme`: the OS
  * by default, or the user's choice via `data-theme` on <html> (see ThemePicker).
  * Apps import this from their tokens.css and override only what makes them theirs:
- * the signature trio, fonts, radius and any app-only tokens.
+ * the signature trio, radius and any app-only tokens.
  */
+@import "@fontsource-variable/geist";
+@import "@fontsource-variable/newsreader/opsz.css";
+@import "@fontsource-variable/newsreader/opsz-italic.css";
 :root {
   color-scheme: light dark;
 
@@ -68,7 +71,34 @@
   --shadow-primary: inset 0 1px 0 light-dark(rgb(255 255 255 / 0.15), rgb(255 255 255 / 0.3)), 0 1px 2px var(--shade-primary);
   --shadow-pop: inset 0 1px 0 var(--highlight), 0 2px 4px var(--shade-near), 0 18px 36px -12px var(--shade-deep);
   --radius: 0.875rem;
-  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  /* Geist for text and UI; Newsreader (a serif with character) for page titles and big numbers. */
+  --font-sans: "Geist Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  --font-display: "Newsreader Variable", Georgia, "Times New Roman", serif;
+
+  /*
+   * The horizon: the dusk sky, lavender into the app's signature. Used sparingly, as a mark rather
+   * than wallpaper: the app's logo tile, a thin line on top of a hero card, the active nav marker
+   * and the arcs of rings.
+   */
+  --horizon-end: color-mix(in oklab, var(--signature) 78%, var(--brand));
+  --horizon: linear-gradient(90deg, var(--brand), var(--horizon-end));
+  --horizon-v: linear-gradient(180deg, var(--brand), var(--horizon-end));
+
+  /* Paper: an almost invisible grain on the warm paper in light mode; in dark mode a faint glow at
+     the top of the page instead, like the sky just after sunset. Set per scheme below. */
+  --paper-grain: 0.05;
+  --paper-glow: none;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --paper-grain: 0;
+    --paper-glow: radial-gradient(ellipse 70rem 26rem at 60% -8rem, rgb(185 168 238 / 0.13), rgb(255 139 119 / 0.04) 55%, transparent 75%);
+  }
+}
+:root[data-theme="dark"] {
+  --paper-grain: 0;
+  --paper-glow: radial-gradient(ellipse 70rem 26rem at 60% -8rem, rgb(185 168 238 / 0.13), rgb(255 139 119 / 0.04) 55%, transparent 75%);
 }
 
 :root[data-theme="light"] { color-scheme: light; }

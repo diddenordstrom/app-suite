@@ -87,7 +87,7 @@ export function Home() {
             <div className="flex flex-wrap items-center gap-5">
               <Ring value={week.actualKm} goal={data.ringGoal} size={116}>
                 <div>
-                  <div className="text-xl font-semibold tabular-nums">{fmt.num(week.actualKm)}</div>
+                  <div className="font-display text-3xl leading-none font-medium tabular-nums">{fmt.num(week.actualKm)}</div>
                   <div className="text-xs text-muted-foreground">{data.ringGoal ? t("home.ofGoal", { goal: fmt.num(data.ringGoal), unit: fmt.unit }) : fmt.unit}</div>
                 </div>
               </Ring>
@@ -98,7 +98,7 @@ export function Home() {
               <Ring value={data.month.actualKm} goal={data.month.plannedKm || null} size={116}
                 segments={data.month.weeks.map((w, i) => ({ key: w.weekStart, value: w.actualKm, color: WEEK_COLORS[i % WEEK_COLORS.length] }))}>
                 <div>
-                  <div className="text-xl font-semibold tabular-nums">{fmt.num(data.month.actualKm)}</div>
+                  <div className="font-display text-3xl leading-none font-medium tabular-nums">{fmt.num(data.month.actualKm)}</div>
                   <div className="text-xs text-muted-foreground">{data.month.plannedKm ? t("home.ofGoal", { goal: fmt.num(data.month.plannedKm), unit: fmt.unit }) : fmt.unit}</div>
                 </div>
               </Ring>
@@ -166,7 +166,7 @@ export function Home() {
               {data.loadTrend.length > 7 && (
                 <LineChart height={120} directLabels={false} xFormat={dayLabel} yFormat={(v) => `${Math.round(v)}`}
                   series={[
-                    { key: "ctl", label: t("load.fitness"), color: "var(--chart-1)", points: data.loadTrend.map((p) => ({ x: ms(p.date), y: p.ctl })) },
+                    { key: "ctl", label: t("load.fitness"), color: "var(--chart-1)", area: true, points: data.loadTrend.map((p) => ({ x: ms(p.date), y: p.ctl })) },
                     { key: "atl", label: t("load.fatigue"), color: "var(--chart-2)", points: data.loadTrend.map((p) => ({ x: ms(p.date), y: p.atl })) },
                   ]} />
               )}
@@ -195,7 +195,7 @@ function NextRace({ race: r, threshold }: { race: HomeData["races"][number]; thr
   return (
     <div className="flex items-center gap-3">
       <div className="flex size-14 shrink-0 flex-col items-center justify-center rounded-lg bg-signature-soft text-signature-foreground">
-        <span className="text-2xl font-semibold leading-none tabular-nums">{weeks ? r.countdown.weeks : Math.max(0, r.countdown.days)}</span>
+        <span className="font-display text-3xl font-medium leading-none tabular-nums">{weeks ? r.countdown.weeks : Math.max(0, r.countdown.days)}</span>
         <span className="text-[11px]">{weeks ? tn("race.weeks", r.countdown.weeks) : tn("race.days", Math.max(0, r.countdown.days))}</span>
       </div>
       <div className="min-w-0 space-y-0.5 text-sm">

@@ -6,7 +6,6 @@
  * Components reference only semantic token names, never literal colours.
  */
 @import "@homelab/ui/skymning.css";
-@import "@fontsource-variable/nunito";
 @import "@fontsource/barlow-condensed/700.css";
 
 :root {
@@ -19,7 +18,6 @@
   --garden-leaf: #2d6a1f;
   /* The phone frame around app screenshots (Fartlek page). Decoration only: no text sits on it. */
   --bezel: light-dark(#2b2536, #0f0c17);
-  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
   --font-sign: "Barlow Condensed", "Arial Narrow", Arial, sans-serif;
 }
 

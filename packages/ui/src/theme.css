@@ -45,7 +45,31 @@
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) + 2px);
   --font-sans: var(--font-sans);
+  --font-display: var(--font-display);
 }
+
+/* Page titles inside the app shell are set in the display face. Unlayered on purpose, so it wins
+   over a page's own font-semibold. */
+.app-main h1 {
+  font-family: var(--font-display);
+  font-weight: 500;
+  letter-spacing: -0.015em;
+}
+
+/* Paper (skymning.css): grain in light mode, a glow in dark mode. Fixed behind everything and
+   never in the way of clicks. */
+body { background-image: var(--paper-glow); background-repeat: no-repeat; }
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  pointer-events: none;
+  opacity: var(--paper-grain);
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix type='saturate' values='0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+@media print { body::before { display: none; } }
 
 /* The shared components live outside each app's root; tell Tailwind to scan them. */
 @source "./";
