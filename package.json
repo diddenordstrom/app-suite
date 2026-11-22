@@ -1,0 +1,49 @@
+{
+  "name": "app-suite",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "apps/*"
+  ],
+  "scripts": {
+    "dev:fartlek": "npm run dev -w apps/fartlek",
+    "dev:kvitt": "npm run dev -w apps/kvitt",
+    "dev:etapp": "npm run dev -w apps/etapp",
+    "dev:portfolio": "npm run dev -w apps/portfolio",
+    "dev:brygga": "npm run dev -w apps/brygga",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "lint": "eslint .",
+    "test": "npm test --workspaces --if-present",
+    "docs:index": "node scripts/docs-index.mjs",
+    "docs:check": "node scripts/docs-index.mjs --check",
+    "check": "npm run typecheck && npm run lint && npm test && npm run docs:check",
+    "build": "npm run build --workspaces --if-present",
+    "dev:garden": "npm run dev -w apps/garden"
+  },
+  "devDependencies": {
+    "@eslint/js": "^10.0.1",
+    "@tailwindcss/vite": "^4.3.5",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/node": "^26.6.6",
+    "@types/react": "^19.3.0",
+    "@types/react-dom": "^19.3.0",
+    "@types/web-push": "^3.6.4",
+    "@vitejs/plugin-react": "^6.3.0",
+    "concurrently": "^10.0.7",
+    "drizzle-kit": "^0.31.11",
+    "esbuild": "^0.28.2",
+    "eslint": "^10.15.0",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "tailwindcss": "^4.3.5",
+    "tsx": "^4.23.15",
+    "typescript": "^6.0.3",
+    "typescript-eslint": "^8.73.0",
+    "vite": "^8.3.8",
+    "vite-plugin-pwa": "^2.0.0",
+    "vitest": "^5.1.0"
+  },
+  "engines": {
+    "node": ">=22"
+  }
+}

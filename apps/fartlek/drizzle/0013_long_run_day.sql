@@ -1,0 +1,1 @@
+ALTER TABLE `user_settings` ADD `long_run_day` integer DEFAULT 0 NOT NULL;

@@ -1,0 +1,25 @@
+/*
+ * kvitt's look on top of the suite palette (@homelab/ui/skymning.css): rounded, Nunito,
+ * mint as its signature (fresh groceries, money settled), and Keep-style list tints.
+ * Components reference only semantic token names, never literal colours.
+ */
+@import "@homelab/ui/skymning.css";
+@import "@fontsource-variable/nunito";
+
+:root {
+  --signature: light-dark(#2f9a6d, #6fd3a5);
+  --signature-soft: light-dark(#d3efe2, #1e4436);
+  --signature-foreground: light-dark(#1b6346, #aeead0);
+
+  /* Per-list card tints (Keep-style pastels). */
+  --list-default: var(--card);
+  --list-red: light-dark(#fbdcdc, #47262d);
+  --list-orange: light-dark(#fde4cf, #46301f);
+  --list-yellow: light-dark(#fdf3c7, #433b1d);
+  --list-green: light-dark(#dcf2dc, #24392c);
+  --list-teal: light-dark(#d2eeea, #1f3a38);
+  --list-blue: light-dark(#dbe7f8, #232f45);
+  --list-purple: light-dark(#e7dffa, #322948);
+  --list-pink: light-dark(#f9e0ec, #432639);
+  --font-sans: "Nunito Variable", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}

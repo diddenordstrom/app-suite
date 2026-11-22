@@ -1,0 +1,20 @@
+/*
+ * fartlek's look on top of the suite palette (@homelab/ui/skymning.css): coral as its
+ * signature (effort, heat), tighter corners and the system font for a data-dense app, and
+ * more saturated chart colours so series stay apart in busy charts.
+ * Components reference only semantic token names, never literal colours.
+ */
+@import "@homelab/ui/skymning.css";
+
+:root {
+  --signature: light-dark(#e05a44, #ff8b77);
+  --signature-soft: light-dark(#fcdcd5, #5a2a24);
+  --signature-foreground: light-dark(#962f20, #ffc2b6);
+
+  --chart-1: light-dark(#7d68cc, #9085e9);
+  --chart-2: light-dark(#e05a44, #ff8b77);
+  --chart-3: light-dark(#1a9e70, #2bbd88);
+  --chart-4: light-dark(#2a78d6, #4b95ec);
+  --chart-5: light-dark(#c2417a, #ec6fa5);
+  --radius: 0.5rem;
+}

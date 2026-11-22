@@ -1,0 +1,10 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    // The Fartlek page renders Fartlek's own components (src/client/components/fartlek/live). Their
+    // "@/shared/..." imports fall through to Fartlek's src because portfolio has no such files;
+    // vite.config.ts resolves "@/" by the importing file instead.
+    "paths": { "@/*": ["./src/*", "../fartlek/src/*"], "@fartlek/*": ["../fartlek/src/*"] }
+  },
+  "include": ["src", "vite.config.ts"]
+}

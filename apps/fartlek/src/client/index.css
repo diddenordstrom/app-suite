@@ -1,0 +1,16 @@
+@import "tailwindcss";
+@import "@homelab/ui/theme.css";
+@import "./ui/tokens.css";
+
+/* fartlek-only tokens: the sequential intensity ramp. */
+@theme inline {
+  --color-seq-1: var(--seq-1);
+  --color-seq-2: var(--seq-2);
+  --color-seq-3: var(--seq-3);
+}
+
+/* A line of the "suggest week" simulation coming in. */
+@keyframes fadein {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}

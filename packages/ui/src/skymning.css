@@ -1,0 +1,56 @@
+/*
+ * Skymning ("dusk"): the suite's shared palette. Lavender carries the surfaces and primary
+ * actions; a warm second colour, the app's *signature*, carries "today", active states and
+ * highlights. Light mode sits on warm paper, dark mode on a lifted twilight plum rather than
+ * near-black. Every text pair here meets WCAG AA (4.5:1), tinted badges included.
+ *
+ * Each token is `light-dark(light, dark)`. Which one applies follows `color-scheme`: the OS
+ * by default, or the user's choice via `data-theme` on <html> (see ThemePicker).
+ * Apps import this from their tokens.css and override only what makes them theirs:
+ * the signature trio, fonts, radius and any app-only tokens.
+ */
+:root {
+  color-scheme: light dark;
+
+  --brand: light-dark(#a996e0, #a996e0);
+  --brand-foreground: #ffffff;
+  --primary: light-dark(#6a56b3, #c4b5f6);
+  --primary-foreground: light-dark(#ffffff, #1d1730);
+  --accent: light-dark(#eee8f9, #3a3157);              /* lavender tint: hovers, active nav */
+  --accent-foreground: light-dark(#463a75, #e6dcff);
+
+  --background: light-dark(#fbf7f2, #1e1a29);          /* warm paper / twilight plum */
+  --foreground: light-dark(#2b2536, #f2edf9);
+  --card: light-dark(#ffffff, #282336);
+  --muted: light-dark(#f3ece3, #312b41);
+  --muted-foreground: light-dark(#655c71, #b5adc7);
+  --border: light-dark(#e5dccf, #3d3551);
+  --ring: light-dark(#8f7bd6, #a996e0);
+
+  /* Darker than before in light mode so text on their 15% tints (badges) stays AA. */
+  --success: light-dark(#2a7049, #86d4a8);
+  --warning: light-dark(#8a500a, #efbe6c);
+  --danger: light-dark(#a8354c, #f2909f);
+
+  /* Signature: solid (dots, bars, rings), soft (chip backgrounds) and text on soft. Default apricot. */
+  --signature: light-dark(#d9733f, #f5a77a);
+  --signature-soft: light-dark(#fde3d2, #563325);
+  --signature-foreground: light-dark(#8a4116, #ffcaa8);
+
+  --chart-1: light-dark(#7d68cc, #b9a8ee);
+  --chart-2: light-dark(#d9733f, #f5a77a);
+  --chart-3: light-dark(#4f9a72, #86d4a8);
+  --chart-4: light-dark(#4f86c6, #8fb6e6);
+  --chart-5: light-dark(#c95f7e, #ee8a9c);
+  /* Sequential (one hue, light → dark) for ordered intensity: easy / moderate / hard. */
+  --seq-1: light-dark(#d6cdf4, #463b6e);
+  --seq-2: light-dark(#9a87dc, #7d6bc8);
+  --seq-3: light-dark(#54448f, #c7baf3);
+
+  --overlay: light-dark(rgb(43 37 54 / 0.35), rgb(8 6 14 / 0.6));
+  --radius: 0.875rem;
+  --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+:root[data-theme="light"] { color-scheme: light; }
+:root[data-theme="dark"] { color-scheme: dark; }

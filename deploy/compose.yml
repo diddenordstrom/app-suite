@@ -1,0 +1,124 @@
+# app-suite on the homelab: every app in one stack, deployed by Komodo.
+# Komodo clones this repo, writes .env next to this file from deploy/komodo/app-suite.toml
+# (secrets come from Komodo variables) and runs `docker compose up -d`. See README.md.
+#
+# Routing: Cloudflare Tunnel sends *.${DOMAIN} and ${DOMAIN} to Traefik (in komodo/compose.yaml),
+# and Traefik picks the app from the hostname in its labels. A new app needs only a service block here.
+# Each app keeps its SQLite database (and etapp its photos) in ${DATA_DIR}/<app>.
+
+x-app: &app
+  restart: unless-stopped
+  networks: [proxy] # Traefik reaches each app at http://<app>:3000, no published ports
+
+services:
+  # Fartlek was called runplan: its data folder and Komodo variables keep the old name (no move, no
+  # new secrets), and runplan.${DOMAIN} redirects here with the path, so old links keep working.
+  fartlek:
+    <<: *app
+    image: ghcr.io/diddenordstrom/fartlek:latest
+    container_name: fartlek
+    volumes: ["${DATA_DIR}/runplan:/data"]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.fartlek.rule: Host(`fartlek.${DOMAIN}`)
+      traefik.http.services.fartlek.loadbalancer.server.port: "3000"
+      traefik.http.routers.runplan-redirect.rule: Host(`runplan.${DOMAIN}`)
+      traefik.http.routers.runplan-redirect.middlewares: runplan-redirect
+      traefik.http.middlewares.runplan-redirect.redirectregex.regex: ^https?://runplan\.([^/]+)(.*)$$
+      traefik.http.middlewares.runplan-redirect.redirectregex.replacement: https://fartlek.$${1}$${2}
+      traefik.http.middlewares.runplan-redirect.redirectregex.permanent: "true"
+    environment:
+      AUTH_MODE: oidc
+      PUBLIC_URL: https://fartlek.${DOMAIN}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${RUNPLAN_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${RUNPLAN_OIDC_CLIENT_SECRET}
+      SESSION_SECRET: ${RUNPLAN_SESSION_SECRET}
+      # Encrypts users' Garmin API keys. Losing it means everyone re-pastes their key.
+      RUNPLAN_MASTER_KEY: ${RUNPLAN_MASTER_KEY}
+      # /demo gives each visitor a throwaway database in /data/demo/ (max 100, 2 h idle); never touches app.db.
+      DEMO_ENABLED: "true"
+
+  # Kvitt was called shopsplit: same as Fartlek, data folder and variables keep the old name and
+  # shopsplit.${DOMAIN} redirects here. Members' invite and recovery links keep working through it.
+  kvitt:
+    <<: *app
+    image: ghcr.io/diddenordstrom/kvitt:latest
+    container_name: kvitt
+    volumes: ["${DATA_DIR}/shopsplit:/data"]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.kvitt.rule: Host(`kvitt.${DOMAIN}`)
+      traefik.http.services.kvitt.loadbalancer.server.port: "3000"
+      traefik.http.routers.shopsplit-redirect.rule: Host(`shopsplit.${DOMAIN}`)
+      traefik.http.routers.shopsplit-redirect.middlewares: shopsplit-redirect
+      traefik.http.middlewares.shopsplit-redirect.redirectregex.regex: ^https?://shopsplit\.([^/]+)(.*)$$
+      traefik.http.middlewares.shopsplit-redirect.redirectregex.replacement: https://kvitt.$${1}$${2}
+      traefik.http.middlewares.shopsplit-redirect.redirectregex.permanent: "true"
+    environment:
+      AUTH_MODE: oidc
+      PUBLIC_URL: https://kvitt.${DOMAIN}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${SHOPSPLIT_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${SHOPSPLIT_OIDC_CLIENT_SECRET}
+      SESSION_SECRET: ${SHOPSPLIT_SESSION_SECRET}
+      # /demo gives each visitor a throwaway database in /data/demo/ (max 100, 2 h idle); never touches app.db.
+      DEMO_ENABLED: "true"
+
+  etapp:
+    <<: *app
+    image: ghcr.io/diddenordstrom/etapp:latest
+    container_name: etapp
+    volumes: ["${DATA_DIR}/etapp:/data"] # app.db + uploads/ (day cover photos)
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.etapp.rule: Host(`etapp.${DOMAIN}`)
+      traefik.http.services.etapp.loadbalancer.server.port: "3000"
+    environment:
+      AUTH_MODE: oidc
+      PUBLIC_URL: https://etapp.${DOMAIN}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${ETAPP_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${ETAPP_OIDC_CLIENT_SECRET}
+      SESSION_SECRET: ${ETAPP_SESSION_SECRET}
+      # /demo gives each visitor a throwaway database in /data/demo/ (max 100, 2 h idle); never touches app.db.
+      DEMO_ENABLED: "true"
+
+  garden:
+    <<: *app
+    image: ghcr.io/diddenordstrom/garden:latest
+    container_name: garden
+    volumes: ["${DATA_DIR}/garden:/data"]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.garden.rule: Host(`garden.${DOMAIN}`)
+      traefik.http.services.garden.loadbalancer.server.port: "3000"
+    environment:
+      AUTH_MODE: oidc
+      PUBLIC_URL: https://garden.${DOMAIN}
+      OIDC_ISSUER: ${OIDC_ISSUER}
+      OIDC_CLIENT_ID: ${GARDEN_OIDC_CLIENT_ID}
+      OIDC_CLIENT_SECRET: ${GARDEN_OIDC_CLIENT_SECRET}
+      SESSION_SECRET: ${GARDEN_SESSION_SECRET}
+
+  portfolio:
+    <<: *app
+    image: ghcr.io/diddenordstrom/portfolio:latest
+    container_name: portfolio # static page, no database or secrets
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.portfolio.rule: Host(`${DOMAIN}`) # the apex, not portfolio.${DOMAIN}
+      traefik.http.services.portfolio.loadbalancer.server.port: "3000"
+
+  brygga:
+    <<: *app
+    image: ghcr.io/diddenordstrom/brygga:latest
+    container_name: brygga # no database or secrets: every number stays in the visitor's browser
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.brygga.rule: Host(`brygga.${DOMAIN}`)
+      traefik.http.services.brygga.loadbalancer.server.port: "3000"
+
+networks:
+  proxy:
+    external: true # shared with cloudflared, Traefik and Komodo (`docker network create proxy` if it doesn't exist)

@@ -1,0 +1,104 @@
+# Infrastructure on marvin, started by hand: Traefik (routes every hostname the tunnel sends it)
+# and Komodo: Core (web UI + API), Periphery (the agent that runs docker) and its database.
+# Adapted from Komodo's ferretdb.compose.yaml (v2.3.3): FerretDB on Postgres instead of MongoDB,
+# because recent MongoDB does not run on every ARM board. Core is reached through Traefik at
+# komodo.${DOMAIN}, which also lets GitHub and CI call its webhook listener.
+#
+# This stack is the one thing Komodo does not deploy itself. Start and update it by hand:
+#   cd /etc/komodo/setup && docker compose -p komodo --env-file compose.env up -d
+# (copy this file and compose.env.example there first; see ../README.md)
+
+services:
+  traefik:
+    image: traefik:v3
+    container_name: traefik
+    labels:
+      komodo.skip: # keep routing when Komodo stops all containers
+    restart: unless-stopped
+    command:
+      - --providers.docker=true
+      - --providers.docker.exposedbydefault=false # only containers with traefik.enable=true
+      - --providers.docker.network=proxy
+      - --entrypoints.web.address=:80 # TLS ends at Cloudflare; the tunnel speaks plain HTTP to Traefik
+      - --ping=true
+      - --log.level=WARN
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks: [proxy]
+    healthcheck:
+      test: ["CMD", "traefik", "healthcheck", "--ping"]
+      interval: 30s
+
+  postgres:
+    # Pinned: FerretDB and its Postgres image must be upgraded together.
+    image: ghcr.io/ferretdb/postgres-documentdb:17-0.107.0-ferretdb-2.7.0
+    labels:
+      komodo.skip: # keep it running when Komodo stops all containers
+    restart: unless-stopped
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: ${KOMODO_DATABASE_USERNAME}
+      POSTGRES_PASSWORD: ${KOMODO_DATABASE_PASSWORD}
+      POSTGRES_DB: postgres
+    healthcheck:
+      # The first start initialises the database, which takes a while on a small board.
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 30s
+
+  ferretdb:
+    image: ghcr.io/ferretdb/ferretdb:2.7.0
+    labels:
+      komodo.skip:
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    volumes:
+      - ferretdb-state:/state
+    environment:
+      FERRETDB_POSTGRESQL_URL: postgres://${KOMODO_DATABASE_USERNAME}:${KOMODO_DATABASE_PASSWORD}@postgres:5432/postgres
+
+  core:
+    image: ghcr.io/moghtech/komodo-core:${COMPOSE_KOMODO_IMAGE_TAG:-2}
+    init: true
+    restart: unless-stopped
+    depends_on:
+      ferretdb:
+        condition: service_healthy # core exits if the database is not there at start
+    env_file: ./compose.env
+    environment:
+      KOMODO_DATABASE_ADDRESS: ferretdb:27017
+    networks: [default, proxy]
+    labels:
+      traefik.enable: "true"
+      traefik.http.routers.komodo.rule: Host(`komodo.${DOMAIN}`)
+      traefik.http.services.komodo.loadbalancer.server.port: "9120"
+    volumes:
+      - keys:/config/keys
+      - ${COMPOSE_KOMODO_BACKUPS_PATH}:/backups
+
+  periphery:
+    image: ghcr.io/moghtech/komodo-periphery:${COMPOSE_KOMODO_IMAGE_TAG:-2}
+    init: true
+    restart: unless-stopped
+    depends_on: [core]
+    env_file: ./compose.env
+    volumes:
+      - keys:/config/keys
+      - /var/run/docker.sock:/var/run/docker.sock
+      - /proc:/proc
+      # Stacks are cloned under here; the path must be the same inside and outside the container.
+      - ${PERIPHERY_ROOT_DIRECTORY:-/etc/komodo}:${PERIPHERY_ROOT_DIRECTORY:-/etc/komodo}
+
+volumes:
+  postgres-data:
+  ferretdb-state:
+  keys:
+
+networks:
+  proxy:
+    external: true

@@ -1,0 +1,23 @@
+{
+  "name": "@homelab/ui",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared React UI kit: the Skymning palette, tokens mapping, components, app shell, theme picker, SVG charts. Apps override their signature colour, fonts and logo.",
+  "exports": {
+    ".": "./src/index.ts",
+    "./theme.css": "./src/theme.css",
+    "./skymning.css": "./src/skymning.css",
+    "./vite": "./vite.ts"
+  },
+  "peerDependencies": {
+    "clsx": "*",
+    "react": "*",
+    "react-dom": "*",
+    "react-router-dom": "*",
+    "tailwind-merge": "*"
+  },
+  "dependencies": {
+    "@homelab/i18n": "*"
+  }
+}

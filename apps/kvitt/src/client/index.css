@@ -1,0 +1,17 @@
+@import "tailwindcss";
+@import "@homelab/ui/theme.css";
+@import "./ui/tokens.css";
+
+/* kvitt-only tokens: per-list card tints. */
+@theme inline {
+  --color-list-default: var(--list-default);
+  --color-list-red: var(--list-red);
+  --color-list-orange: var(--list-orange);
+  --color-list-yellow: var(--list-yellow);
+  --color-list-green: var(--list-green);
+  --color-list-teal: var(--list-teal);
+  --color-list-blue: var(--list-blue);
+  --color-list-purple: var(--list-purple);
+  --color-list-pink: var(--list-pink);
+}
+

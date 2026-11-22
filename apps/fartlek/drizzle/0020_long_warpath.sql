@@ -1,0 +1,6 @@
+CREATE TABLE `engine_tuning` (
+	`user_id` integer PRIMARY KEY NOT NULL,
+	`overrides` text NOT NULL,
+	`updated_at` integer NOT NULL,
+	FOREIGN KEY (`user_id`) REFERENCES `users`(`id`) ON UPDATE no action ON DELETE cascade
+);

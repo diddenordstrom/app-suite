@@ -1,0 +1,24 @@
+@import "tailwindcss";
+@import "@homelab/ui/theme.css";
+@import "./ui/tokens.css";
+
+/* The Fartlek page renders Fartlek's own components, so their classes must be generated too. */
+@source "../../../fartlek/src/client";
+
+/* Portfolio-only tokens: each app's colour trio (see tokens.css), the road-sign brown and tent
+   orange borrowed from Etapp's preview, harvest yellow and the sequential purples for the charts. */
+@theme inline {
+  --color-sg: var(--sg);
+  --color-sg-soft: var(--sg-soft);
+  --color-sg-fg: var(--sg-fg);
+  --color-sign: var(--sign);
+  --color-sign-foreground: var(--sign-foreground);
+  --color-tent: var(--tent);
+  --color-harvest: var(--harvest);
+  --color-garden-leaf: var(--garden-leaf);
+  --color-bezel: var(--bezel);
+  --color-seq-1: var(--seq-1);
+  --color-seq-2: var(--seq-2);
+  --color-seq-3: var(--seq-3);
+  --font-sign: var(--font-sign);
+}

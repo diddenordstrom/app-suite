@@ -1,0 +1,11 @@
+@import "tailwindcss";
+@import "@homelab/ui/theme.css";
+@import "./ui/tokens.css";
+
+/* Etapp-only tokens: the road sign for stop numbers and the night accent. */
+@theme inline {
+  --color-sign: var(--sign);
+  --color-sign-foreground: var(--sign-foreground);
+  --color-tent: var(--tent);
+  --font-sign: var(--font-sign);
+}

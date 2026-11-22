@@ -1,0 +1,1 @@
+ALTER TABLE `wellness` ADD `sleep_score` real;

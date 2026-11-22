@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ghcr.io/diddenordstrom/brygga:latest  # built from the app-suite monorepo
+    container_name: brygga
+    restart: unless-stopped
+    networks: [proxy]  # cloudflared reaches it at http://brygga:3000, so no published port
+networks:
+  proxy:
+    external: true
+# No database, no login and no secrets: every number stays in the visitor's browser.
+# Cloudflare Tunnel: public hostname brygga.didrik.dev -> http://brygga:3000

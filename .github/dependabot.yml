@@ -1,0 +1,45 @@
+# One weekly PR per ecosystem for minor + patch bumps (and one for security fixes)
+# instead of one PR per package: a single lockfile update and one CI run to review.
+# Major npm and Docker bumps still get their own PR so breaking changes are reviewed
+# one by one. Exceptions:
+# - vitest and @vitest/* must share a major version, so they always move together.
+# - GitHub Actions majors are grouped too: they are almost always a runtime bump.
+# A package goes to the first group it matches, so `vitest` comes before `minor-patch`.
+# The security group needs "Dependabot security updates" on in the repo settings.
+version: 2
+
+updates:
+  - package-ecosystem: npm
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      security:
+        applies-to: security-updates
+        patterns: ['*']
+      vitest:
+        applies-to: version-updates
+        patterns: ['vitest', '@vitest/*']
+      minor-patch:
+        applies-to: version-updates
+        patterns: ['*']
+        update-types: [minor, patch]
+    # typescript-eslint caps its typescript peer below 6.1 (checked at 8.73.0), so TS 7
+    # breaks `npm i` until it catches up. Drop this once it supports TS 7.
+    ignore:
+      - dependency-name: typescript
+        update-types: [version-update:semver-major]
+    commit-message: { prefix: '⬆️' }
+
+  - package-ecosystem: github-actions
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    groups:
+      actions:
+        applies-to: version-updates
+        patterns: ['*']
+    commit-message: { prefix: '⬆️' }
+
+  - package-ecosystem: docker
+    directory: /
+    schedule: { interval: weekly, day: monday }
+    commit-message: { prefix: '⬆️' }

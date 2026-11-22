@@ -1,0 +1,8 @@
+{
+  "name": "@homelab/i18n",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared Swedish/English i18n: the language setting, t()/tn() and the strings every app shares (buttons, errors, auth, settings). Apps add their own dictionaries.",
+  "exports": { ".": "./src/index.ts" }
+}

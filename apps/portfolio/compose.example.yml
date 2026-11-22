@@ -1,0 +1,11 @@
+services:
+  app:
+    image: ghcr.io/diddenordstrom/portfolio:latest  # built from the app-suite monorepo
+    container_name: portfolio
+    restart: unless-stopped
+    networks: [proxy]  # cloudflared reaches it at http://portfolio:3000, so no published port
+networks:
+  proxy:
+    external: true
+# No database, no login and no secrets: the page is static.
+# Cloudflare Tunnel: public hostname didrik.dev (the apex, no redirect) -> http://portfolio:3000

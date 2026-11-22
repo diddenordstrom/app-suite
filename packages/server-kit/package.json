@@ -1,0 +1,21 @@
+{
+  "name": "@homelab/server-kit",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Shared server pieces: sign-in (OIDC/dev/demo), demo mode, SQLite + migrations bootstrap, AES-256-GCM secrets, serving the built client with cache headers. Bundled into each app's server build, Web Push (VAPID keys, device subscriptions, daily schedule).",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "@hono/node-server": "^2.1.9",
+    "better-sqlite3": "^13.2.0",
+    "drizzle-orm": "*",
+    "hono": "^4.13.19",
+    "openid-client": "^6.9.0",
+    "web-push": "^4.0.0"
+  }
+}

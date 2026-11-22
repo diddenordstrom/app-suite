@@ -1,0 +1,8 @@
+node_modules
+dist
+data
+.env
+*.db
+*.db-*
+# The Fartlek landing page's demo snapshot is source, not app data
+!apps/portfolio/src/client/components/fartlek/data/

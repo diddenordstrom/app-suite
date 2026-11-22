@@ -1,0 +1,20 @@
+services:
+  app:
+    image: ghcr.io/diddenordstrom/kvitt:latest  # built from the app-suite monorepo
+    container_name: kvitt
+    restart: unless-stopped
+    volumes: ["./data:/data"]
+    networks: [proxy]  # cloudflared reaches it at http://kvitt:3000, so no published port
+    environment:
+      AUTH_MODE: "oidc"
+      SESSION_SECRET: "generate-with-openssl-rand-hex-32"
+      PUBLIC_URL: "https://kvitt.didrik.dev"
+      OIDC_ISSUER: "https://sso.didrik.dev"  # Pocket ID
+      OIDC_CLIENT_ID: "from-pocket-id"
+      OIDC_CLIENT_SECRET: "from-pocket-id"
+networks:
+  proxy:
+    external: true
+# Pocket ID client: callback URL https://kvitt.didrik.dev/api/auth/callback
+# (not group-restricted, or include your user's group).
+# Cloudflare Tunnel: public hostname kvitt.didrik.dev -> http://kvitt:3000

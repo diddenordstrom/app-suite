@@ -1,0 +1,180 @@
+# Komodo resources for app-suite, applied by the resource sync below on every push to main.
+# Secrets never live here: they are Komodo variables marked secret (Settings → Variables),
+# referenced as [[NAME]]. Komodo writes `environment` to deploy/.env before `docker compose up`.
+#
+# Adding an app: a service block in ../compose.yml, plus any new variables in `environment`
+# here (and the secret values in Komodo). No ssh, no Cloudflare.
+
+[[stack]]
+name = "app-suite"
+description = "Every app-suite app (deploy/compose.yml); Traefik and Komodo run in deploy/komodo/compose.yaml"
+# The sync only updates the stack's settings; it never deploys it. The sync runs on the push itself,
+# before CI has built the images, so deploying here pulled images that didn't exist yet (a renamed or
+# new app fails with "manifest unknown"). CI's deploy job deploys once every image is pushed.
+deploy = false
+[stack.config]
+server = "marvin"
+project_name = "app-suite" # the same compose project as before Komodo, so it takes over the running containers
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+run_directory = "deploy"
+file_paths = ["compose.yml"]
+registry_provider = "ghcr.io" # private images: the ghcr.io account under Settings → Providers
+registry_account = "diddenordstrom"
+# CI calls the deploy webhook after pushing images. Always redeploy (pull + up), even when
+# compose.yml did not change, because the change is in the images.
+webhook_enabled = true
+webhook_force_deploy = true
+# Fallback for anything CI did not trigger: Komodo's daily Global Auto Update.
+poll_for_updates = true
+auto_update = true
+environment = """
+DOMAIN=didrik.dev
+OIDC_ISSUER=https://sso.didrik.dev
+DATA_DIR=[[APP_SUITE_DATA_DIR]]
+
+# Fartlek and Kvitt kept the variables from when they were runplan and shopsplit.
+RUNPLAN_OIDC_CLIENT_ID=[[RUNPLAN_OIDC_CLIENT_ID]]
+RUNPLAN_OIDC_CLIENT_SECRET=[[RUNPLAN_OIDC_CLIENT_SECRET]]
+RUNPLAN_SESSION_SECRET=[[RUNPLAN_SESSION_SECRET]]
+RUNPLAN_MASTER_KEY=[[RUNPLAN_MASTER_KEY]]
+
+SHOPSPLIT_OIDC_CLIENT_ID=[[SHOPSPLIT_OIDC_CLIENT_ID]]
+SHOPSPLIT_OIDC_CLIENT_SECRET=[[SHOPSPLIT_OIDC_CLIENT_SECRET]]
+SHOPSPLIT_SESSION_SECRET=[[SHOPSPLIT_SESSION_SECRET]]
+
+ETAPP_OIDC_CLIENT_ID=[[ETAPP_OIDC_CLIENT_ID]]
+ETAPP_OIDC_CLIENT_SECRET=[[ETAPP_OIDC_CLIENT_SECRET]]
+ETAPP_SESSION_SECRET=[[ETAPP_SESSION_SECRET]]
+
+GARDEN_OIDC_CLIENT_ID=[[GARDEN_OIDC_CLIENT_ID]]
+GARDEN_OIDC_CLIENT_SECRET=[[GARDEN_OIDC_CLIENT_SECRET]]
+GARDEN_SESSION_SECRET=[[GARDEN_SESSION_SECRET]]
+"""
+
+# Images built by Komodo on marvin instead of GitHub Actions: run the procedure "release" (or point a
+# GitHub webhook at it). It builds the apps one at a time, pushes them to ghcr.io and then deploys
+# the app-suite stack. No tests, audit or smoke test run here, so run `npm run check` before pushing.
+# The ghcr.io account needs a token with write:packages. Same tags as CI: latest, commit hash, and a
+# version Komodo counts up by itself.
+[[builder]]
+name = "marvin"
+[builder.config]
+type = "Server"
+params.server_id = "marvin"
+
+[[build]]
+name = "fartlek"
+description = "ghcr.io/diddenordstrom/fartlek, built from the root Dockerfile"
+[build.config]
+builder = "marvin"
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+build_args = "APP=fartlek"
+image_registry = [{ domain = "ghcr.io", account = "diddenordstrom" }]
+webhook_enabled = false # only the release procedure builds
+
+[[build]]
+name = "kvitt"
+description = "ghcr.io/diddenordstrom/kvitt, built from the root Dockerfile"
+[build.config]
+builder = "marvin"
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+build_args = "APP=kvitt"
+image_registry = [{ domain = "ghcr.io", account = "diddenordstrom" }]
+webhook_enabled = false # only the release procedure builds
+
+[[build]]
+name = "etapp"
+description = "ghcr.io/diddenordstrom/etapp, built from the root Dockerfile"
+[build.config]
+builder = "marvin"
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+build_args = "APP=etapp"
+image_registry = [{ domain = "ghcr.io", account = "diddenordstrom" }]
+webhook_enabled = false # only the release procedure builds
+
+[[build]]
+name = "garden"
+description = "ghcr.io/diddenordstrom/garden, built from the root Dockerfile"
+[build.config]
+builder = "marvin"
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+build_args = "APP=garden"
+image_registry = [{ domain = "ghcr.io", account = "diddenordstrom" }]
+webhook_enabled = false # only the release procedure builds
+
+[[build]]
+name = "portfolio"
+description = "ghcr.io/diddenordstrom/portfolio, built from the root Dockerfile"
+[build.config]
+builder = "marvin"
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+build_args = "APP=portfolio"
+image_registry = [{ domain = "ghcr.io", account = "diddenordstrom" }]
+webhook_enabled = false # only the release procedure builds
+
+[[build]]
+name = "brygga"
+description = "ghcr.io/diddenordstrom/brygga, built from the root Dockerfile"
+[build.config]
+builder = "marvin"
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+build_args = "APP=brygga"
+image_registry = [{ domain = "ghcr.io", account = "diddenordstrom" }]
+webhook_enabled = false # only the release procedure builds
+
+# One app per stage, so marvin builds one image at a time next to the running apps.
+[[procedure]]
+name = "release"
+description = "Build every app image on marvin, push to ghcr.io, then deploy the app-suite stack"
+[[procedure.config.stage]]
+name = "Build fartlek"
+executions = [{ execution.type = "RunBuild", execution.params.build = "fartlek", enabled = true }]
+
+[[procedure.config.stage]]
+name = "Build kvitt"
+executions = [{ execution.type = "RunBuild", execution.params.build = "kvitt", enabled = true }]
+
+[[procedure.config.stage]]
+name = "Build etapp"
+executions = [{ execution.type = "RunBuild", execution.params.build = "etapp", enabled = true }]
+
+[[procedure.config.stage]]
+name = "Build garden"
+executions = [{ execution.type = "RunBuild", execution.params.build = "garden", enabled = true }]
+
+[[procedure.config.stage]]
+name = "Build portfolio"
+executions = [{ execution.type = "RunBuild", execution.params.build = "portfolio", enabled = true }]
+
+[[procedure.config.stage]]
+name = "Build brygga"
+executions = [{ execution.type = "RunBuild", execution.params.build = "brygga", enabled = true }]
+
+[[procedure.config.stage]]
+name = "Deploy"
+executions = [{ execution.type = "DeployStack", execution.params.stack = "app-suite", enabled = true }]
+
+# The sync manages itself: change this file, push, and Komodo applies it.
+[[resource_sync]]
+name = "app-suite"
+description = "Komodo resources from deploy/komodo/app-suite.toml"
+[resource_sync.config]
+git_account = "diddenordstrom"
+repo = "diddenordstrom/app-suite"
+branch = "main"
+resource_path = ["deploy/komodo/app-suite.toml"]
+webhook_enabled = true

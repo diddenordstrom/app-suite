@@ -1,0 +1,486 @@
+<!doctype html>
+<html lang="sv">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Nettoförmögenhet, brygga & sluttid, utkast 4</title>
+<style>
+:root{--bg:#f7f7f5;--card:#fff;--ink:#1d1d1b;--muted:#6b6b66;--accent:#2b6cb0;--green:#3a9d5d;--orange:#d98a2b;--grey:#8a8a84;--line:#e4e4df}
+@media (prefers-color-scheme: dark){:root{--bg:#161614;--card:#21211e;--ink:#eee;--muted:#9a9a93;--accent:#6fa8e6;--green:#58c07c;--orange:#e9a24f;--grey:#6d6d68;--line:#34342f}}
+*{box-sizing:border-box}
+body{margin:0;font-family:system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);padding:16px}
+h1{font-size:20px;margin:0 0 4px}
+.sub{color:var(--muted);font-size:13px;margin-bottom:16px;line-height:1.5}
+h2{font-size:12px;text-transform:uppercase;letter-spacing:.06em;color:var(--muted);margin:18px 0 8px}
+h2:first-child{margin-top:0}
+.wrap{display:grid;grid-template-columns:minmax(300px,380px) 1fr;gap:16px;max-width:1120px;margin:auto;align-items:start}
+@media(max-width:820px){.wrap{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px}
+.field{margin-bottom:12px}
+.field label{display:block;font-size:13px;margin-bottom:4px}
+.field .line{display:grid;grid-template-columns:1fr 130px;gap:8px;align-items:center}
+.field .line.single{grid-template-columns:1fr}
+input[type=text]{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:transparent;color:var(--ink);font-size:13px;font-variant-numeric:tabular-nums;text-align:right}
+input[type=range]{width:100%;margin:4px 0 0}
+.hint{font-size:12px;color:var(--muted);background:var(--bg);border-radius:8px;padding:7px 9px;margin:-2px 0 12px}
+.hint b{color:var(--ink);font-variant-numeric:tabular-nums}
+details{margin-top:18px;border-top:1px solid var(--line);padding-top:10px}
+summary{cursor:pointer;font-size:13px;color:var(--accent);margin-bottom:8px}
+.kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:8px}
+.kpi{padding:10px;border-radius:10px;border:1px solid var(--line)}
+.kpi span{display:block;font-size:12px;color:var(--muted);margin-bottom:2px}
+.kpi b{font-size:16px;font-variant-numeric:tabular-nums}
+.kpi small{color:var(--muted);font-size:12px}
+.big{font-size:30px;font-weight:650;font-variant-numeric:tabular-nums;margin:2px 0 12px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+td{padding:4px 0;border-bottom:1px solid var(--line)}
+td:last-child{text-align:right;font-variant-numeric:tabular-nums}
+.legend{display:flex;gap:14px;font-size:12px;color:var(--muted);margin:6px 0 4px;flex-wrap:wrap}
+.legend i{display:inline-block;width:14px;height:3px;vertical-align:middle;margin-right:5px;border-radius:2px}
+canvas{width:100%;height:380px;display:block}
+.note{font-size:12px;color:var(--muted);line-height:1.55}
+.neg{color:#c0392b}
+.ok{color:var(--green)}
+.tl{display:flex;height:28px;border-radius:6px;overflow:hidden;font-size:12px;margin-bottom:6px}
+.tl div{display:flex;align-items:center;justify-content:center;color:#fff;white-space:nowrap;overflow:hidden;padding:0 4px}
+.tl .work{background:var(--grey)}
+.tl .bridge{background:var(--orange)}
+.tl .pens{background:var(--green)}
+.tlLabels{font-size:12px;color:var(--muted);margin-bottom:12px}
+.status{font-size:13px;line-height:1.9}
+.big2{font-size:17px;font-weight:600;line-height:1.4;margin:4px 0 12px}
+</style>
+</head>
+<body>
+<h1>Nettoförmögenhet, brygga & sluttid</h1>
+<div class="sub">Utkast 4. Belopp i kronor, justerat för inflation (dagens kronor).<br>
+Tips: skriv <b>3M</b> för 3 000 000, <b>500k</b> för 500 000 eller <b>1,5M</b> för 1 500 000. Tryck Enter eller klicka utanför fältet för att formatera.</div>
+
+<div class="wrap">
+  <div class="card">
+    <div id="inputs"></div>
+    <details>
+      <summary>Avancerat (ändra bara om du vill)</summary>
+      <div id="assump"></div>
+    </details>
+  </div>
+
+  <div>
+    <div class="card">
+      <div style="font-size:13px;color:var(--muted)">Nettoförmögenhet idag</div>
+      <div class="big" id="nwToday">-</div>
+      <table id="breakdown"></table>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div style="font-size:13px;color:var(--muted);margin-bottom:6px">Tidslinje för vald sluttid</div>
+      <div class="tl" id="timeline"></div>
+      <div class="tlLabels" id="timelineLabels"></div>
+      <div class="big2" id="prognos"></div>
+      <div class="status" id="status"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="kpis" id="kpis"></div>
+    </div>
+
+    <div class="card" style="margin-top:16px">
+      <div class="legend">
+        <span><i style="background:var(--accent)"></i>Total nettoförmögenhet</span>
+        <span><i style="background:var(--green)"></i>Likvid (aktier + privat)</span>
+        <span><i style="background:var(--orange)"></i>Pensioner (allmän + tjänst)</span>
+      </div>
+      <canvas id="chart"></canvas>
+      <details>
+        <summary>Alla möjliga sluttider</summary>
+        <table id="candidates"></table>
+      </details>
+    </div>
+
+    <div class="card note" style="margin-top:16px">
+      <b>Förenklingar i utkastet:</b>
+      Avkastningen är nominell med månadsvis ränta-på-ränta. Allmän pension byggs upp med 18,5 % av lönen och betalas ut som saldo ÷ delningstal per år från pensionsstart. Tjänstepension betalas ut på samma sätt med eget delningstal. Garantipension, skatt (kapitalvinst, kapitalförsäkring, pensionsskatt) och verklig löneutveckling ingår inte. Bolånet amorteras med 2 % per år. Under arbetsåren betalas bolånet ur lönen, och efter sluta jobba tas det från kapitalet. Bostaden säljs inte i modellen. Bryggan kontrolleras både med en simulering och med en säkerhetsmarginal i dagens kronor. Sluttiderna prövas en i taget från nu till 75 år.
+    </div>
+  </div>
+</div>
+
+<script>
+const main = [
+  {group:'Om dig', items:[
+    {id:'age', label:'Din ålder', min:18, max:80, step:1, val:35},
+    {id:'retAge', label:'Sluta jobba vid ålder', min:40, max:75, step:1, val:60},
+    {id:'salary', label:'Bruttolön per år (kr)', min:0, max:3000000, step:10000, val:600000},
+  ]},
+  {group:'Pensionsstart', items:[
+    {id:'allmStart', label:'Allmän pension börjar vid ålder', min:63, max:75, step:1, val:65},
+    {id:'tjStart', label:'Tjänstepension börjar vid ålder', min:55, max:75, step:1, val:65},
+  ]},
+  {group:'Tillgångar', items:[
+    {id:'stocks', label:'Aktier och fonder (kr)', min:0, max:10000000, step:10000, val:500000},
+    {id:'stockSave', label:'Sparande i aktier per månad (kr)', min:0, max:50000, step:500, val:5000},
+    {id:'priv', label:'Privat pensionssparande (kr)', min:0, max:10000000, step:10000, val:200000},
+    {id:'privSave', label:'Inbetalning privat pension per månad (kr)', min:0, max:30000, step:100, val:1000},
+    {id:'tjanst', label:'Tjänstepension, saldo (kr)', min:0, max:10000000, step:10000, val:300000},
+    {id:'allm', label:'Allmän pension, pensionsbehållning (kr)', min:0, max:10000000, step:10000, val:400000},
+  ]},
+  {group:'Bostad & bolån', items:[
+    {id:'house', label:'Bostadens värde (kr)', min:0, max:20000000, step:50000, val:3000000},
+    {id:'loan', label:'Bolån (kr)', min:0, max:15000000, step:10000, val:2000000},
+    {id:'loanRate', label:'Bolåneränta (% per år)', min:0, max:10, step:0.05, val:3},
+    {id:'amort', label:'Amortering (% av lånet per år)', min:0, max:10, step:0.5, val:2},
+    {hint:true},
+  ]},
+  {group:'Utgifter', items:[
+    {id:'expensesNow', label:'Utgifter idag per månad (kr)', min:0, max:150000, step:1000, val:30000},
+    {id:'expensesAfter', label:'Utgifter efter sluta jobba per månad (kr, dagens)', min:0, max:150000, step:1000, val:30000},
+  ]},
+];
+
+const assumptions = [
+  {group:'Avkastning (% per år)', items:[
+    {id:'stockRet', label:'Aktier och fonder', val:7, step:0.1},
+    {id:'privRet', label:'Privat pension', val:5, step:0.1},
+    {id:'tjRet', label:'Tjänstepension', val:5, step:0.1},
+    {id:'allmRet', label:'Allmän pension (index)', val:3, step:0.1},
+    {id:'houseGrowth', label:'Bostadsprisökning', val:3, step:0.1},
+  ]},
+  {group:'Ekonomi', items:[
+    {id:'salaryGrowth', label:'Löneökning (% per år)', val:3, step:0.1},
+    {id:'inflation', label:'Inflation (% per år)', val:2, step:0.1},
+  ]},
+  {group:'Pensionssystemet', items:[
+    {id:'allmPct', label:'Allmän pension, avsättning (% av lönen)', val:18.5, step:0.5},
+    {id:'divisor', label:'Allmän pension, delningstal (år)', val:18, step:1},
+    {id:'tjPct', label:'Tjänstepension, arbetsgivare (% av lönen)', val:4.5, step:0.5},
+    {id:'tjDivisor', label:'Tjänstepension, delningstal (år)', val:20, step:1},
+  ]},
+  {group:'Brygga & FIRE', items:[
+    {id:'bryggRet', label:'Brygga: avkastning, real (% per år)', val:3, step:0.1},
+    {id:'margin', label:'Brygga: säkerhetsmarginal (%)', val:20, step:1},
+    {id:'swr', label:'FIRE: säker uttagsgrad (%)', val:4, step:0.1},
+  ]},
+];
+
+// Pengafält är de med steg 100 eller mer. De visas med mellanslag var tredje siffra
+// och godkänner suffixen k (tusen) och M (miljon).
+const isMoney = f => f.step >= 100;
+
+function parseNum(s, money){
+  let str = String(s).trim().toLowerCase().replace(/[\s\u00a0]/g, '');
+  let mult = 1;
+  if (money){
+    if (str.endsWith('m')){ mult = 1e6; str = str.slice(0,-1); }
+    else if (str.endsWith('k')){ mult = 1e3; str = str.slice(0,-1); }
+  }
+  str = str.replace(',', '.');
+  const v = parseFloat(str);
+  return isNaN(v) ? NaN : v * mult;
+}
+
+function formatNum(v, money){
+  if (isNaN(v)) return '';
+  if (money) return Math.round(v).toLocaleString('sv-SE');
+  return String(Math.round(v * 100) / 100).replace('.', ',');
+}
+
+const inputs = {};
+
+function makeField(f, parent, slider){
+  const money = isMoney(f);
+  const div = document.createElement('div');
+  div.className = 'field';
+  const rangeHtml = slider ? `<input type="range" id="${f.id}" min="${f.min}" max="${f.max}" step="${f.step}" value="${f.val}">` : '';
+  div.innerHTML = `<label for="${f.id}_n">${f.label}</label>
+    <div class="line ${slider ? '' : 'single'}">
+      <input type="text" inputmode="decimal" id="${f.id}_n" value="${formatNum(f.val, money)}">
+      ${rangeHtml}
+    </div>`;
+  parent.appendChild(div);
+  const n = div.querySelector('input[type=text]');
+  const r = div.querySelector('input[type=range]');
+
+  n.oninput = () => {
+    const v = parseNum(n.value, money);
+    if (!isNaN(v) && r) r.value = v;
+    update();
+  };
+  n.onblur = () => { n.value = formatNum(parseNum(n.value, money), money); update(); };
+  n.onkeydown = e => { if (e.key === 'Enter') n.blur(); };
+
+  if (r){
+    r.oninput = () => { n.value = formatNum(parseFloat(r.value), money); update(); };
+  }
+  inputs[f.id] = {n, money};
+}
+
+function buildUI(){
+  const root = document.getElementById('inputs');
+  for (const grp of main){
+    const h = document.createElement('h2'); h.textContent = grp.group; root.appendChild(h);
+    for (const f of grp.items){
+      if (f.hint){
+        const d = document.createElement('div'); d.className = 'hint'; d.id = 'payHint'; root.appendChild(d);
+      } else makeField(f, root, true);
+    }
+  }
+  const ass = document.getElementById('assump');
+  for (const grp of assumptions){
+    const h = document.createElement('h2'); h.textContent = grp.group; ass.appendChild(h);
+    for (const f of grp.items) makeField(f, ass, false);
+  }
+}
+
+const g = id => { const v = parseNum(inputs[id].n.value, inputs[id].money); return isNaN(v) ? 0 : v; };
+const fmt = v => Math.round(v).toLocaleString('sv-SE') + ' kr';
+const mkr = v => (v/1e6).toFixed(2).replace('.', ',') + ' Mkr';
+const mr = r => Math.pow(1 + r/100, 1/12) - 1;
+const yr = v => (Math.round(v*10)/10).toString().replace('.', ',') + ' år';
+
+function monthlyPayment(){
+  return g('loan') * (g('loanRate') + g('amort')) / 100 / 12;
+}
+
+// Nuvärde av brygg-utgifterna i dagens kronor, från sluta jobba till allmän pensionsstart.
+function pvBridge(a){
+  const n = Math.max(0, Math.round((g('allmStart') - a) * 12));
+  if (n === 0) return 0;
+  const i = Math.pow(1 + g('bryggRet')/100, 1/12) - 1;
+  const E = g('expensesAfter') + (g('loan') > 0 ? monthlyPayment() : 0); // lånet räknas med för säkerhets skull
+  return i === 0 ? E * n : E * (1 - Math.pow(1 + i, -n)) / i;
+}
+
+// Simulerar hela vägen till 100 år givet sluta-jobba-ålder a.
+function runPath(a){
+  const age0 = g('age'), allmStart = g('allmStart'), tjStart = g('tjStart');
+  const infl = g('inflation')/100;
+  const rS = mr(g('stockRet')), rP = mr(g('privRet')), rT = mr(g('tjRet')), rA = mr(g('allmRet')), rH = mr(g('houseGrowth'));
+  const L0 = g('loan'), rL = g('loanRate')/100/12, amortM = L0 * g('amort')/100/12, payM0 = monthlyPayment();
+  let S = g('stocks'), H = g('house'), L = L0, P = g('priv'), T = g('tjanst'), A = g('allm');
+  const stockSave = g('stockSave'), privSave = g('privSave');
+  const salary0 = g('salary'), salG = g('salaryGrowth')/100;
+  const allmPct = g('allmPct')/100, tjPct = g('tjPct')/100;
+  const div = g('divisor'), tjDiv = g('tjDivisor');
+  const exp0 = g('expensesAfter'), swr = g('swr')/100;
+  const months = Math.max(0, Math.round((100 - age0) * 12));
+
+  const pts = [];
+  let allmPay = 0, tjPay = 0, allmOn = false, tjOn = false;
+  let bridgeShort = false, shortfall = false, liqAtA = null, minBridge = Infinity, fire4 = null;
+
+  for (let m = 0; m <= months; m++){
+    const yrs = m/12, age = age0 + yrs;
+    const working = age < a;
+    const defl = Math.pow(1 + infl, yrs);
+
+    if (m % 12 === 0){
+      pts.push({age, nw:(S+H-L+P+T+A)/defl, liquid:(S+P)/defl, pension:(A+T)/defl});
+    }
+    if (liqAtA === null && !working) liqAtA = S + P;
+    if (!working && age < allmStart) minBridge = Math.min(minBridge, (S+P)/defl);
+
+    if (!allmOn && age >= allmStart){ allmOn = true; allmPay = A / (div*12); }
+    if (!tjOn && age >= tjStart){ tjOn = true; tjPay = T / (tjDiv*12); }
+    if (fire4 === null && age >= allmStart){
+      fire4 = ((S+P)*swr/12/defl + (allmPay+tjPay)/defl) >= g('expensesAfter');
+    }
+
+    // Pensionsutbetalningar (kontant)
+    const pA = allmOn ? Math.min(allmPay, A) : 0;
+    const pT = tjOn ? Math.min(tjPay, T) : 0;
+    const cashPension = pA + pT;
+
+    // Lön och avsättningar (endast under arbetsåren)
+    const salaryM = working ? salary0 * Math.pow(1+salG, yrs) / 12 : 0;
+    const allmC = salaryM * allmPct, tjC = salaryM * tjPct;
+
+    // Bolån
+    const wasPaidOff = L0 > 0 && L <= 0.5;
+    const interest = L * rL;
+    const princ = Math.min(L, amortM);
+    L -= princ;
+    const mortCash = interest + princ;
+    const freed = (wasPaidOff && working) ? payM0 : 0;
+
+    // Tillväxt och utbetalningar
+    S = S * (1 + rS);
+    P = P * (1 + rP);
+    H = H * (1 + rH);
+    T = Math.max(0, T * (1 + rT) - pT + (working ? tjC : 0));
+    A = Math.max(0, A * (1 + rA) - pA + (working ? allmC : 0));
+
+    if (working){
+      S += stockSave + freed + cashPension;
+      P += privSave;
+    } else {
+      const need = exp0 * defl + mortCash;
+      const net = need - cashPension;
+      if (net > 0){
+        const fromS = Math.min(S, net); S -= fromS;
+        let rest = net - fromS;
+        const fromP = Math.min(P, rest); P -= fromP;
+        rest -= fromP;
+        if (rest > 0.5){
+          shortfall = true;
+          if (age < allmStart) bridgeShort = true;
+        }
+      } else {
+        S += -net;
+      }
+    }
+  }
+
+  const defA = Math.pow(1 + infl, a - age0);
+  const liqRealA = liqAtA === null ? 0 : liqAtA / defA;
+  const need = pvBridge(a);
+  const marginOk = liqRealA * (1 - g('margin')/100) >= need;
+  const bridgeOk = !bridgeShort && marginOk;
+  return {
+    a, pts, liqRealA, need, marginOk, bridgeShort, shortfall, bridgeOk,
+    ok: bridgeOk && !shortfall,
+    minBridge: minBridge === Infinity ? liqRealA : minBridge,
+    fire4: !!fire4,
+  };
+}
+
+function reason(c){
+  if (c.bridgeShort) return 'Kapitalet räcker inte under bryggan';
+  if (!c.marginOk) return 'Säkerhetsmarginalen blir för liten';
+  return 'Kapitalet tar slut före 100 år';
+}
+
+function css(v){ return getComputedStyle(document.documentElement).getPropertyValue(v).trim(); }
+
+function draw(pts, markers){
+  const c = document.getElementById('chart');
+  const dpr = window.devicePixelRatio || 1;
+  const W = c.clientWidth, H = c.clientHeight;
+  c.width = W*dpr; c.height = H*dpr;
+  const ctx = c.getContext('2d');
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  ctx.clearRect(0,0,W,H);
+  if (pts.length < 2) return;
+
+  const pad = {l:72, r:12, t:12, b:28};
+  const x0 = pts[0].age, x1 = pts[pts.length-1].age;
+  const all = pts.flatMap(p => [p.nw, p.liquid, p.pension]);
+  const yMax = Math.max(1, ...all) * 1.05;
+  const yMin = Math.min(0, ...all);
+  const X = a => pad.l + (a-x0)/(x1-x0) * (W-pad.l-pad.r);
+  const Y = v => H-pad.b - (v-yMin)/(yMax-yMin) * (H-pad.t-pad.b);
+
+  ctx.font = '11px system-ui, sans-serif';
+  ctx.fillStyle = css('--muted');
+  ctx.strokeStyle = css('--line');
+  ctx.lineWidth = 1;
+  for (let i = 0; i <= 5; i++){
+    const v = yMin + (yMax-yMin)*i/5;
+    ctx.beginPath(); ctx.moveTo(pad.l, Y(v)); ctx.lineTo(W-pad.r, Y(v)); ctx.stroke();
+    ctx.fillText(mkr(v), 4, Y(v)+4);
+  }
+  for (let a = Math.ceil(x0/5)*5; a <= x1; a += 5){
+    ctx.fillText(a + ' år', X(a)-14, H-8);
+  }
+
+  function line(key, color){
+    ctx.beginPath();
+    pts.forEach((p,i) => { const x = X(p.age), y = Y(p[key]); i ? ctx.lineTo(x,y) : ctx.moveTo(x,y); });
+    ctx.strokeStyle = color; ctx.lineWidth = 2.2; ctx.stroke();
+  }
+  line('pension', css('--orange'));
+  line('liquid', css('--green'));
+  line('nw', css('--accent'));
+
+  markers.forEach((mk, idx) => {
+    if (mk.age < x0 || mk.age > x1) return;
+    ctx.setLineDash([5,4]);
+    ctx.strokeStyle = css('--muted'); ctx.lineWidth = 1;
+    ctx.beginPath(); ctx.moveTo(X(mk.age), pad.t); ctx.lineTo(X(mk.age), H-pad.b); ctx.stroke();
+    ctx.setLineDash([]);
+    ctx.fillStyle = css('--ink');
+    ctx.fillText(mk.label + ' ' + mk.age + ' år', X(mk.age)+4, pad.t + 12 + idx*14);
+  });
+}
+
+function update(){
+  const today = g('stocks') + g('house') - g('loan') + g('priv') + g('tjanst') + g('allm');
+  const nwEl = document.getElementById('nwToday');
+  nwEl.textContent = fmt(today);
+  nwEl.className = 'big' + (today < 0 ? ' neg' : '');
+
+  document.getElementById('payHint').innerHTML =
+    `Månadsbetalning (ränta + amortering, första månaden): <b>${fmt(monthlyPayment())}</b>`;
+
+  const rows = [
+    ['Aktier och fonder', g('stocks')],
+    ['Bostad', g('house')],
+    ['Bolån', -g('loan')],
+    ['Privat pension', g('priv')],
+    ['Tjänstepension', g('tjanst')],
+    ['Allmän pension', g('allm')],
+  ];
+  document.getElementById('breakdown').innerHTML = rows.map(([k,v]) =>
+    `<tr><td>${k}</td><td class="${v<0?'neg':''}">${fmt(v)}</td></tr>`).join('');
+
+  // Sluttidsprognos: prova alla åldrar från nu och till 75
+  const age0 = g('age');
+  const cands = [];
+  for (let a = Math.floor(age0) + 1; a <= 75; a++) cands.push(runPath(a));
+  const earliest = cands.find(c => c.ok);
+  const chosen = runPath(g('retAge'));
+
+  // Tidslinje
+  const retAge = Math.max(age0, g('retAge'));
+  const allmStart = Math.max(retAge, g('allmStart'));
+  const total = Math.max(1, 100 - age0);
+  const wW = (retAge - age0) / total * 100;
+  const wB = (allmStart - retAge) / total * 100;
+  const wP = 100 - wW - wB;
+  document.getElementById('timeline').innerHTML =
+    `<div class="work" style="width:${wW}%">${wW > 8 ? 'Arbete' : ''}</div>` +
+    `<div class="bridge" style="width:${wB}%">${wB > 8 ? 'Brygga' : ''}</div>` +
+    `<div class="pens" style="width:${wP}%">${wP > 8 ? 'Pension' : ''}</div>`;
+  document.getElementById('timelineLabels').textContent =
+    `Nu ${age0} år · Sluta jobba ${g('retAge')} år · Allmän pension ${g('allmStart')} år · Tjänstepension ${g('tjStart')} år · 100 år`;
+
+  // Prognos
+  const expNow = g('expensesNow'), expAfter = g('expensesAfter');
+  document.getElementById('prognos').innerHTML = earliest
+    ? `Tidigaste sluttid enligt prognosen: <span class="ok">${yr(earliest.a)}</span>`
+    : `Ingen sluttid mellan ${age0 + 1} och 75 år klarar alla kontroller. Prova att sänka utgifterna efter sluta jobba eller öka sparandet.`;
+
+  const yesNo = (ok, t) => `<span class="${ok?'ok':'neg'}">${ok?'OK':'Nej'}</span> ${t}`;
+  document.getElementById('status').innerHTML = [
+    `Utgifter: ${fmt(expNow)} idag, ${fmt(expAfter)} efter sluta jobba`,
+    yesNo(!chosen.bridgeShort, 'Bryggan täcks från sluta jobba till allmän pensionsstart'),
+    yesNo(chosen.marginOk, `Säkerhetsmarginal ${g('margin')} % på bryggan`),
+    yesNo(!chosen.shortfall, 'Kapitalet räcker till 100 år'),
+    yesNo(chosen.fire4, `4-procentsregeln vid allmän pensionsstart (${g('swr')} %)`),
+  ].join('<br>') + `<br><span style="color:var(--muted)">Status gäller vald sluttid ${g('retAge')} år.</span>`;
+
+  // Nyckeltal för vald sluttid
+  const kpis = [
+    ['Nettoförmögenhet vid sluta jobba', fmt(chosen.pts.find(p => p.age >= g('retAge'))?.nw ?? 0) + '<br><small>dagens kr</small>'],
+    ['Likvid vid sluta jobba', fmt(chosen.liqRealA) + '<br><small>aktier + privat, dagens kr</small>'],
+    ['Brygga kräver', fmt(chosen.need) + '<br><small>med marginal ' + fmt(chosen.need / (1 - g('margin')/100)) + '</small>'],
+    ['Lägsta likvid i bryggan', fmt(chosen.minBridge) + '<br><small>dagens kr</small>'],
+  ];
+  document.getElementById('kpis').innerHTML = kpis.map(([k,v]) =>
+    `<div class="kpi"><span>${k}</span><b>${v}</b></div>`).join('');
+
+  // Alla sluttider
+  document.getElementById('candidates').innerHTML =
+    '<tr><td><b>Sluttid</b></td><td><b>Resultat</b></td></tr>' +
+    cands.map(c => `<tr><td>${c.a} år</td><td class="${c.ok?'ok':'neg'}">${c.ok ? '✓ Klarar allt' : '✗ ' + reason(c)}</td></tr>`).join('');
+
+  draw(chosen.pts, [
+    {age: g('retAge'), label: 'Sluta jobba'},
+    {age: g('allmStart'), label: 'Allmän pension'},
+  ]);
+}
+
+buildUI();
+update();
+window.addEventListener('resize', update);
+</script>
+</body>
+</html>

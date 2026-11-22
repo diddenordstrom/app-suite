@@ -1,0 +1,160 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1794157785999,
+      "tag": "0000_sleepy_slipstream",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "6",
+      "when": 1794161424311,
+      "tag": "0001_bumpy_bastion",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "6",
+      "when": 1794162142795,
+      "tag": "0002_romantic_moira_mactaggert",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "6",
+      "when": 1794177196894,
+      "tag": "0003_hot_northstar",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "6",
+      "when": 1794178702910,
+      "tag": "0004_closed_talisman",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "6",
+      "when": 1794248181455,
+      "tag": "0005_blocks",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "6",
+      "when": 1794248182152,
+      "tag": "0006_drop_phases",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "6",
+      "when": 1794315691121,
+      "tag": "0007_tours_seen",
+      "breakpoints": true
+    },
+    {
+      "idx": 8,
+      "version": "6",
+      "when": 1794380101002,
+      "tag": "0008_garmin_sleep_score",
+      "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "6",
+      "when": 1794409617014,
+      "tag": "0009_activity_detail",
+      "breakpoints": true
+    },
+    {
+      "idx": 10,
+      "version": "6",
+      "when": 1794411509227,
+      "tag": "0010_workout_steps",
+      "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "6",
+      "when": 1794427663836,
+      "tag": "0011_activity_splits",
+      "breakpoints": true
+    },
+    {
+      "idx": 12,
+      "version": "6",
+      "when": 1794430440230,
+      "tag": "0012_block_cross_min",
+      "breakpoints": true
+    },
+    {
+      "idx": 13,
+      "version": "6",
+      "when": 1794475176642,
+      "tag": "0013_long_run_day",
+      "breakpoints": true
+    },
+    {
+      "idx": 14,
+      "version": "6",
+      "when": 1794522575381,
+      "tag": "0014_checkin_feel",
+      "breakpoints": true
+    },
+    {
+      "idx": 15,
+      "version": "6",
+      "when": 1794551237278,
+      "tag": "0015_intervals",
+      "breakpoints": true
+    },
+    {
+      "idx": 16,
+      "version": "6",
+      "when": 1794566201819,
+      "tag": "0016_block_goal",
+      "breakpoints": true
+    },
+    {
+      "idx": 17,
+      "version": "6",
+      "when": 1794567138514,
+      "tag": "0017_best_efforts",
+      "breakpoints": true
+    },
+    {
+      "idx": 18,
+      "version": "6",
+      "when": 1794577320929,
+      "tag": "0018_session_templates",
+      "breakpoints": true
+    },
+    {
+      "idx": 19,
+      "version": "6",
+      "when": 1794593720162,
+      "tag": "0019_race_results",
+      "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "6",
+      "when": 1794670031889,
+      "tag": "0020_long_warpath",
+      "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "6",
+      "when": 1795189349816,
+      "tag": "0021_web_push",
+      "breakpoints": true
+    }
+  ]
+}

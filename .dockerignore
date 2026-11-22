@@ -1,0 +1,11 @@
+**/node_modules
+**/dist
+**/data
+**/.env
+.git
+**/.nuxt
+**/.output
+**/coverage
+**/test-results
+# The Fartlek landing page's demo snapshot is source, not app data
+!apps/portfolio/src/client/components/fartlek/data

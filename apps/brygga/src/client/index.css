@@ -1,0 +1,13 @@
+@import "tailwindcss";
+@import "@homelab/ui/theme.css";
+@import "./ui/tokens.css";
+
+/* Brygga-only tokens: the timeline phases (see tokens.css). */
+@theme inline {
+  --color-phase-work: var(--phase-work);
+  --color-phase-work-foreground: var(--phase-work-foreground);
+  --color-phase-bridge: var(--phase-bridge);
+  --color-phase-bridge-foreground: var(--phase-bridge-foreground);
+  --color-phase-pension: var(--phase-pension);
+  --color-phase-pension-foreground: var(--phase-pension-foreground);
+}

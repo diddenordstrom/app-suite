@@ -1,0 +1,1 @@
+ALTER TABLE `blocks` ADD `goal_km` real;
