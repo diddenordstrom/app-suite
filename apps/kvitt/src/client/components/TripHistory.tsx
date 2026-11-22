@@ -8,7 +8,7 @@ export function TripHistory({ trips }: { trips: Trip[] }) {
   const closed = trips.filter((t) => t.status === "closed").sort((a, b) => (b.closedAt ?? 0) - (a.closedAt ?? 0)).slice(0, 30);
   if (closed.length === 0) return <p className="text-sm text-muted-foreground">{tr("history.none")}</p>;
   return (
-    <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+    <ul className="divide-y divide-border rounded-lg border border-card-edge bg-card shadow-card">
       {closed.map((t) => {
         const total = t.allocations.reduce((s, a) => s + a.amount, 0);
         return (

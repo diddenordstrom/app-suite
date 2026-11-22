@@ -120,7 +120,7 @@ export function GardenBedPopover({ position, locationId, name, paintedAreaM2, st
   const row = (label: string, value: string) => <div className="flex justify-between"><dt className="text-muted-foreground">{label}</dt><dd>{value}</dd></div>;
   return (
     <>
-      <div className="fixed z-30 min-w-[200px] max-w-[280px] -translate-x-1/2 rounded-lg border border-border bg-card p-3 shadow-lg" style={{ top: position.y + 10, left: position.x }} data-testid="garden-bed-popover">
+      <div className="fixed z-30 min-w-[200px] max-w-[280px] -translate-x-1/2 rounded-lg border border-card-edge bg-card shadow-card p-3 shadow-lg" style={{ top: position.y + 10, left: position.x }} data-testid="garden-bed-popover">
         <div className="mb-2 flex items-center justify-between">
           <h3 className="text-sm font-semibold">{name}</h3>
           <button type="button" aria-label={t("common.close")} onClick={onClose} className="text-xs text-muted-foreground hover:text-foreground">×</button>

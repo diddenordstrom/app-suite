@@ -48,6 +48,25 @@
   --seq-3: light-dark(#54448f, #c7baf3);
 
   --overlay: light-dark(rgb(43 37 54 / 0.35), rgb(8 6 14 / 0.6));
+
+  /*
+   * Depth, in three steps: cards sit softly on the page, controls (buttons, the chosen tab) are
+   * raised a little more because they can be pressed, and floating things (dialogs, menus,
+   * tooltips, the tour) get the big shadow. Controls stay subtle too: a thin shadow, no glow. Light mode tints the shadows plum so they melt into
+   * the paper; dark mode leans on a 1px light top edge, since a shadow barely shows on dark.
+   */
+  --card-edge: light-dark(rgb(43 37 54 / 0.08), rgb(255 255 255 / 0.05));
+  --control: light-dark(#ffffff, #342d47);              /* raised control surface (outline button, chosen tab) */
+  --highlight: light-dark(rgb(255 255 255 / 0), rgb(255 255 255 / 0.06));
+  --shade-near: light-dark(rgb(43 37 54 / 0.06), rgb(8 6 14 / 0.45));
+  --shade-far: light-dark(rgb(43 37 54 / 0.06), rgb(8 6 14 / 0.3));
+  --shade-deep: light-dark(rgb(43 37 54 / 0.16), rgb(8 6 14 / 0.7));
+  --shade-primary: light-dark(rgb(74 56 140 / 0.3), rgb(8 6 14 / 0.5));
+  --shadow-card: inset 0 1px 0 var(--highlight), 0 1px 2px var(--shade-near), 0 2px 8px var(--shade-far);
+  --shadow-card-hover: inset 0 1px 0 var(--highlight), 0 1px 2px var(--shade-near), 0 4px 10px -2px var(--shade-far), 0 16px 32px -12px var(--shade-deep);
+  --shadow-control: inset 0 1px 0 var(--highlight), 0 1px 2px var(--shade-near);
+  --shadow-primary: inset 0 1px 0 light-dark(rgb(255 255 255 / 0.15), rgb(255 255 255 / 0.3)), 0 1px 2px var(--shade-primary);
+  --shadow-pop: inset 0 1px 0 var(--highlight), 0 2px 4px var(--shade-near), 0 18px 36px -12px var(--shade-deep);
   --radius: 0.875rem;
   --font-sans: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }

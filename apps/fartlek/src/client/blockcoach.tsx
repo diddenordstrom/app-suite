@@ -181,7 +181,7 @@ export function CrossHabit({ coach, onChange }: { coach: CoachData; onChange: (m
   const v = coach.crossMin, habit = coach.habitMin;
   const set = (m: number) => onChange(Math.max(0, Math.min(1500, m)));
   return (
-    <section className="space-y-2 rounded-lg border border-border bg-card px-4 py-3" aria-labelledby="cross-h">
+    <section className="space-y-2 rounded-lg border border-card-edge bg-card shadow-card px-4 py-3" aria-labelledby="cross-h">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h3 id="cross-h" className="text-sm font-semibold">{t("cross.title")}</h3>
@@ -259,7 +259,7 @@ export function QuickAdd({ weekLabel, onAdd }: { weekLabel: string; onAdd: (part
             <span aria-hidden className="size-2 rounded-full" style={{ background: q.color }} />+ {t(q.label)}
           </button>
           {open === q.kind && (
-            <div role="dialog" aria-label={t(q.label)} className="absolute left-0 top-[calc(100%+6px)] z-20 w-72 space-y-2.5 rounded-lg border border-border bg-card p-3 text-sm shadow-lg">
+            <div role="dialog" aria-label={t(q.label)} className="absolute left-0 top-[calc(100%+6px)] z-20 w-72 space-y-2.5 rounded-lg border border-card-edge bg-card shadow-card p-3 text-sm shadow-lg">
               <div className="text-xs font-semibold text-muted-foreground">{t(q.label)} · {weekLabel}</div>
               <div className="flex flex-wrap items-center gap-2">
                 {q.kind === "easy" && <>{num("easy", "easy", t("quick.dist", { unit: fmt.unit }), 0.5, true)}<span>{t("quick.dist", { unit: fmt.unit })}</span></>}

@@ -19,7 +19,7 @@ export function ActivityFeed({ items }: { items: Activity[] }) {
   return (
     <>
       <ErrorText>{error}</ErrorText>
-      <ul className="divide-y divide-border rounded-lg border border-border bg-card">
+      <ul className="divide-y divide-border rounded-lg border border-card-edge bg-card shadow-card">
         {items.map((a) => {
           let icon, text, amount: number, extra = null;
           const id = a.kind === "trip" ? a.trip.id : a.kind === "expense" ? a.expense.id : a.settlement.id;

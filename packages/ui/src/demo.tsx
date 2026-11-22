@@ -6,7 +6,8 @@ export function DemoBanner({ onEnd }: { onEnd: () => void }) {
   return (
     <div role="note" className="mb-4 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-lg bg-signature-soft px-4 py-2.5 text-sm text-signature-foreground">
       <span className="min-w-0 flex-1"><strong className="font-semibold">{tShared("demo.mode")}.</strong> {tShared("demo.banner")}</span>
-      <Button variant="outline" className="h-8" onClick={onEnd}>{tShared("demo.end")}</Button>
+      {/* On the tinted banner a grey control surface clashes: the button takes the banner's own colour. */}
+      <Button variant="ghost" className="h-8 border border-signature-foreground/30 text-signature-foreground hover:bg-signature/15" onClick={onEnd}>{tShared("demo.end")}</Button>
     </div>
   );
 }

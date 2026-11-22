@@ -137,7 +137,7 @@ function WeekHead({ b, i, ev, plan, deepest, editable, onRemove, compact, label 
   const e = ev.weeks[i];
   if (!e) return null;
   return (
-    <div className={cn("flex flex-col gap-1.5 rounded-lg border border-border bg-card p-2.5", compact && "border-0 bg-transparent p-0")}>
+    <div className={cn("flex flex-col gap-1.5 rounded-lg border border-card-edge bg-card shadow-card p-2.5", compact && "border-0 bg-transparent p-0")}>
       {label && <span className="text-[11px] font-semibold uppercase tracking-wide text-signature-foreground">{label}</span>}
       <div className="flex items-start justify-between gap-2">
         <h4 className={cn("font-semibold tabular-nums", compact ? "text-lg" : "text-sm")}>{t("blk.week", { week: weekNumber(ws), dist: fmt.dist(e.km) })}</h4>

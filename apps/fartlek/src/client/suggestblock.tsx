@@ -336,7 +336,7 @@ function TwoColumns({ weeks, panel, ev }: { weeks: ReactNode; panel: ReactNode; 
       <aside ref={setAside} className="space-y-3 xl:sticky xl:top-0 xl:self-start">{panel}</aside>
       {/* Narrower screens put the numbers under the weeks: a bar at the bottom keeps the main ones in sight. */}
       <button type="button" onClick={() => aside?.scrollIntoView({ behavior: "smooth", block: "start" })}
-        className="sticky bottom-0 z-10 flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2 text-left text-sm tabular-nums shadow-lg xl:hidden">
+        className="sticky bottom-0 z-10 flex items-center gap-3 rounded-lg border border-card-edge bg-card shadow-card px-3 py-2 text-left text-sm tabular-nums shadow-lg xl:hidden">
         <span className="flex flex-1 flex-wrap gap-x-3">
           <span><strong>{fmt.dist(ev.km, 0)}</strong></span>
           <span>{t("be.bar.peak")} <strong>{fmt.dist(peak, 0)}</strong></span>
@@ -422,7 +422,7 @@ function BlockEditor({ res, own, rhythm, extended, names, onExtend, onUnextend, 
 
 function Tile({ label, value, sub, tone = "ok", badge }: { label: string; value: string; sub: string; tone?: Tone; badge?: string }) {
   return (
-    <div className="space-y-0.5 rounded-lg border border-border bg-card p-3">
+    <div className="space-y-0.5 rounded-lg border border-card-edge bg-card shadow-card p-3">
       <div className="text-xs text-muted-foreground">{label}</div>
       <div className="truncate text-xl font-semibold tabular-nums">{value}</div>
       <div className="text-xs text-muted-foreground">{sub}</div>
@@ -470,7 +470,7 @@ function BlockCharts({ seed, ev, stacked }: { seed: BlockSeed; ev: BlockEval; st
   const kmTop = Math.max(20, tol, ...pts.map((p) => p.km)) * 1.15;
   const yKm = (v: number) => 128 - (v / kmTop) * 118;
   const deep = ev.deepest ? pts.findIndex((p) => p.ws === ev.deepest!.weekStart) : -1;
-  const card = "space-y-1 rounded-lg border border-border bg-card p-3";
+  const card = "space-y-1 rounded-lg border border-card-edge bg-card shadow-card p-3";
   const bar = Math.min(28, dx * 0.6);
   return (
     <div className={cn("grid gap-2", !stacked && "md:grid-cols-2")}>
@@ -616,7 +616,7 @@ function ReplanEditor({ res, options, startWith, onClose, onSaved }: { res: Extr
     : res.goal != null ? t("rp.banner", { done: fmt.dist(res.done.km), goal: fmt.dist(res.goal, 0) })
     : t("rp.bannerNoGoal", { done: fmt.dist(res.done.km) });
   const goalTile = (
-    <div className="space-y-1 rounded-lg border border-border bg-card p-3">
+    <div className="space-y-1 rounded-lg border border-card-edge bg-card shadow-card p-3">
       <div className="text-xs text-muted-foreground">{t("blk.stat.goal")}</div>
       <div className="text-xl font-semibold tabular-nums">{fmt.dist(newGoal, 0)}{res.goal != null && <span className="ml-1.5 text-sm font-normal text-muted-foreground">/ {fmt.dist(res.goal, 0)}</span>}</div>
       {res.goal != null && <div className="h-2 overflow-hidden rounded-full bg-muted" aria-hidden><div className="h-full bg-signature" style={{ width: `${Math.min(100, (res.done.km / Math.max(1, newGoal)) * 100)}%` }} /></div>}
@@ -645,7 +645,7 @@ function ReplanEditor({ res, options, startWith, onClose, onSaved }: { res: Extr
           <BlockWarnings ev={ev} />
           <BlockCharts seed={b.seed} ev={ev} stacked />
         </>} />
-      <div className="overflow-x-auto rounded-lg border border-border bg-card px-3">
+      <div className="overflow-x-auto rounded-lg border border-card-edge bg-card shadow-card px-3">
         <table className="w-full min-w-[34rem] text-sm tabular-nums">
           <thead><tr className="text-left text-xs text-muted-foreground">
             <th className="py-2 font-normal">{t("rp.col.week")}</th><th className="py-2 font-normal">{t("rp.col.before")}</th>

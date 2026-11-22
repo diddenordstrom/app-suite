@@ -33,7 +33,7 @@ export function DayCard({ plan, di, home, highlight }: { plan: PlanResponse; di:
   const move = (dir: -1 | 1) => void run(() => call("POST", `/days/${day.id}/move`, { dir }, ["plan"]));
 
   return (
-    <article id={`day-${day.id}`} className={cn("space-y-3.5 rounded-lg border border-border bg-card p-3.5", highlight === day.id && "ring-2 ring-primary")}>
+    <article id={`day-${day.id}`} className={cn("space-y-3.5 rounded-lg border border-card-edge bg-card shadow-card p-3.5", highlight === day.id && "ring-2 ring-primary")}>
       <Cover day={day} title={title} />
       {editing ? (
         <DayEdit day={day} onDone={() => setEditing(false)} />

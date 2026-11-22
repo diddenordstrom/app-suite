@@ -15,7 +15,7 @@ export function SortMenu<K extends string>({ label, options, value, desc, onPick
         </svg>
       </button>
       {open && (
-        <div data-testid="sort-menu" className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-border bg-card py-1 shadow-lg">
+        <div data-testid="sort-menu" className="absolute right-0 top-full z-20 mt-1 w-48 rounded-lg border border-card-edge bg-card shadow-card py-1 shadow-lg">
           {options.map((o) => (
             <button key={o.key} type="button" onClick={() => { onPick(o.key); setOpen(false); }}
               className={cn("flex w-full items-center justify-between px-3 py-2 text-sm hover:bg-accent", value === o.key && "font-semibold")}>

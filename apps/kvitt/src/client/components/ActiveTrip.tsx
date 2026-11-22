@@ -66,7 +66,7 @@ export function ActiveTrip({ trip, lists, onCheckedOut }: { trip: Trip; lists: L
         return (
           <section key={ownerId} className="space-y-2">
             <h2 className="px-1 text-sm font-semibold text-muted-foreground uppercase">{ownerId === h.me.id ? t("trip.yoursGroup") : h.name(ownerId)}</h2>
-            <ul className="relative divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">
+            <ul className="relative divide-y divide-border overflow-hidden rounded-lg border border-card-edge bg-card shadow-card">
               {open.map((i) => <Row key={i.id} item={i} status="open" set={set} flipRef={flip(i.id)} />)}
               {done.length > 0 && (
                 <li key="done" ref={flip(-ownerId - 1)} className="bg-muted px-4 py-1.5 text-xs font-semibold text-muted-foreground">
