@@ -14,7 +14,7 @@
     "clsx": "*",
     "react": "*",
     "react-dom": "*",
-    "react-router-dom": "*",
+    "react-router-dom": "^7.18.6",
     "tailwind-merge": "*"
   },
   "dependencies": {
