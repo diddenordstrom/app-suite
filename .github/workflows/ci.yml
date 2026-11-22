@@ -48,6 +48,46 @@ jobs:
       - if: steps.changes.outputs.code == 'true'
         run: npm run build
 
+  # Build every app's image on pull requests and start it the way production does. The tests run the
+  # source; only this catches a bundle that builds but crashes at start (a dependency inlined into the
+  # ESM server bundle, a missing file in the image). Skips an app whose files did not change, and still
+  # succeeds then, so it can stay a required check.
+  smoke:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        app: [fartlek, kvitt, etapp, garden, portfolio, brygga]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: dorny/paths-filter@v4
+        id: changes
+        with:
+          filters: |
+            app:
+              - 'apps/${{ matrix.app }}/**'
+              - 'packages/**'
+              - 'package-lock.json'
+              - 'Dockerfile'
+              - 'scripts/**'
+      - if: steps.changes.outputs.app == 'true'
+        run: docker build --build-arg APP=${{ matrix.app }} -t smoke .
+      - if: steps.changes.outputs.app == 'true'
+        run: |
+          # Dummy values: just enough config for the server to start in production mode.
+          docker run -d --name smoke -p 3000:3000 \
+            -e AUTH_MODE=oidc -e OIDC_ISSUER=https://auth.example.com -e OIDC_CLIENT_ID=smoke -e OIDC_CLIENT_SECRET=smoke \
+            -e SESSION_SECRET=0123456789abcdef0123456789abcdef -e PUBLIC_URL=http://localhost:3000 \
+            -e RUNPLAN_MASTER_KEY=0123456789abcdef0123456789abcdef \
+            smoke
+          for i in $(seq 1 30); do
+            curl -fsS http://localhost:3000/api/health && exit 0
+            sleep 1
+          done
+          docker logs smoke
+          exit 1
+
   image:
     needs: [audit, test]
     if: github.event_name == 'push'
