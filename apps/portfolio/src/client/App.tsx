@@ -8,11 +8,13 @@ import { Hero } from "./components/Hero";
 
 /** Loaded only on /fartlek: it brings Fartlek's own components and the demo data along. */
 const FartlekPage = lazy(() => import("./components/fartlek/FartlekPage").then((m) => ({ default: m.FartlekPage })));
+const KvittPage = lazy(() => import("./components/kvitt/KvittPage").then((m) => ({ default: m.KvittPage })));
 
-/** The portfolio is one page plus Fartlek's landing page; the server answers every path with index.html. */
+/** The portfolio is one page plus landing pages for Fartlek and Kvitt; the server answers every path with index.html. */
 export function App() {
   const path = location.pathname.replace(/\/+$/, "") || "/";
   if (path === "/fartlek") return <Suspense fallback={null}><FartlekPage /></Suspense>;
+  if (path === "/kvitt") return <Suspense fallback={null}><KvittPage /></Suspense>;
   return <Home />;
 }
 
