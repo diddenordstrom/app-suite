@@ -18,7 +18,7 @@
     "scenarios": "tsx src/server/scenarios.ts"
   },
   "dependencies": {
-    "@garmin/fitsdk": "^21.221.0",
+    "@garmin/fitsdk": "^21.222.0",
     "@homelab/i18n": "*",
     "@homelab/server-kit": "*",
     "@homelab/ui": "*",
@@ -31,7 +31,7 @@
     "openid-client": "^6.9.0",
     "react": "^19.3.1",
     "react-dom": "^19.3.1",
-    "react-router-dom": "^7.18.5",
+    "react-router-dom": "^7.18.6",
     "tailwind-merge": "^3.7.0",
     "web-push": "^4.0.0"
   }
