@@ -8,7 +8,7 @@ import { useTrip } from "../trip";
 import { fmtDate, fmtKm, fmtShortDate, useCurrentDay, usePlan } from "../plan";
 import { Button, Card, cn, ErrorText, Field, Input, SegmentedControl, Textarea, PageSkeleton } from "../ui";
 import { Eyebrow } from "../components/bits";
-import { DayCard } from "../components/DayCard";
+import { DayView } from "../components/DayView";
 import { PageHeader } from "../components/common";
 import { t, tn } from "../i18n";
 
@@ -19,10 +19,43 @@ export function Days() {
   return (
     <div className="space-y-4">
       <PageHeader title={detail.name} />
-      <StartCard plan={q.data} home={detail.home} />
-      <Summary plan={q.data} home={detail.home} />
       <Planner plan={q.data} home={detail.home} />
+      <TripPlanning plan={q.data} home={detail.home} />
     </div>
+  );
+}
+
+/** Start, date, quick entry and the whole route: used while planning, so folded below the day. ?quick=1 opens it. */
+function TripPlanning({ plan, home }: { plan: PlanResponse; home: Home }) {
+  const [params, setParams] = useSearchParams();
+  const [open, setOpen] = useState(false);
+  const { idx, select } = useCurrentDay(plan);
+  const wantQuick = params.get("quick") === "1";
+  useEffect(() => {
+    if (!wantQuick) return;
+    setOpen(true);
+    setParams((p) => { p.delete("quick"); return p; }, { replace: true });
+    requestAnimationFrame(() => {
+      const el = document.getElementById("quick-entry");
+      el?.scrollIntoView({ block: "center" });
+      el?.focus();
+    });
+  }, [wantQuick, setParams]);
+  return (
+    <details open={open} onToggle={(e) => setOpen(e.currentTarget.open)} className="group rounded-lg border border-border bg-card">
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-2 p-4">
+        <span>
+          <span className="block text-sm font-semibold">{t("plan.trip")}</span>
+          <span className="block text-xs text-muted-foreground">{t("plan.tripHint")}</span>
+        </span>
+        <span aria-hidden className="text-muted-foreground transition group-open:rotate-90">›</span>
+      </summary>
+      <div className="space-y-4 px-4 pb-4">
+        <StartCard plan={plan} home={home} />
+        <QuickEntry dayId={plan.days[idx].id} n={idx + 1} onDay={select} />
+        <Summary plan={plan} home={home} />
+      </div>
+    </details>
   );
 }
 
@@ -109,7 +142,6 @@ function Planner({ plan, home }: { plan: PlanResponse; home: Home }) {
 
   return (
     <>
-      <QuickEntry dayId={day.id} n={idx + 1} onDay={select} />
       <div className="-mx-1 flex gap-1.5 overflow-x-auto px-1 pb-1" role="group" aria-label={t("day.pick")}>
         {plan.days.map((d, i) => {
           const date = dayDate(plan.startDate, i);
@@ -131,7 +163,7 @@ function Planner({ plan, home }: { plan: PlanResponse; home: Home }) {
         })}
         <button type="button" onClick={addDay} disabled={busy} aria-label={t("day.add")} className="flex min-w-12 shrink-0 items-center justify-center rounded-md border border-border bg-card text-xl">+</button>
       </div>
-      <DayCard plan={plan} di={idx} home={home} highlight={highlight} />
+      <DayView key={day.id} plan={plan} di={idx} home={home} highlight={highlight} />
       <div className="flex justify-between gap-2">
         <Button variant="outline" disabled={idx === 0} onClick={() => go(idx - 1)}>{t("day.prev")}</Button>
         <Button variant="outline" disabled={idx === plan.days.length - 1} onClick={() => go(idx + 1)}>{t("day.next")}</Button>
@@ -152,6 +184,7 @@ function QuickEntry({ dayId, n, onDay }: { dayId: number; n: number; onDay: (id:
       const r = await call<QuickResponse>("POST", "/quick", { dayId, text }, ["plan"]);
       const what = [
         r.added.days ? tn("quick.days", r.added.days) : "", r.added.stops ? tn("quick.stops", r.added.stops) : "",
+        r.added.vias ? tn("quick.vias", r.added.vias) : "",
         r.added.todos ? tn("quick.todos", r.added.todos) : "", r.added.nights ? tn("quick.nights", r.added.nights) : "",
       ].filter(Boolean);
       const warnings = r.warnings.map((w) => t(w.code === "shortLink" ? "quick.shortLink" : "quick.badLink", { line: w.line }));
@@ -164,7 +197,7 @@ function QuickEntry({ dayId, n, onDay }: { dayId: number; n: number; onDay: (id:
     <Card>
       <form onSubmit={submit} className="space-y-3">
         <Eyebrow>{t("quick.title", { n })}</Eyebrow>
-        <Textarea rows={3} value={text} onChange={(e) => { setText(e.target.value); setMsg(null); }} placeholder={t("quick.placeholder")} aria-label={t("quick.title", { n })} className="min-h-24" />
+        <Textarea id="quick-entry" rows={3} value={text} onChange={(e) => { setText(e.target.value); setMsg(null); }} placeholder={t("quick.placeholder")} aria-label={t("quick.title", { n })} className="min-h-24" />
         <details className="text-xs text-muted-foreground">
           <summary className="cursor-pointer">{t("quick.howTo")}</summary>
           <p className="mt-1.5">{t("quick.help")}</p>

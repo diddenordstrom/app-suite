@@ -5,7 +5,7 @@ import { useTrip } from "../trip";
 import { usePlan } from "../plan";
 import { Card, ErrorText, PageSkeleton } from "../ui";
 import { PageHeader } from "../components/common";
-import { pointLabel } from "../components/Leg";
+import { pointLabel } from "../components/DayView";
 import { t } from "../i18n";
 
 type Pt = { kind: "start" | "stop" | "night"; n: number; label: string; lat: number; lon: number; target?: string };
@@ -24,6 +24,7 @@ export function MapPage() {
   let no = 1;
   plan.days.forEach((d, di) => {
     for (const st of d.stops) {
+      if (st.kind === "via") continue; // vias steer the route; the map shows the places you stop at
       const n = no++;
       if (hasCoords(st)) seq.push({ kind: "stop", n, label: st.name, lat: st.lat, lon: st.lon, target: `?stop=${st.id}` });
       else missing.push(st.name);

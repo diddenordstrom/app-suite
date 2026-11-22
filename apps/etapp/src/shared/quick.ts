@@ -5,17 +5,18 @@
  *   Gränna, se polkagrisbutiken                  → stop with one todo
  *   dag Gudbrandsdalen                           → starts a new day titled "Gudbrandsdalen"
  *   natt tält Vättern 57.9, 14.5                 → the current day's night: tent at "Vättern" with a position
+ *   via Kongsvinger                              → a via point: steers the route, no todos
  *
  * A line may carry "lat, lon" or a long Google Maps link for a position. Bullets pasted from a notes app are ignored.
  * Parsing is pure; applying the commands to a trip is the server's job.
  */
 import { coordsFromMapsUrl, type LatLon } from "./geo";
-import { CATEGORIES, type Category, type SleepType } from "./plan";
+import { CATEGORIES, type Category, type SleepType, type StopKind } from "./plan";
 
 export type QuickCommand =
   | { kind: "day"; title: string }
   | { kind: "night"; sleepType: SleepType | null; name: string | null; lat: number | null; lon: number | null }
-  | { kind: "stop"; name: string; lat: number | null; lon: number | null; todos: { text: string; category: Category }[] };
+  | { kind: "stop"; stopKind: StopKind; name: string; lat: number | null; lon: number | null; todos: { text: string; category: Category }[] };
 
 /** shortLink: a maps.app.goo.gl share link (no position in it). badLink: some other URL without a position. */
 export interface QuickWarning { line: number; code: "shortLink" | "badLink" }
@@ -60,6 +61,13 @@ function takePosition(s: string): { rest: string; ll: LatLon | null; warning: Qu
   return { rest, ll, warning };
 }
 
+/** One place from free text: a name plus an optional position (coordinates or a long Maps link). Used by "Lägg till". */
+export function parsePlace(text: string): { name: string; lat: number | null; lon: number | null; warning: QuickWarning["code"] | null } {
+  const p = takePosition(text.trim());
+  const name = p.rest.replace(/\s+/g, " ").trim().replace(/^[,;\s]+|[,;\s]+$/g, "");
+  return { name: cap(name), lat: p.ll?.lat ?? null, lon: p.ll?.lon ?? null, warning: p.warning };
+}
+
 /** "fika Kroatorpet" → fika "Kroatorpet"; "lunch i Lom" → mat "Lunch i Lom"; anything else → se. */
 export function parseTodo(seg: string): { text: string; category: Category } {
   const word = seg.split(/\s+/)[0], lw = word.toLowerCase();
@@ -93,13 +101,20 @@ export function parseQuick(text: string): QuickResult {
       return;
     }
 
+    if ((m = line.match(/^via\s+(.+)$/i))) {
+      const p = parsePlace(m[1]);
+      if (p.warning) warnings.push({ line: i + 1, code: p.warning });
+      if (p.name) commands.push({ kind: "stop", stopKind: "via", name: p.name, lat: p.lat, lon: p.lon, todos: [] });
+      return;
+    }
+
     const p = takePosition(line);
     if (p.warning) warnings.push({ line: i + 1, code: p.warning });
     const segs = p.rest.split(",").map((x) => x.trim()).filter(Boolean);
     const name = segs[0]?.replace(/^stopp?\s+/i, "").trim();
     if (!name) return;
     commands.push({
-      kind: "stop", name: cap(name), lat: p.ll?.lat ?? null, lon: p.ll?.lon ?? null,
+      kind: "stop", stopKind: "stop", name: cap(name), lat: p.ll?.lat ?? null, lon: p.ll?.lon ?? null,
       todos: segs.slice(1).map(parseTodo),
     });
   });
@@ -108,11 +123,12 @@ export function parseQuick(text: string): QuickResult {
 
 /** Counts for the "Added 2 stops, 3 todos" message. */
 export function summarize(r: QuickResult) {
-  let days = 0, stops = 0, todos = 0, nights = 0;
+  let days = 0, stops = 0, vias = 0, todos = 0, nights = 0;
   for (const c of r.commands) {
     if (c.kind === "day") days++;
     else if (c.kind === "night") nights++;
+    else if (c.stopKind === "via") vias++;
     else { stops++; todos += c.todos.length; }
   }
-  return { days, stops, todos, nights };
+  return { days, stops, vias, todos, nights };
 }

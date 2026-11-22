@@ -7,11 +7,14 @@ Roadtrip planner for trips with a roof tent: a trip is split into days, each day
 
 ## How it works
 - **Sharing.** Admins sign in with Pocket ID (OIDC) and create trips. Travellers join through `/join/<code>` with just a name and get a long-lived cookie plus a personal recovery link (`/api/recover/<token>`). Any traveller can edit the plan; the trip name, invite link and travellers are admin-only.
-- **Plan.** Days (with the night), stops (position, note, usual season), todos (fika, mat, sova, se, fixa) and a packing list with a roof-tent starter. Stop numbers run through the whole trip like road signs; moving a stop past a day's edge moves it into the next day.
+- **Plan.** Days (with the night and a typed-in driving time), stops (position, note, usual season, photo, inspiration links), todos (fika, mat, sova, se, fixa), vias (points that only steer the route) and a packing list with a roof-tent starter. Stop numbers run through the whole trip like road signs and skip vias; moving a stop past a day's edge moves it into the next day.
+- **Day view.** Read mode first: the day as a timeline. Tapping a stop, via or the night opens it in place, and every field saves on blur. See [docs/decisions/etapp-day-view.md](../../docs/decisions/etapp-day-view.md).
+- **Idea bank.** Stops without a day (`day_id` null), saved by name or by pasting a link, put on a day with one tap.
+- **Add.** The raised tab bar button opens one sheet for a stop, via, night or idea; the place field takes a name, coordinates or a long Maps link.
 - **Start.** Home (each traveller sets their own in Settings), the device's location, or any place or "lat, lon". A day starts where the previous one ended.
-- **Quick entry.** One line per stop, todos after commas, `dag Title` for a new day, `natt Place` for the night; coordinates or a long Google Maps link give a position. Short `maps.app.goo.gl` links carry no position and get a warning. Bullets pasted from a notes app are ignored.
-- **Out to the real tools.** Directions, day and whole-trip routes, nearby and along-the-way searches open Google Maps; weather opens yr.no. Distances and times in the app are rough (straight line × 1.3 at 70 km/h) and say so; the map tab is schematic, without a base map.
-- **Photos.** A day can have a cover photo, scaled to 1400 px JPEG in the browser and stored in `UPLOADS_DIR` (default: `uploads` next to the database, so `/data/uploads` in Docker; back up `/data`).
+- **Quick entry.** Under "Planera resan". One line per stop, todos after commas, `via Place` for a via, `dag Title` for a new day, `natt Place` for the night; coordinates or a long Google Maps link give a position. Short `maps.app.goo.gl` links carry no position and get a warning. Bullets pasted from a notes app are ignored.
+- **Out to the real tools.** Day and whole-trip routes and searches open Google Maps; "Hitta här omkring" on a stop also links to ut.no (hikes), eBird (birds) and Park4night (tent spots) at its position; weather opens yr.no. All plain links, no API keys. The day's driving time is typed in from Google Maps (a "Lång dag" badge above 6 h); the trip summary keeps a rough straight-line estimate and says so; the map tab is schematic, without a base map.
+- **Photos.** A day can have a cover photo and a stop or idea one photo, scaled to 1400 px JPEG in the browser and stored in `UPLOADS_DIR` (default: `uploads` next to the database, so `/data/uploads` in Docker; back up `/data`).
 - **Live and offline.** Changes reach other travellers via SSE (`/api/t/:tid/events`). The last plan is cached for reading offline, and ticking todos and packing items works offline: ticks queue on the device and sync when it is back online. Other edits need a connection.
 
 ## Layout

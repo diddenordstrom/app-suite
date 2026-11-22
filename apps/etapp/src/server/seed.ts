@@ -7,17 +7,22 @@ import { eq } from "drizzle-orm";
 import type { Db } from "./db";
 import { days, memberships, trips, users } from "./db/schema";
 import { randomToken } from "./http";
-import { createPackItems, createStop } from "./planStore";
+import { createLink, createPackItems, createStop } from "./planStore";
 import { PACK_GROUPS, STARTER_PACK } from "../shared/packing";
-import type { Category } from "../shared/plan";
+import type { Category, StopKind } from "../shared/plan";
 
-type SeedStop = { name: string; lat?: number; lon?: number; note?: string; todos?: [Category, string][] };
-type SeedDay = { title: string; stops: SeedStop[]; sleep?: { name: string; lat?: number; lon?: number; note?: string } };
+type SeedStop = { name: string; kind?: StopKind; lat?: number; lon?: number; note?: string; todos?: [Category, string][] };
+type SeedDay = { title: string; stops: SeedStop[]; driveMinutes?: number; sleep?: { name: string; lat?: number; lon?: number; note?: string } };
 
 const DEMO: SeedDay[] = [
   {
     title: "Mot Jotunheimen",
-    stops: [],
+    driveMinutes: 9 * 60 + 30,
+    stops: [
+      { name: "Karlstad", kind: "via", lat: 59.3793, lon: 13.5036 },
+      { name: "Kongsvinger", kind: "via" },
+      { name: "Hamar", kind: "via" },
+    ],
     sleep: { name: "Längs Sognefjellsvegen", note: "Slå läger i dalgången eller uppe på fjället" },
   },
   {
@@ -62,11 +67,17 @@ const DEMO: SeedDay[] = [
   },
 ];
 
-/** Seed the demo trip when the database has no trips. Returns the trip id, or null when skipped. */
+/** The idea bank: places saved for later, not on a day yet. */
+const IDEAS: { name: string; note?: string; url?: string }[] = [
+  { name: "Briksdalsbreen", note: "Glaciärarm, kort promenad", url: "https://www.youtube.com/results?search_query=Briksdalsbreen" },
+  { name: "Juvasshytta", note: "Högt upp på väg mot Galdhøpiggen" },
+];
+
 /** Owner of the demo trip: the fake dev user by default, or the demo user in a demo visitor's database. */
 type Owner = { sub: string; email: string | null; name: string };
 const DEV_USER: Owner = { sub: "dev-user", email: "dev@example.com", name: "Dev User" };
 
+/** Seed the demo trip when the database has no trips. Returns the trip id, or null when skipped. */
 export function seedDemo(db: Db, owner: Owner = DEV_USER): number | null {
   if (db.select({ id: trips.id }).from(trips).limit(1).get()) return null;
   return db.transaction((tx) => {
@@ -80,12 +91,16 @@ export function seedDemo(db: Db, owner: Owner = DEV_USER): number | null {
     }).run();
     DEMO.forEach((d, i) => {
       const day = tx.insert(days).values({
-        tripId: trip.id, position: i + 1, title: d.title, createdAt: now,
+        tripId: trip.id, position: i + 1, title: d.title, driveMinutes: d.driveMinutes ?? null, createdAt: now,
         sleepName: d.sleep?.name ?? "", sleepLat: d.sleep?.lat ?? null, sleepLon: d.sleep?.lon ?? null, sleepNote: d.sleep?.note ?? "",
       }).returning().get();
       for (const s of d.stops)
         createStop(tx, trip.id, day.id, s, (s.todos ?? []).map(([category, text]) => ({ category, text })));
     });
+    for (const idea of IDEAS) {
+      const row = createStop(tx, trip.id, null, idea);
+      if (idea.url) createLink(tx, trip.id, row.id, idea.url);
+    }
     createPackItems(tx, trip.id, PACK_GROUPS.flatMap((group) => STARTER_PACK[group].map((text) => ({ group, text }))));
     return trip.id;
   });

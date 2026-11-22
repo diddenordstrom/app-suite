@@ -1,22 +1,12 @@
-import { useState } from "react";
 import type { DayBody } from "@/shared/api";
 import { formatLatLon, hasCoords } from "@/shared/geo";
 import { nearbyUrl, SLEEP_SEARCHES } from "@/shared/links";
 import { SLEEP_TYPES, type Day } from "@/shared/plan";
 import { useAction } from "../hooks";
 import { useTrip } from "../trip";
-import { ErrorText, Field, Input, SegmentedControl } from "../ui";
-import { ChipLink, Chips, Eyebrow } from "./bits";
-import { readPosition } from "./StopItem";
+import { ErrorText, Field, SegmentedControl } from "../ui";
+import { AutoInput as BlurInput, ChipLink, Chips, Eyebrow, readPosition } from "./bits";
 import { t } from "../i18n";
-
-/** Saves a text field when it loses focus and has changed. */
-function BlurInput({ value, onSave, ...p }: { value: string; onSave: (v: string) => void } & Omit<React.ComponentProps<"input">, "value" | "onChange">) {
-  const [v, setV] = useState(value);
-  const [seen, setSeen] = useState(value);
-  if (value !== seen) { setSeen(value); setV(value); } // server value changed (another traveller): follow it
-  return <Input {...p} value={v} onChange={(e) => setV(e.target.value)} onBlur={() => { if (v.trim() !== value) onSave(v.trim()); }} />;
-}
 
 /** The night block at the end of a day: type, place, position, note and searches for somewhere to sleep. */
 export function SleepBlock({ day, n, area }: { day: Day; n: number; area: string }) {

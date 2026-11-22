@@ -5,7 +5,7 @@
  * Timestamps are epoch ms.
  */
 import type { PackGroup } from "./packing";
-import type { Category, Day, Home, Plan, SleepType, StartMode } from "./plan";
+import type { Category, Day, Home, Plan, SleepType, StartMode, Stop, StopKind } from "./plan";
 import type { QuickWarning } from "./quick";
 
 export type Role = "admin" | "member";
@@ -33,8 +33,8 @@ export interface TripDetail {
 export type PlanDay = Day & { photoUrl: string | null };
 export interface PackItem { id: number; group: PackGroup; text: string; done: boolean }
 
-/** GET /api/t/:tid/plan — the whole plan, days and stops in order. */
-export interface PlanResponse extends Omit<Plan, "days"> { days: PlanDay[]; pack: PackItem[] }
+/** GET /api/t/:tid/plan — the whole plan, days and stops in order, plus the idea bank (stops not on a day yet). */
+export interface PlanResponse extends Omit<Plan, "days"> { days: PlanDay[]; ideas: Stop[]; pack: PackItem[] }
 
 // ---- request bodies ----
 export interface CreateTripBody { name: string; adminName?: string }
@@ -46,10 +46,18 @@ export interface UpdatePlanBody { area?: string; startMode?: StartMode; startTex
 export interface DayBody {
   title?: string;
   sleepType?: SleepType; sleepName?: string; sleepLat?: number | null; sleepLon?: number | null; sleepNote?: string;
+  driveMinutes?: number | null;
 }
+/**
+ * POST /days/:id/stops and POST /ideas create, PATCH /stops/:id edits. `todos` on create is a comma list like quick
+ * entry ("fika Bakeriet, se kyrkan"); `url` on create saves a first inspiration link. `dayId` on PATCH moves the stop
+ * to the end of that day, or to the idea bank with null.
+ */
 export interface StopBody {
-  name?: string; lat?: number | null; lon?: number | null; note?: string; openFrom?: number | null; openTo?: number | null;
+  name?: string; kind?: StopKind; lat?: number | null; lon?: number | null; note?: string; openFrom?: number | null; openTo?: number | null;
+  dayId?: number | null; todos?: string; url?: string;
 }
+export interface LinkBody { url?: string; note?: string }
 export interface TodoBody { text?: string; category?: Category; done?: boolean }
 export interface PackBody { group?: PackGroup; text?: string; done?: boolean }
 /** POST /move on a day or stop: one step earlier (-1) or later (1). A stop at a day's edge moves into the next day. */
@@ -59,7 +67,7 @@ export interface MoveBody { dir: -1 | 1 }
 export interface QuickBody { dayId: number; text: string }
 export interface QuickResponse {
   dayId: number;
-  added: { days: number; stops: number; todos: number; nights: number };
+  added: { days: number; stops: number; vias: number; todos: number; nights: number };
   warnings: QuickWarning[];
 }
 

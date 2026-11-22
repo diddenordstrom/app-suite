@@ -1,10 +1,10 @@
 /** Reading and writing a trip's plan rows. Routes validate input; this file knows the tables and the ordering. */
-import { and, asc, eq, max } from "drizzle-orm";
+import { and, asc, eq, isNull, max } from "drizzle-orm";
 import type { Db } from "./db";
-import { days, packItems, stops, todos, trips } from "./db/schema";
+import { days, packItems, stopLinks, stops, todos, trips } from "./db/schema";
 import type { PackItem, PlanDay, PlanResponse } from "../shared/api";
 import type { PackGroup } from "../shared/packing";
-import type { Category } from "../shared/plan";
+import type { Category, Stop, StopKind } from "../shared/plan";
 import type { QuickCommand } from "../shared/quick";
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
@@ -20,17 +20,22 @@ export function loadPlan(db: Db, tripId: number): PlanResponse {
   const ds = db.select().from(days).where(eq(days.tripId, tripId)).orderBy(asc(days.position), asc(days.id)).all();
   const ss = db.select().from(stops).where(eq(stops.tripId, tripId)).orderBy(asc(stops.position), asc(stops.id)).all();
   const ts = db.select().from(todos).where(eq(todos.tripId, tripId)).orderBy(asc(todos.position), asc(todos.id)).all();
+  const ls = db.select().from(stopLinks).where(eq(stopLinks.tripId, tripId)).orderBy(asc(stopLinks.position), asc(stopLinks.id)).all();
   const ps = db.select().from(packItems).where(eq(packItems.tripId, tripId)).orderBy(asc(packItems.position), asc(packItems.id)).all();
+  const toStop = (s: StopRow): Stop => ({
+    id: s.id, kind: s.kind, name: s.name, lat: s.lat, lon: s.lon, note: s.note, openFrom: s.openFrom, openTo: s.openTo,
+    photoUrl: photoUrl(tripId, s.photo),
+    todos: ts.filter((x) => x.stopId === s.id).map((x) => ({ id: x.id, text: x.text, category: x.category, done: x.done })),
+    links: ls.filter((x) => x.stopId === s.id).map((x) => ({ id: x.id, url: x.url, note: x.note })),
+  });
   const planDays: PlanDay[] = ds.map((d) => ({
-    id: d.id, title: d.title, photoUrl: photoUrl(tripId, d.photo),
+    id: d.id, title: d.title, photoUrl: photoUrl(tripId, d.photo), driveMinutes: d.driveMinutes,
     sleep: { type: d.sleepType, name: d.sleepName, lat: d.sleepLat, lon: d.sleepLon, note: d.sleepNote },
-    stops: ss.filter((s) => s.dayId === d.id).map((s) => ({
-      id: s.id, name: s.name, lat: s.lat, lon: s.lon, note: s.note, openFrom: s.openFrom, openTo: s.openTo,
-      todos: ts.filter((x) => x.stopId === s.id).map((x) => ({ id: x.id, text: x.text, category: x.category, done: x.done })),
-    })),
+    stops: ss.filter((s) => s.dayId === d.id).map(toStop),
   }));
+  const ideas = ss.filter((s) => s.dayId === null).map(toStop);
   const pack: PackItem[] = ps.map((p) => ({ id: p.id, group: p.grp, text: p.text, done: p.done }));
-  return { area: t.area, startMode: t.startMode, startText: t.startText, startDate: t.startDate, days: planDays, pack };
+  return { area: t.area, startMode: t.startMode, startText: t.startText, startDate: t.startDate, days: planDays, ideas, pack };
 }
 
 /** Next position at the end of a list. */
@@ -41,15 +46,22 @@ export function createDay(db: DbOrTx, tripId: number, title = ""): DayRow {
   return db.insert(days).values({ tripId, position: after(last), title, createdAt: Date.now() }).returning().get();
 }
 
+/** Last position in a day, or in the trip's idea bank when dayId is null. */
+function lastPosition(db: DbOrTx, tripId: number, dayId: number | null) {
+  const where = dayId === null ? and(eq(stops.tripId, tripId), isNull(stops.dayId)) : eq(stops.dayId, dayId);
+  return db.select({ m: max(stops.position) }).from(stops).where(where).get()?.m;
+}
+
+/** A stop at the end of a day, or an idea (dayId null). */
 export function createStop(
-  db: DbOrTx, tripId: number, dayId: number,
-  s: { name: string; lat?: number | null; lon?: number | null; note?: string; openFrom?: number | null; openTo?: number | null },
+  db: DbOrTx, tripId: number, dayId: number | null,
+  s: { name: string; kind?: StopKind; lat?: number | null; lon?: number | null; note?: string; openFrom?: number | null; openTo?: number | null },
   items: { text: string; category: Category; done?: boolean }[] = [],
 ): StopRow {
-  const last = db.select({ m: max(stops.position) }).from(stops).where(eq(stops.dayId, dayId)).get()?.m;
+  const last = lastPosition(db, tripId, dayId);
   const now = Date.now();
   const row = db.insert(stops).values({
-    tripId, dayId, position: after(last), name: s.name, lat: s.lat ?? null, lon: s.lon ?? null,
+    tripId, dayId, position: after(last), kind: s.kind ?? "stop", name: s.name, lat: s.lat ?? null, lon: s.lon ?? null,
     note: s.note ?? "", openFrom: s.openFrom ?? null, openTo: s.openTo ?? null, createdAt: now,
   }).returning().get();
   items.forEach((x, i) => {
@@ -61,6 +73,16 @@ export function createStop(
 export function createTodo(db: DbOrTx, tripId: number, stopId: number, text: string, category: Category) {
   const last = db.select({ m: max(todos.position) }).from(todos).where(eq(todos.stopId, stopId)).get()?.m;
   return db.insert(todos).values({ tripId, stopId, position: after(last), text, category, createdAt: Date.now() }).returning().get();
+}
+
+export function createLink(db: DbOrTx, tripId: number, stopId: number, url: string, note = "") {
+  const last = db.select({ m: max(stopLinks.position) }).from(stopLinks).where(eq(stopLinks.stopId, stopId)).get()?.m;
+  return db.insert(stopLinks).values({ tripId, stopId, position: after(last), url, note, createdAt: Date.now() }).returning().get();
+}
+
+/** Put a stop at the end of another day, or in the idea bank (null). */
+export function setStopDay(db: DbOrTx, tripId: number, stopId: number, dayId: number | null) {
+  db.update(stops).set({ dayId, position: after(lastPosition(db, tripId, dayId)) }).where(eq(stops.id, stopId)).run();
 }
 
 export function createPackItems(db: DbOrTx, tripId: number, items: { group: PackGroup; text: string }[]) {
@@ -92,10 +114,11 @@ export function moveStop(db: Db, tripId: number, stopId: number, dir: -1 | 1): b
   const ds = db.select().from(days).where(eq(days.tripId, tripId)).orderBy(asc(days.position), asc(days.id)).all();
   const all = db.select().from(stops).where(eq(stops.tripId, tripId)).orderBy(asc(stops.position), asc(stops.id)).all();
   const s = all.find((x) => x.id === stopId);
-  if (!s) return false;
+  if (!s || s.dayId === null) return false;
+  const dayId = s.dayId;
   const di = ds.findIndex((d) => d.id === s.dayId);
   const inDay = (dayId: number) => all.filter((x) => x.dayId === dayId);
-  const list = inDay(s.dayId);
+  const list = inDay(dayId);
   const si = list.indexOf(s);
   const sj = si + dir;
   db.transaction((tx) => {
@@ -104,13 +127,13 @@ export function moveStop(db: Db, tripId: number, stopId: number, dir: -1 | 1): b
     if (sj >= 0 && sj < list.length) {
       const next = [...list];
       [next[si], next[sj]] = [next[sj], next[si]];
-      renumber(next, s.dayId);
+      renumber(next, dayId);
       return;
     }
     const target = ds[di + dir];
     if (!target) return;
     const moved = inDay(target.id);
-    renumber(list.filter((x) => x.id !== s.id), s.dayId);
+    renumber(list.filter((x) => x.id !== s.id), dayId);
     renumber(dir < 0 ? [...moved, s] : [s, ...moved], target.id);
   });
   return (sj >= 0 && sj < list.length) || !!ds[di + dir];
@@ -128,7 +151,7 @@ export function applyQuick(db: Db, tripId: number, dayId: number, commands: Quic
         if (c.name) set.sleepName = c.name;
         if (c.lat !== null && c.lon !== null) { set.sleepLat = c.lat; set.sleepLon = c.lon; }
         if (Object.keys(set).length) tx.update(days).set(set).where(eq(days.id, current)).run();
-      } else createStop(tx, tripId, current, { name: c.name, lat: c.lat, lon: c.lon }, c.todos);
+      } else createStop(tx, tripId, current, { name: c.name, kind: c.stopKind, lat: c.lat, lon: c.lon }, c.todos);
     }
     return current;
   });
@@ -141,6 +164,8 @@ export const stopOf = (db: Db, tripId: number, id: number) =>
   db.select().from(stops).where(and(eq(stops.id, id), eq(stops.tripId, tripId))).get();
 export const todoOf = (db: Db, tripId: number, id: number) =>
   db.select().from(todos).where(and(eq(todos.id, id), eq(todos.tripId, tripId))).get();
+export const linkOf = (db: Db, tripId: number, id: number) =>
+  db.select().from(stopLinks).where(and(eq(stopLinks.id, id), eq(stopLinks.tripId, tripId))).get();
 export const packOf = (db: Db, tripId: number, id: number) =>
   db.select().from(packItems).where(and(eq(packItems.id, id), eq(packItems.tripId, tripId))).get();
 

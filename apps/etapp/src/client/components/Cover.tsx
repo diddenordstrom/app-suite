@@ -65,6 +65,16 @@ function shrink(file: File): Promise<Blob> {
   });
 }
 
+/** Shrink and PUT a photo to `/api{base}{sub}` (a day cover or a stop's photo). Throws ApiError on failure. */
+export async function uploadPhoto(base: string, sub: string, file: File): Promise<void> {
+  const blob = await shrink(file);
+  const res = await fetch(`/api${base}${sub}`, { method: "PUT", credentials: "same-origin", headers: { "content-type": blob.type || "image/jpeg" }, body: blob });
+  if (!res.ok) {
+    const body = (await res.json().catch(() => null)) as { error?: string } | null;
+    throw new ApiError(body?.error ?? String(res.status), res.status);
+  }
+}
+
 const btn = "inline-flex h-8 cursor-pointer items-center rounded-md border border-border bg-card px-2.5 text-xs font-medium text-foreground shadow-sm hover:border-primary";
 
 /** The day's cover: its photo or contour lines, with buttons to add, change or remove the photo. */
@@ -80,12 +90,7 @@ export function Cover({ day, title }: { day: PlanDay; title: string }) {
     if (!file) return;
     setBusy(true); setError(null);
     try {
-      const blob = await shrink(file);
-      const res = await fetch(`/api${base}/days/${day.id}/photo`, { method: "PUT", credentials: "same-origin", headers: { "content-type": blob.type || "image/jpeg" }, body: blob });
-      if (!res.ok) {
-        const body = (await res.json().catch(() => null)) as { error?: string } | null;
-        throw new ApiError(body?.error ?? String(res.status), res.status);
-      }
+      await uploadPhoto(base, `/days/${day.id}/photo`, file);
       invalidateScopes(tid, ["plan"]);
     } catch (err) {
       setError(t("cover.failed", { reason: errorMessage(err) }));

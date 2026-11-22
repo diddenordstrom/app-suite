@@ -119,4 +119,26 @@ describe("day photos", () => {
     await admin.del(`/t/${tid}/days/${dayId}`);
     expect(fs.readdirSync(dir)).toHaveLength(before);
   });
+
+  it("stops and ideas get a photo too; deleting the stop or its day removes the file", async () => {
+    const admin = client(app);
+    const { id: tid } = await admin.post<{ id: number }>("/trips", { name: "z" });
+    const dayId = (await admin.get<PlanResponse>(`/t/${tid}/plan`)).days[0].id;
+    const { id: stopId } = await admin.post<{ id: number }>(`/t/${tid}/days/${dayId}/stops`, { name: "Lom" });
+    const { id: ideaId } = await admin.post<{ id: number }>(`/t/${tid}/ideas`, { name: "Trollstigen" });
+    const before = fs.readdirSync(dir).length;
+
+    const r = await put(admin, `/t/${tid}/stops/${stopId}/photo`, JPEG);
+    const { photoUrl } = (await r.json()) as { photoUrl: string };
+    expect((await admin.get<PlanResponse>(`/t/${tid}/plan`)).days[0].stops[0].photoUrl).toBe(photoUrl);
+    expect((await admin.req("GET", photoUrl.slice(4))).status).toBe(200);
+    await put(admin, `/t/${tid}/stops/${ideaId}/photo`, JPEG);
+    expect((await admin.get<PlanResponse>(`/t/${tid}/plan`)).ideas[0].photoUrl).toMatch(/\.jpg$/);
+    expect(fs.readdirSync(dir)).toHaveLength(before + 2);
+
+    await admin.del(`/t/${tid}/stops/${ideaId}`);
+    expect(fs.readdirSync(dir)).toHaveLength(before + 1);
+    await admin.del(`/t/${tid}/days/${dayId}`);
+    expect(fs.readdirSync(dir)).toHaveLength(before);
+  });
 });

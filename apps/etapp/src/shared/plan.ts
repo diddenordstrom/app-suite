@@ -13,18 +13,34 @@ export type SleepType = (typeof SLEEP_TYPES)[number];
 export const START_MODES = ["home", "here", "custom"] as const;
 export type StartMode = (typeof START_MODES)[number];
 
+export const STOP_KINDS = ["stop", "via"] as const;
+/** "stop": a place you explore, with todos. "via": a point that only steers the route. */
+export type StopKind = (typeof STOP_KINDS)[number];
+
+/** A day's driving above this (minutes) gets a gentle "long day" note. */
+export const LONG_DAY_MINUTES = 6 * 60;
+
 export interface Todo { id: number; text: string; category: Category; done: boolean }
 
+/** Inspiration saved on a stop: a video, thread or post and what to look for in it. */
+export interface StopLink { id: number; url: string; note: string }
+
 export interface Stop {
-  id: number; name: string; lat: number | null; lon: number | null; note: string;
+  id: number; kind: StopKind; name: string; lat: number | null; lon: number | null; note: string;
   /** Usual season, months 1–12; a range may wrap the new year (11 → 3). Null when unknown. */
   openFrom: number | null; openTo: number | null;
   todos: Todo[];
+  links: StopLink[];
+  photoUrl: string | null;
 }
 
 export interface Sleep { type: SleepType; name: string; lat: number | null; lon: number | null; note: string }
 
-export interface Day { id: number; title: string; stops: Stop[]; sleep: Sleep }
+export interface Day {
+  id: number; title: string; stops: Stop[]; sleep: Sleep;
+  /** Driving time typed in from Google Maps, in minutes; null when not given. */
+  driveMinutes: number | null;
+}
 
 export interface Plan {
   /** Country or region added to name-only searches so Google Maps finds the right place. */
@@ -132,7 +148,7 @@ export function tripStats(plan: Plan, home: Home | null) {
   plan.days.forEach((d, di) => {
     const ds = dayStats(plan, di, home);
     km += ds.km; knownLegs += ds.known; legs += ds.total;
-    stops += d.stops.length;
+    stops += d.stops.filter((s) => s.kind === "stop").length;
     for (const s of d.stops) for (const x of s.todos) { todos++; if (x.done) done++; }
   });
   return { days: plan.days.length, stops, km, todos, done, knownLegs, legs };
@@ -152,12 +168,33 @@ export function todayIndex(plan: Plan, now = new Date()): number {
   return -1;
 }
 
-/** Number on the first stop of day `di`: stops are numbered through the whole trip like road signs. */
+/** Number on the first stop of day `di`: stops are numbered through the whole trip like road signs. Vias get none. */
 export function firstStopNumber(plan: Plan, di: number): number {
   let n = 1;
-  for (let i = 0; i < di; i++) n += plan.days[i].stops.length;
+  for (let i = 0; i < di; i++) n += plan.days[i].stops.filter((s) => s.kind === "stop").length;
   return n;
 }
+
+/** Sign number for each stop of day `di` (null for vias). */
+export function stopNumbers(plan: Plan, di: number): (number | null)[] {
+  let n = firstStopNumber(plan, di);
+  return plan.days[di].stops.map((s) => (s.kind === "stop" ? n++ : null));
+}
+
+/** "10:20", "10 h 20 min", "10h", "620" (minutes) → minutes; "" → null; anything else → undefined. */
+export function parseDuration(text: string): number | null | undefined {
+  const s = text.trim().toLowerCase();
+  if (!s) return null;
+  let m = s.match(/^(\d{1,2})[:.](\d{2})$/);
+  if (m && Number(m[2]) < 60) return Number(m[1]) * 60 + Number(m[2]);
+  m = s.match(/^(?:(\d{1,2})\s*(?:h|t|tim|timmar)\.?)?\s*(?:(\d{1,3})\s*(?:m|min|minuter)\.?)?$/);
+  if (m && (m[1] || m[2])) return Number(m[1] ?? 0) * 60 + Number(m[2] ?? 0);
+  if (/^\d{1,4}$/.test(s)) return Number(s);
+  return undefined;
+}
+
+/** Minutes as "10:20" for the input. */
+export const formatDuration = (min: number | null) => (min == null ? "" : `${Math.floor(min / 60)}:${String(min % 60).padStart(2, "0")}`);
 
 /**
  * Month (1–12) when the stop is outside its usual season on `date`, else null.
