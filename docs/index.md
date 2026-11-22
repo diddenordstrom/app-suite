@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · note · Skeletons instead of "Laddar…" ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Skymning look: Geist + Newsreader, horizon, chart areas, paper ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Skymning depth: soft cards and controls ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
-- 2026-11-20 · decision · Fartlek: one engine and one way of training for every goal ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -25,6 +25,7 @@
 - [Demo mode with a throwaway database per visitor](decisions/demo-mode.md): Portfolio visitors without an account try runplan, shopsplit and Etapp through /demo, each in their own capped, short-lived SQLite file _(decision · accepted · 2026-11-10)_
 - [Komodo deploys the stack from git; Traefik and a wildcard tunnel route the hostnames](decisions/deploy-komodo.md): Why a new app is now only a pull request (no ssh, no Cloudflare change), what replaced watchtower, and where secrets live _(decision · accepted · 2026-11-11)_
 - [The wiki lives in docs/ of the monorepo](decisions/docs-wiki-in-monorepo.md): Why notes and decisions are kept in this repo, how index and log work, and when to split them out _(decision · accepted · 2026-11-09)_
+- [Etapp day view: read first, live editing, vias, idea bank](decisions/etapp-day-view.md): Why Etapp's day became a read-mode timeline with live editing, vias, an idea bank, discover links, stop photos and a typed-in drive time _(decision · accepted · 2026-11-22)_
 - [Etapp sharing model: admins sign in, travellers join by invite link](decisions/etapp-sharing-model.md): Admins use OIDC and create trips; travel companions join with just a name via a link, no account _(decision · accepted · 2026-11-09)_
 - [Fartlek adapts at week level: Monday check-in, reasons for misses, pause by repeating the week](decisions/fartlek-adaptive-engine.md): How the block engine reacts to struck, moved, short and too-hard sessions: evaluate per week not per day, ask why after two misses in a row, a pause repeats the week and shifts the block, a skipped easy run may lift the long run slightly past the 30-day rule _(decision · accepted · 2026-11-14)_
 - [Fartlek best efforts, automatic critical speed and race prediction](decisions/fartlek-best-efforts.md): How Fartlek reads best efforts from stored streams, fits critical speed without a test, predicts race times week by week (marathon from published volume, durability and training models), and shows Garmin's VO2max _(decision · accepted · 2026-11-13)_
