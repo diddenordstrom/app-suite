@@ -14,8 +14,8 @@ describe("apps", () => {
     expect(APPS.filter((a) => a.demo).map((a) => a.id)).toEqual(["fartlek", "kvitt", "etapp"]);
   });
 
-  it("gives Fartlek its own page", () => {
-    expect(APPS.filter((a) => a.page).map((a) => [a.id, a.page])).toEqual([["fartlek", "/fartlek"]]);
+  it("gives Fartlek and Kvitt their own pages", () => {
+    expect(APPS.filter((a) => a.page).map((a) => [a.id, a.page])).toEqual([["fartlek", "/fartlek"], ["kvitt", "/kvitt"]]);
   });
 
   it("lists every app once", () => {

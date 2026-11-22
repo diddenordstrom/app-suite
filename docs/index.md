@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-22 · decision · Kvitt landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-20 · decision · Fartlek Mål till plan: Garmin required, phases first, beside Skapa block ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · note · Fartlek: Mål till plan planned, morning notification scale on the roadmap ([log/2026-11.md](log/2026-11.md))
 - 2026-11-20 · decision · Fartlek: morning notification with today's session and form ([log/2026-11.md](log/2026-11.md))
-- 2026-11-20 · decision · Web Push shared by every app ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -56,6 +56,7 @@
 - [Fartlek workouts to the watch via intervals.icu](decisions/fartlek-watch-push.md): Structured workouts reach the Garmin watch through intervals.icu (API key now, OAuth later), not a .FIT download; how the push works and what it needs on the intervals.icu side _(decision · accepted · 2026-11-13)_
 - [Brygga, the FIRE calculator: a login-free app that keeps everything in the browser](decisions/fire-calculator.md): Plan for moving the FIRE/bridge calculator (draft 4) into the suite: no server data, single/duo mode, ISK and pension tax in the simulation, build order _(decision · accepted · 2026-11-09)_
 - [Kvitt: bjudningar, gäster och en grön zon](decisions/kvitt-bjudningar.md): How treats (bjudningar) stay out of the ledger, how an anonymous guest and a green zone work, the data and API changes, and build order _(decision · accepted · 2026-11-10)_
+- [Kvitt landing page on the portfolio](decisions/kvitt-landing-page.md): What /kvitt pitches (free, open source, one account per group, trip or ongoing), how it compares with Splitwise and Steven, and why its screen is drawn rather than live _(decision · accepted · 2026-11-22)_
 - [Kvitt never shows an empty list](decisions/kvitt-no-empty-lists.md): A list with nothing left to buy goes away: archived (soft-deleted) when trip history needs it, deleted otherwise _(decision · accepted · 2026-11-10)_
 - [Kvitt: plånböcker and bilutgifter for trips with friends](decisions/kvitt-wallets-and-car.md): How a couple counts as one in balances (plånbok), and how the car calculator in the expense form works, with what was passed over _(decision · accepted · 2026-11-22)_
 - [Metric explanations live in ⓘ tips, not in the tours](decisions/metric-info-tips.md): Values like CTL/ATL/TSB get a short ⓘ explanation next to them; tours only point to the ⓘ; no separate glossary page _(decision · accepted · 2026-11-14)_

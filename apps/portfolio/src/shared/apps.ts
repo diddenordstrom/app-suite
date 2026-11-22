@@ -15,7 +15,7 @@ export interface AppInfo {
 
 export const APPS: readonly AppInfo[] = [
   { id: "fartlek", name: "Fartlek", demo: true, page: "/fartlek" },
-  { id: "kvitt", name: "Kvitt", demo: true },
+  { id: "kvitt", name: "Kvitt", demo: true, page: "/kvitt" },
   { id: "garden", name: "Autarki" },
   { id: "etapp", name: "Etapp", demo: true },
   { id: "brygga", name: "Brygga" },

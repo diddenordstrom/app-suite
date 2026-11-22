@@ -1,4 +1,5 @@
 import * as landing from "./fartlekLanding";
+import * as kvittLanding from "./kvittLanding";
 
 /** The portfolio's own strings. `en` is the source of truth for keys; `sv` is typed against it. */
 export const en = {
@@ -119,6 +120,7 @@ export const en = {
   "footer.blog": "The blog",
 
   ...landing.en,
+  ...kvittLanding.en,
 };
 
 export const sv: Record<keyof typeof en, string> = {
@@ -239,4 +241,5 @@ export const sv: Record<keyof typeof en, string> = {
   "footer.blog": "Bloggen",
 
   ...landing.sv,
+  ...kvittLanding.sv,
 };
