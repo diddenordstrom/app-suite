@@ -4,7 +4,7 @@ import type { Activity, BalancesResponse } from "@/shared/api";
 import type { PairBalance } from "@/shared/balances";
 import { useQuery } from "../api";
 import { useHousehold } from "../household";
-import { Button, Card, cn, ErrorText, SegmentedControl, Spinner } from "../ui";
+import { Button, Card, cn, ErrorText, SegmentedControl, PageSkeleton, SkeletonRows } from "../ui";
 import { PageHeader } from "../components/common";
 import { ActivityFeed } from "../components/ActivityFeed";
 import { GiftLog } from "../components/GiftLog";
@@ -40,7 +40,7 @@ function BalancesTab() {
 
   return (
     <>
-      {bal.loading ? <Spinner /> : !data ? <ErrorText>{bal.error?.message}</ErrorText> : (
+      {bal.loading ? <PageSkeleton header={false} rows={4} /> : !data ? <ErrorText>{bal.error?.message}</ErrorText> : (
         <>
           {data.plan.inside ? (
             <Card className="bg-signature-soft text-signature-foreground">
@@ -120,7 +120,7 @@ function BalancesTab() {
           <Link to="/stats" className="text-sm text-muted-foreground hover:text-foreground">{t("balances.stats")}</Link>
           <Link to="/history" className="text-sm text-muted-foreground hover:text-foreground">{t("balances.fullHistory")}</Link>
         </div>
-        {activity.loading ? <Spinner /> : <ActivityFeed items={(activity.data ?? []).slice(0, 5)} />}
+        {activity.loading ? <SkeletonRows rows={3} /> : <ActivityFeed items={(activity.data ?? []).slice(0, 5)} />}
       </section>
       <SettleDialog pair={settling} onClose={() => setSettling(null)} />
     </>

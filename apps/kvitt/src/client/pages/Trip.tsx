@@ -3,7 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import type { List, Trip } from "@/shared/api";
 import { useQuery } from "../api";
 import { useHousehold } from "../household";
-import { Button, Card, cn, ErrorText, Spinner } from "../ui";
+import { Button, Card, cn, ErrorText, PageSkeleton } from "../ui";
 import { PageHeader } from "../components/common";
 import { ActiveTrip } from "../components/ActiveTrip";
 import type { CheckoutSummary } from "../components/CheckoutDialog";
@@ -21,7 +21,7 @@ export function TripPage() {
   const [starting, setStarting] = useState(false);
 
   if (summary) return <Summary summary={summary} onDone={() => setSummary(null)} />;
-  if (trips.loading || lists.loading) return <Spinner />;
+  if (trips.loading || lists.loading) return <PageSkeleton cards={2} columns="" />;
   if (!trips.data) return <ErrorText>{trips.error?.message}</ErrorText>;
 
   const active = trips.data.filter((t) => t.status === "active").sort((a, b) => Number(b.shopperId === h.me.id) - Number(a.shopperId === h.me.id) || b.startedAt - a.startedAt);

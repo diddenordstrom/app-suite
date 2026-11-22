@@ -3,7 +3,7 @@ import type { StatsEntry } from "@/shared/api";
 import { buildStats, type GroupStat, type StatsRange } from "@/shared/stats";
 import { useQuery } from "../api";
 import { useHousehold } from "../household";
-import { BarChart, Card, cn, ErrorText, SegmentedControl, Spinner, Stat } from "../ui";
+import { BarChart, Card, cn, ErrorText, SegmentedControl, Stat, PageSkeleton } from "../ui";
 import { PageHeader } from "../components/common";
 import { CartIcon, ReceiptIcon } from "../components/icons";
 import { locale, t, tn } from "../i18n";
@@ -44,7 +44,7 @@ export function Stats() {
           { value: "all", label: t("stats.rangeAll") },
         ]} />
       </PageHeader>
-      {q.loading ? <Spinner /> : !q.data ? <ErrorText>{q.error?.message}</ErrorText> : (
+      {q.loading ? <PageSkeleton header={false} cards={2} /> : !q.data ? <ErrorText>{q.error?.message}</ErrorText> : (
         <>
           <Card className="grid grid-cols-3 gap-3">
             <Stat label={t("stats.household")} value={h.fmt(s.total)} />

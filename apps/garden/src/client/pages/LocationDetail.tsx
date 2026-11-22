@@ -1,6 +1,6 @@
 import { useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Badge, Button, Card, Dialog, Input } from "../ui";
+import { Badge, Button, Card, Dialog, Input, PageSkeleton } from "../ui";
 import { api, get, useLoad } from "../api";
 import { useHousehold } from "../household";
 import { locale, t, type MsgKey } from "../i18n";
@@ -48,7 +48,7 @@ export function LocationDetail() {
   const [busy, setBusy] = useState(false);
 
   const back = <div className="mb-4"><Link to="/locations" className="text-sm text-muted-foreground transition hover:text-foreground">{t("locationDetail.backLink")}</Link></div>;
-  if (loading && !data) return <>{back}<div className="flex justify-center py-16 text-sm text-muted-foreground">{t("common.loading")}</div></>;
+  if (loading && !data) return <>{back}<PageSkeleton header={false} cards={2} columns="" /></>;
   if (!data) return <>{back}<div className="flex justify-center py-16 text-sm text-muted-foreground">{error ? "404" : null}</div></>;
 
   const { summary, full, nudge } = data;

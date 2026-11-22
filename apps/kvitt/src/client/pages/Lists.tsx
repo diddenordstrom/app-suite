@@ -4,7 +4,7 @@ import { useQuery } from "../api";
 import { useAction } from "../hooks";
 import { useHousehold } from "../household";
 import { usePendingOps } from "../tripQueue";
-import { Button, Dialog, EmptyState, ErrorText, Field, Input, Spinner } from "../ui";
+import { Button, Dialog, EmptyState, ErrorText, Field, Input, PageSkeleton } from "../ui";
 import { PageHeader } from "../components/common";
 import { CartIcon, PlusIcon } from "../components/icons";
 import { ListCard } from "../components/ListCard";
@@ -32,7 +32,7 @@ export function Lists() {
       </PageHeader>
 
       {lists.loading ? (
-        <Spinner />
+        <PageSkeleton header={false} rows={4} />
       ) : lists.error && !lists.data ? (
         <ErrorText>{lists.error.message}</ErrorText>
       ) : sorted.length === 0 ? (

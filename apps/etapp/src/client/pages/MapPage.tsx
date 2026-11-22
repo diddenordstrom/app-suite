@@ -3,7 +3,7 @@ import { hasCoords } from "@/shared/geo";
 import { sleepPoint, startPoint } from "@/shared/plan";
 import { useTrip } from "../trip";
 import { usePlan } from "../plan";
-import { Card, ErrorText, Spinner } from "../ui";
+import { Card, ErrorText, PageSkeleton } from "../ui";
 import { PageHeader } from "../components/common";
 import { pointLabel } from "../components/Leg";
 import { t } from "../i18n";
@@ -15,7 +15,7 @@ export function MapPage() {
   const { detail } = useTrip();
   const q = usePlan();
   const navigate = useNavigate();
-  if (!q.data) return q.error ? <ErrorText>{q.error.message}</ErrorText> : <div className="grid place-items-center py-16"><Spinner /></div>;
+  if (!q.data) return q.error ? <ErrorText>{q.error.message}</ErrorText> : <PageSkeleton cards={1} columns="" />;
   const plan = q.data;
 
   const seq: Pt[] = [], missing: string[] = [];

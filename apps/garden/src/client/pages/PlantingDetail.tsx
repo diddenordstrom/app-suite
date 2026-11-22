@@ -1,6 +1,6 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
-import { Button, Card, Dialog, Input, cn } from "../ui";
+import { Button, Card, Dialog, Input, cn, PageSkeleton } from "../ui";
 import { ApiError, api, get, useLoad } from "../api";
 import { useHousehold } from "../household";
 import { t, type MsgKey } from "../i18n";
@@ -59,7 +59,7 @@ export function PlantingDetail() {
   const [busy, setBusy] = useState(false);
 
   const back = <div className="mb-4"><Link to="/plantings" className="text-sm text-muted-foreground transition hover:text-foreground">{t("plantingDetail.backLink")}</Link></div>;
-  if (loading && !data) return <>{back}<div className="flex justify-center py-16 text-sm text-muted-foreground">{t("common.loading")}</div></>;
+  if (loading && !data) return <>{back}<PageSkeleton header={false} cards={2} columns="" /></>;
   if (notFound || !data) return <>{back}<div className="flex justify-center py-16 text-sm text-muted-foreground">404</div></>;
 
   const { planting, companions } = data;
