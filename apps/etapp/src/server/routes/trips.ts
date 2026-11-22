@@ -3,13 +3,14 @@ import { Hono } from "hono";
 import { and, eq } from "drizzle-orm";
 import type { Config } from "../config";
 import type { Db } from "../db";
-import { memberships, trips } from "../db/schema";
+import { days, memberships, stops, trips } from "../db/schema";
 import type { EventBus } from "../events";
 import { badRequest, idParam, notFound, optLatLon, optText, randomToken, readBody, str } from "../http";
 import { recoveryUrl, requireAdmin, toMember, type AppEnv } from "../viewer";
 import type { TripDetail } from "../../shared/api";
+import type { PhotoStore } from "../photos";
 
-export function tripRoutes(db: Db, config: Config, bus: EventBus) {
+export function tripRoutes(db: Db, config: Config, bus: EventBus, photos: PhotoStore) {
   const app = new Hono<AppEnv>();
 
   app.get("/", (c) => {
@@ -34,6 +35,20 @@ export function tripRoutes(db: Db, config: Config, bus: EventBus) {
     if (b.name !== undefined) set.name = str(b, "name", 60);
     if (Object.keys(set).length) db.update(trips).set(set).where(eq(trips.id, c.get("tid"))).run();
     bus.emit(c.get("tid"), "trip");
+    return c.json({ ok: true });
+  });
+
+  /** Delete the whole trip: days, stops, todos, links, packing list, travellers and photo files. Admin only. */
+  app.delete("/", (c) => {
+    requireAdmin(c);
+    const tid = c.get("tid");
+    const files = [
+      ...db.select({ f: days.photo }).from(days).where(eq(days.tripId, tid)).all(),
+      ...db.select({ f: stops.photo }).from(stops).where(eq(stops.tripId, tid)).all(),
+    ];
+    db.delete(trips).where(eq(trips.id, tid)).run();
+    for (const { f } of files) photos.remove(f);
+    bus.emit(tid, "trip");
     return c.json({ ok: true });
   });
 

@@ -155,12 +155,24 @@ function TripName() {
     e.preventDefault();
     void run(() => h.call("PATCH", "", { name: name.trim() } satisfies UpdateTripBody, ["trip"]));
   };
+  /** Gone for everyone on the trip. The app then shows the next trip, or the welcome screen when none is left. */
+  const remove = () => {
+    if (!confirm(t("trip.confirmDelete", { name: h.detail.name }))) return;
+    void run(async () => {
+      await h.call("DELETE", "");
+      clearCache();
+      location.href = "/";
+    });
+  };
   return (
     <Section title={t("settings.trip")}>
       <form onSubmit={submit} className="space-y-3">
         <Field label={t("settings.name")}><Input required value={name} onChange={(e) => setName(e.target.value)} /></Field>
         <ErrorText>{error}</ErrorText>
-        <Button type="submit" disabled={busy}>{t("common.save")}</Button>
+        <div className="flex flex-wrap gap-2">
+          <Button type="submit" disabled={busy}>{t("common.save")}</Button>
+          <Button type="button" variant="ghost" className="ml-auto text-danger" disabled={busy} onClick={remove}>{t("trip.delete")}</Button>
+        </div>
       </form>
     </Section>
   );

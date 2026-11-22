@@ -37,7 +37,7 @@ export const en = {
   "quick.title": "Quick entry to day {n}",
   "quick.placeholder": "Huskvarna, fika Kroatorpet, handla ICA\nGränna, se polkagrisbutiken\nnatt tält Vättern",
   "quick.howTo": "How to write",
-  "quick.help": "One line per stop. The first part is the stop; the rest after commas become todos. Start a part with fika, mat, sova, se or fixa to pick its type. \"dag Title\" starts a new day and \"natt Place\" sets the night. Add coordinates or a long Google Maps link to a line to give it a position.",
+  "quick.help": "One line per stop. The first part is the stop; the rest after commas become todos. Start a part with fika, mat, sova, se or fixa to pick its type. \"dag Title\" starts a new day (or names the day you are on if it is empty), \"via Place\" adds a via and \"natt Place\" sets the night. Add coordinates or a long Google Maps link to a line to give it a position.",
   "quick.add": "Add",
   "quick.added": "Added {what}.",
   "quick.nothing": "Nothing to add.",
@@ -258,6 +258,8 @@ export const en = {
   "ideas.toDay": "Put on day {n}",
   "ideas.otherDay": "Other day…",
   "ideas.unnamed": "New idea",
+  "trip.delete": "Delete trip",
+  "trip.confirmDelete": "Delete \"{name}\" for everyone on the trip? Days, stops, ideas, photos and the packing list go too. This cannot be undone.",
 };
 
 export const sv: Record<keyof typeof en, string> = {
@@ -298,7 +300,7 @@ export const sv: Record<keyof typeof en, string> = {
   "quick.title": "Snabbinmatning till dag {n}",
   "quick.placeholder": "Huskvarna, fika Kroatorpet, handla ICA\nGränna, se polkagrisbutiken\nnatt tält Vättern",
   "quick.howTo": "Så skriver du",
-  "quick.help": "En rad per stopp. Det första på raden är stoppet och resten efter komma blir att göra. Börja en del med fika, mat, sova, se eller fixa för att välja typ. Raden \"dag Titel\" startar en ny dag och \"natt Plats\" sätter nattplatsen. Du kan lägga koordinater eller en lång Google Maps-länk på raden för att få position.",
+  "quick.help": "En rad per stopp. Det första på raden är stoppet och resten efter komma blir att göra. Börja en del med fika, mat, sova, se eller fixa för att välja typ. Raden \"dag Titel\" startar en ny dag (eller döper dagen du står på om den är tom), \"via Plats\" lägger till en via och \"natt Plats\" sätter nattplatsen. Du kan lägga koordinater eller en lång Google Maps-länk på raden för att få position.",
   "quick.add": "Lägg till",
   "quick.added": "Lade till {what}.",
   "quick.nothing": "Hittade inget att lägga till.",
@@ -519,4 +521,6 @@ export const sv: Record<keyof typeof en, string> = {
   "ideas.toDay": "Lägg på dag {n}",
   "ideas.otherDay": "Annan dag…",
   "ideas.unnamed": "Ny idé",
+  "trip.delete": "Ta bort resan",
+  "trip.confirmDelete": "Ta bort \"{name}\" för alla på resan? Dagar, stopp, idéer, bilder och packlistan försvinner också. Det går inte att ångra.",
 };
