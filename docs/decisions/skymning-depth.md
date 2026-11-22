@@ -36,4 +36,4 @@ After the depth, two directions were mocked on the same canvas ("typsnitt + hori
 - **Charts:** `LineChart` series can take `area` (a fill fading out under the line), used for fitness on Fartlek's Home and Trends.
 - **Paper:** an almost invisible grain over the page in light mode, a faint glow at the top in dark mode (`--paper-grain`, `--paper-glow`).
 
-Passed over: glass effects, gradients on buttons and sparkle icons, which read as a generic AI product. The favicons (`public/icon.svg`) keep the flat lavender tile for now.
+Passed over: glass effects, gradients on buttons and sparkle icons, which read as a generic AI product. The app icons (favicons, `apple-touch-icon.png`, the manifest PNGs) carry the same horizon as `MarkTile`; static files cannot read CSS, so each icon holds its app's end colour as a hex (the same oklab mix, light mode).
