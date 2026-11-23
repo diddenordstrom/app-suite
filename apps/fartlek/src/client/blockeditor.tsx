@@ -148,7 +148,7 @@ function WeekHead({ b, i, ev, plan, deepest, editable, onRemove, compact, label 
           </button>
         )}
       </div>
-      <span className="text-xs tabular-nums text-muted-foreground">{t("blk.weekSub", { pct: e.growth == null ? "–" : `${signedInt(e.growth * 100)} %`, form: signed(e.low) })}</span>
+      <span className="text-xs tabular-nums text-muted-foreground">{t("blk.weekSub", { pct: e.growth == null ? "–" : `${signedInt(e.growth * 100)} %`, form: signed(e.low), end: signed(e.form) })}</span>
       <div className="flex flex-wrap items-center gap-1">
         {editable && b.roles[i] !== "race" ? (
           <select value={b.roles[i]} onChange={(x) => b.setRole(i, x.target.value as WeekRole)} aria-label={t("be.weekType", { week: weekNumber(ws) })}
