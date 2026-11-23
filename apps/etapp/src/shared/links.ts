@@ -116,10 +116,20 @@ export function discoverLinks(place: { lat?: number | null; lon?: number | null;
     if ("query" in d) out.push({ key: d.key, url: nearbyUrl(d.query, place, area, 12) });
     else if (!ll) continue;
     else if (d.key === "hikes") out.push({ key: d.key, url: `https://ut.no/kart#12/${ll.lat}/${ll.lon}` });
-    else if (d.key === "birds") out.push({ key: d.key, url: `https://ebird.org/hotspots?env.lat=${ll.lat}&env.lon=${ll.lon}&env.zoom=11` });
+    else if (d.key === "birds") out.push({ key: d.key, url: ebirdHotspotsUrl(place.lat!, place.lon!) });
     else if (d.key === "tent") out.push({ key: d.key, url: `https://park4night.com/en/search?lat=${ll.lat}&lng=${ll.lon}&z=12` });
   }
   return out;
+}
+
+/**
+ * eBird's hotspot explorer around a position. eBird's map pages take the visible area as a box
+ * (env.minX/minY/maxX/maxY in degrees), not a centre point; this one is roughly 30 × 30 km.
+ */
+export function ebirdHotspotsUrl(lat: number, lon: number): string {
+  const dLat = 0.15, dLon = 0.15 / Math.max(0.2, Math.cos((lat * Math.PI) / 180));
+  const f = (n: number) => n.toFixed(4);
+  return `https://ebird.org/hotspots?env.minX=${f(lon - dLon)}&env.minY=${f(lat - dLat)}&env.maxX=${f(lon + dLon)}&env.maxY=${f(lat + dLat)}`;
 }
 
 /** Which service a saved inspiration link points at, for its icon and label. */

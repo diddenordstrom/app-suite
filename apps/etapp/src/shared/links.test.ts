@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { alongTheWay, dayRouteUrl, discoverLinks, linkSource, directionsUrl, legUrl, nearbyUrl, placeSearchUrl, tripRouteUrl, weatherLink } from "./links";
+import { alongTheWay, dayRouteUrl, discoverLinks, ebirdHotspotsUrl, linkSource, directionsUrl, legUrl, nearbyUrl, placeSearchUrl, tripRouteUrl, weatherLink } from "./links";
 import { dayPoints, type Day, type Home, type Plan, type Stop } from "./plan";
 
 let nextId = 1;
@@ -92,7 +92,8 @@ describe("discover and link sources", () => {
     expect(discoverLinks({ name: "Lom" }, "Norge").map((l) => l.key)).toEqual(["sights", "viewpoints", "food"]);
     const all = discoverLinks({ name: "Lom", lat: 61.8381, lon: 8.5672 }, "Norge");
     expect(all.map((l) => l.key)).toEqual(["sights", "viewpoints", "hikes", "birds", "food", "tent"]);
-    expect(all.find((l) => l.key === "birds")!.url).toContain("61.8381");
+    expect(all.find((l) => l.key === "birds")!.url).toBe(ebirdHotspotsUrl(61.8381, 8.5672));
+    expect(ebirdHotspotsUrl(61.8381, 8.5672)).toBe("https://ebird.org/hotspots?env.minX=8.2494&env.minY=61.6881&env.maxX=8.8850&env.maxY=61.9881");
   });
 
   it("recognises where an inspiration link points", () => {

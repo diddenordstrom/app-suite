@@ -3,7 +3,7 @@ title: Fartlek asks which days gym and cross-training go on (plan, not built)
 summary: Plan for the block planner to ask how many gym sessions and which days, and which days and minutes for cross-training, so the engine places them there and keeps the run days apart from them
 type: note
 status: open
-updated: 2026-11-18
+updated: 2026-11-23
 ---
 
 # Fartlek asks which days gym and cross-training go on
@@ -50,7 +50,7 @@ So: gym on Monday and cross on Thursday and Saturday, runs on Tuesday, Wednesday
 
 ## Decisions on the way
 
-- Settled 2026-11-18 with the user: **the app doesn't suggest what to do in the gym**, only the recommendation and the question about days. No focus text, template or session note.
+- Settled 2026-11-18 with the user: **the app doesn't suggest what to do in the gym**, only the recommendation and the question about days. No focus text, template or session note. *Reopened 2026-11-23:* a gym logger and a rule-based session suggester are planned in [the gym module](fartlek-gym-module.md); until that is built, this still holds for the planner.
 - Settled 2026-11-18: the engine tries to avoid a threshold session directly after gym and puts easy running there instead, as in the reference week.
 
 ## Open questions
