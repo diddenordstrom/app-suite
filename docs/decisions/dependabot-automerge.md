@@ -25,5 +25,4 @@ One lockfile bump a week should not need a person when CI already proves it buil
 
 ## Open
 
-- While Actions minutes are used up on the private repo, CI jobs fail at once with no runner, so required checks never go green and nothing auto-merges. Turn the required checks on once CI runs again (or on the public repo).
 - A merged bump lands on `main` but is not released: releases stay manual in Komodo ([deploy-komodo](deploy-komodo.md)).
