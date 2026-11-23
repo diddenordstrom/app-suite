@@ -1,12 +1,12 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, useApi } from "../http";
 import { useSettings } from "../prefs";
 import { Button, Card, CardTitle, Dialog, ErrorText, IconButton, Input, SegmentedControl, Spinner } from "../ui";
 import { fmtDay } from "../bits";
 import { locale, t, tm, type MsgKey } from "../i18n";
-import { clock, entryFor, exName, fmtKg, loadDraft, newClientId, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
-import { alternatives, customId, exercise, EXERCISES, TEMPLATE_IDS, TEMPLATES, type TemplateId } from "@/shared/gym";
+import { clock, entryFor, matchesSearch, moveItem, exName, fmtKg, loadDraft, newClientId, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
+import { alternatives, customId, exercise, EXERCISES, known, TEMPLATE_IDS, TEMPLATES, type TemplateId } from "@/shared/gym";
 import { suggestSets, templateEntries, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type LastTime } from "@/shared/gymplan";
 import { todayIn } from "@/shared/dates";
 
@@ -60,6 +60,28 @@ function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; s
   const [adding, setAdding] = useState(false);
   const minutes = TEMPLATES[tpl].minutes;
   const replace = (i: number, e: DraftEntry) => setDraft({ ...draft, entries: draft.entries.map((x, j) => (j === i ? e : x)) });
+  // Reordering: drag a row by its handle (pointer events, so touch works too), or arrow keys on the handle.
+  const listRef = useRef<HTMLUListElement>(null);
+  const [dragging, setDragging] = useState<number | null>(null);
+  const move = (from: number, to: number) => setDraft({ ...draft, entries: moveItem(draft.entries, from, to) });
+  const startDrag = (ev: PointerEvent<HTMLButtonElement>, i: number) => { ev.currentTarget.setPointerCapture(ev.pointerId); setDragging(i); };
+  const onDrag = (ev: PointerEvent<HTMLButtonElement>) => {
+    if (dragging == null || !listRef.current) return;
+    const rows = [...listRef.current.children] as HTMLElement[];
+    let to = rows.findIndex((r) => { const b = r.getBoundingClientRect(); return ev.clientY < b.top + b.height / 2; });
+    if (to < 0) to = rows.length - 1;
+    if (to > dragging) to = Math.max(dragging, to - 1);
+    if (to !== dragging) { move(dragging, to); setDragging(to); }
+  };
+  const endDrag = () => setDragging(null);
+  const onMoveKey = (ev: KeyboardEvent<HTMLButtonElement>, i: number) => {
+    const to = ev.key === "ArrowUp" ? i - 1 : ev.key === "ArrowDown" ? i + 1 : null;
+    if (to == null || to < 0 || to >= draft.entries.length) return;
+    ev.preventDefault();
+    move(i, to);
+    const btn = ev.currentTarget;
+    requestAnimationFrame(() => btn.focus());
+  };
 
   return (
     <div className="mx-auto max-w-xl space-y-4">
@@ -75,9 +97,14 @@ function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; s
       {day.logged.length > 0 && <p className="text-sm text-muted-foreground">{t("gym.loggedToday")} <Link to="/gym/history" className="underline">{t("gym.history")}</Link></p>}
 
       <Card className="p-0">
-        <ul>
+        <ul ref={listRef}>
           {draft.entries.map((e, i) => (
-            <li key={`${e.exercise}-${i}`} className="flex items-center gap-2 border-b border-border py-1.5 pr-1 pl-4">
+            <li key={e.uid ?? `${e.exercise}-${i}`} className={`flex items-center gap-1 border-b border-border py-1.5 pr-1 pl-1 ${dragging === i ? "relative z-10 bg-accent shadow-lg" : ""}`}>
+              <button type="button" aria-label={t("gym.move", { name: exName(e.exercise) })} title={t("gym.moveHint")}
+                className="grid h-11 w-8 shrink-0 cursor-grab touch-none place-items-center rounded-md text-muted-foreground active:cursor-grabbing"
+                onPointerDown={(ev) => startDrag(ev, i)} onPointerMove={onDrag} onPointerUp={endDrag} onPointerCancel={endDrag} onKeyDown={(ev) => onMoveKey(ev, i)}>
+                <GripIcon />
+              </button>
               <span className="w-5 text-xs text-muted-foreground tabular-nums">{i + 1}</span>
               <span className="min-w-0 flex-1">
                 <span className="block">{exName(e.exercise)}</span>
@@ -178,7 +205,7 @@ function Active({ day, draft, setDraft, onFinished }: { day: GymDay; draft: Draf
       </div>
 
       {draft.entries.map((e, i) => (
-        <ExerciseCard key={`${e.exercise}-${i}`} entry={e} last={day.last[e.exercise]} focus={focus?.e === i ? focus.s : null}
+        <ExerciseCard key={e.uid ?? `${e.exercise}-${i}`} entry={e} last={day.last[e.exercise]} focus={focus?.e === i ? focus.s : null}
           onFocus={(s) => setFocus({ e: i, s })} onTick={(s) => tick(i, s)} onSwap={() => setSwapAt(i)}
           onChange={(s, patch) => update(i, (x) => ({ ...x, sets: x.sets.map((v, m) => (m === s ? { ...v, ...patch } : v)) }))}
           onAddSet={() => { update(i, (x) => ({ ...x, sets: [...x.sets, { ...(x.sets[x.sets.length - 1] ?? { kind: "work", kg: null, reps: x.scheme.low, seconds: null }), done: false }] })); setFocus({ e: i, s: e.sets.length }); }} />
@@ -281,7 +308,9 @@ function SwapDialog({ day, draft, at, onClose, onPick }: { day: GymDay; draft: D
       onPick={(id) => {
         if (!e || at == null) return;
         const sameLoad = exercise(id).load === exercise(e.exercise).load;
-        onPick(at, entryFor(id, e.slot, sameLoad ? e.scheme : null, day.last[id]));
+        // A swap within the slot keeps it; one found by search outside it takes its own pattern.
+        const slot = known(id) && exercise(id).pattern !== e.slot ? exercise(id).pattern : e.slot;
+        onPick(at, { ...entryFor(id, slot, sameLoad && slot === e.slot ? e.scheme : null, day.last[id]), uid: e.uid });
       }} />
   );
 }
@@ -293,8 +322,9 @@ function PickDialog({ open, title, intro, day, suggestions, onClose, onPick }: {
   const own = Object.keys(day.last).filter((id) => id.startsWith("x:"));
   const all = [...EXERCISES.map((e) => e.id), ...own];
   const query = q.trim().toLocaleLowerCase();
-  const list = query ? all.filter((id) => exName(id).toLocaleLowerCase().includes(query) || patternName(id, null).toLocaleLowerCase().includes(query)).slice(0, 30) : suggestions;
-  const exact = all.some((id) => exName(id).toLocaleLowerCase() === query);
+  const list = query ? all.filter((id) => matchesSearch(id, q)).slice(0, 30) : suggestions;
+  // Offer the typed name as a new exercise only when nothing matches it.
+  const exact = list.length > 0;
   return (
     <Dialog open={open} onClose={onClose} title={title}>
       {intro && <p className="mb-3 text-sm text-muted-foreground">{intro}</p>}
@@ -364,5 +394,6 @@ function Done({ f }: { f: Finished }) {
 }
 
 const SwapIcon = () => <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M7 4L3 8l4 4M3 8h14M17 20l4-4-4-4M21 16H7" /></svg>;
+const GripIcon = () => <svg viewBox="0 0 24 24" className="size-4" fill="currentColor" aria-hidden><circle cx="9" cy="6" r="1.6" /><circle cx="15" cy="6" r="1.6" /><circle cx="9" cy="12" r="1.6" /><circle cx="15" cy="12" r="1.6" /><circle cx="9" cy="18" r="1.6" /><circle cx="15" cy="18" r="1.6" /></svg>;
 const XIcon = () => <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" aria-hidden><path d="M6 6l12 12M18 6L6 18" /></svg>;
 const CheckIcon = () => <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={3} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M5 12l5 5 9-10" /></svg>;
