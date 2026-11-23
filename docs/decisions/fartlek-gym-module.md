@@ -1,14 +1,14 @@
 ---
-title: Fartlek gym module: log sets in the gym, suggest sessions that suit the run week (plan, not built)
-summary: Plan for a gym logger (sets with last time's weight, swap an exercise in one tap) and a simple rule-based session suggester inside Fartlek, why it lives in Fartlek rather than its own app, and how it compares with the gym apps that exist
+title: Fartlek gym module: log sets in the gym, suggest sessions that suit the run week
+summary: A gym logger inside Fartlek (sets with last time's weight, swap or add an exercise in one tap, offline, Bolt import) and a rule-based choice of template from the run week; why it lives in Fartlek, how it compares with the gym apps that exist, what is built and what is left
 type: note
 status: open
 updated: 2026-11-23
 ---
 
-# Fartlek gym module (plan, not built)
+# Fartlek gym module
 
-Raised in a chat on 2026-11-23. **Nothing here is built.** It reopens one point of [which days gym and cross-training go on](fartlek-gym-cross-days.md), where Fartlek was not to suggest what to do in the gym; see "What changes" below. Gym as its own session type is in [gym sessions](fartlek-gym-sessions.md).
+Raised in a chat on 2026-11-23; **a first version was built the same day** (see "Built" below). It reopens one point of [which days gym and cross-training go on](fartlek-gym-cross-days.md), where Fartlek was not to suggest what to do in the gym; see "What changes" below. Gym as its own session type is in [gym sessions](fartlek-gym-sessions.md).
 
 ## Why
 
@@ -40,7 +40,49 @@ Most influencer apps are audience monetization on white-label platforms (Trainer
 - Gym is already a session type there: tap Monday's "Gym", start session A, and the synced Garmin `strength_training` activity matches it as today.
 - Keep it in its own tables and its own folders (`shared/gym/`, `client/gym/`) so it could be moved out later if people who don't run want it.
 
-## What to build
+## Flow and navigation (settled 2026-11-23)
+
+Drawn in a private mock with six phone screens. Runna works the same way: strength sits in the plan as an ordinary session, reached from the day, with no tab of its own (and behind its subscription, 1 099 kr a year in Nov 2026).
+
+1. **Home → the Idag card** shows today's gym session: template, number of exercises and time, the first exercises with last time's weights, and one line on *why* today suits it ("threshold Friday, long run Sunday, so heavy legs today"). Buttons: "Öppna pass" and "Annat pass".
+2. **The session page** asks "start?": tabs for templates A, B and C, the exercise list with planned sets and weights, a swap button on each exercise and "Lägg till övning" (so the session can be changed before it starts, not only during it) and "Starta pass".
+3. **"Annat pass"** opens a sheet: today's session, **a free gym session** (template A, B or C, or empty) for a gym day with nothing planned, and **move today's session** to another day with what it does to the key sessions. No "free run": Fartlek doesn't record runs, Garmin does.
+4. **In the session**: set rows with steppers, swap per slot, rest after each set.
+5. **Done**: time, sets, volume, what beat last time, the Garmin activity matched, and the next gym session with its reason.
+
+- **No gym tab at first.** Templates and the exercise catalogue live under Plan, gym history under Activities next to the runs. A fifth tab fits on a phone and can come later if a shortcut is missed; a tab is easy to add and hard to take away.
+- **No joint check-in in the first version** (dropped 2026-11-23, after first planning three buttons *Inget · Lite · Ont* where "Ont" offered C). The runner picks A, B or C on the session page; the suggestion only preselects one. The `feel` column stays so the question can come back without a migration.
+- **Rest timer**: nice to have, not needed for the first version.
+- **One gym session a week gets the full-body template F** (settled 2026-11-23): legs and prevention first (single leg, hinge, calves, outer hip), then a press and a row. With A and B in turns the legs would only come every other week, and they are what protects the running. Chosen when the week holds exactly one planned gym session; two or more go back to A/B.
+- **Not only legs and prevention.** Upper-body work (bench press, pulls, arms) is logged in the same module through template B or a free session, so the runner needs no second log app.
+
+## Data
+
+Hardly any, and no model to train:
+- the exercise catalogue (60–100 exercises with pattern and purpose tags) and the templates are written by hand once and ship with the app;
+- the runner's own sets (exercise, kg, reps, date) are a few thousand rows a year.
+
+"Last time", the suggested weight and "better than last time" are computed from the runner's own log. The log starts empty, which the CSV import covers. The hard part is the feel on the gym floor, not the data.
+
+## Built (first version, 2026-11-23)
+
+- **Catalogue and templates** in [`shared/gym.ts`](../../apps/fartlek/src/shared/gym.ts): about 60 exercises with pattern, load kind (kg, body weight, held), purpose and weight step, plus the names other apps export (Bolt) as aliases. Templates A, B and C as slots with ranked choices. Names are i18n keys `ex.<id>`; an exercise the catalogue doesn't know is stored as `x:<name>` and keeps its name.
+- **Logic** in [`shared/gymplan.ts`](../../apps/fartlek/src/shared/gymplan.ts): double progression (every work set at the top of the range: one step up and back to the bottom; else repeat last time set by set; body weight +1 rep, holds +5 s), the template for the day (F when the week has one planned gym session; C only by hand; B the day before a threshold, interval, long run or race; else A and B take turns, legs first), improvements over last time, and a check of what the client sends. Warm-up and drop sets are stored but never count as "last time" or volume.
+- **Storage**: `gym_sessions` and `gym_sets` (migration `0022_gym`), part of "delete training data". A session is saved once per `clientId` made on the phone, so a resend is harmless. Routes in [`routes/gym.ts`](../../apps/fartlek/src/server/routes/gym.ts): `GET /gym?date=` (planned session, suggested template with its reason, last time per exercise, sessions logged that day, done/planned the last four weeks), `POST /gym/sessions`, list, one, delete, and `POST /gym/import` for a Bolt CSV (sessions already imported are skipped).
+- **Pages**: `/gym` (session page, session in progress, done) and `/gym/history` (sessions, detail, Bolt import). Reached from "Öppna pass" on today's gym session in the Idag card, "Nytt pass" in the history, and a link from Activities. No tab.
+- **On the gym floor**: steppers and a typed value for kg, reps and seconds, the next open set focused after each tick, a count-up rest clock since the last set, the screen kept awake (Wake Lock) where the browser allows it.
+- **Offline**: the session in progress is kept in the browser's `localStorage`, not IndexedDB as first planned (one small JSON object is all it needs). A finished session that can't be sent waits in an outbox and is sent when the gym pages open or the phone comes online.
+- **News and landing page**: its own "what's new" note (December 2026, not part of the November one) and a gym section with a FAQ entry on the [Fartlek landing page](fartlek-landing-page.md).
+- **Demo**: gym planned on Mondays and logged A/B sessions with weights that creep up.
+
+## Left to build
+
+- The "Annat pass" sheet on Home (free session and moving today's session); a free session is reached from the history for now.
+- "A lighter run week gives a lighter gym week" (the suggester only picks the template).
+- A rest timer that counts down and notifies; the planner placing gym days ([gym and cross days](fartlek-gym-cross-days.md)).
+- Matching a logged session to its planned workout without a Garmin activity (today the plan shows a gym session as done only when Garmin syncs one).
+
+## The plan as first written
 
 ### 1. Logger (first, on its own)
 
@@ -55,11 +97,11 @@ Most influencer apps are audience monetization on white-label platforms (Trainer
 Rules and data, not an adaptive model:
 - **Exercise catalogue** tagged by pattern (knee-dominant single leg, hip hinge, hamstrings, calves, hip abduction, anti-rotation core, push, vertical and horizontal pull, shoulders, arms) and purpose (hypertrophy, prevention, both), with alternatives per pattern.
 - **Session templates** as slots: A legs and prevention (single-leg work, hinge, knee-friendly quad work, hamstrings, calves, hip abduction, core), B upper body and core, C a short optional prevention session (slow step-downs, isometric wall sits, tibialis raises, Copenhagen plank).
-- **Rules against the run week**: no heavy leg session the day before a threshold, interval or long run (B instead); a lighter run week gives a lighter gym week; a runner who reports joint pain above 3/10 before the session gets C instead of A. Fartlek suggests and the runner decides, as everywhere else ([suggest a week](fartlek-suggest-week.md)).
+- **Rules against the run week**: no heavy leg session the day before a threshold, interval or long run (B instead); a lighter run week gives a lighter gym week. Fartlek suggests and the runner decides, as everywhere else ([suggest a week](fartlek-suggest-week.md)).
 
 ## What changes in earlier decisions
 
-- [Which days gym and cross-training go on](fartlek-gym-cross-days.md) settled that Fartlek doesn't suggest what to do in the gym. That point is reopened by this page: the suggester above would replace it once built. The day placement and "easy running the day after gym" from that page stand and come first.
+- [Which days gym and cross-training go on](fartlek-gym-cross-days.md) settled that Fartlek doesn't suggest what to do in the gym. That point is reopened by this page: the gym page now suggests a template, while the planner still only places the day. The day placement and "easy running the day after gym" from that page stand and come first.
 
 ## Known limits
 
@@ -68,7 +110,8 @@ Rules and data, not an adaptive model:
 
 ## Open questions
 
-- Is the rest timer in the first version, and push or screen awake?
+
+- When the rest timer comes: push or screen awake?
 - Does a Garmin `strength_training` FIT file carry sets, reps and weights that could pre-fill the log? Check one real file before relying on it.
 - Templates in block text (like the run sessions) or only in the UI?
 - How much of the catalogue ships with the app versus what the runner adds.

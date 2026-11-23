@@ -20,12 +20,13 @@ import * as samesession from "./samesession";
 import * as raceresults from "./raceresults";
 import * as devsettings from "./devsettings";
 import * as weekreview from "./weekreview";
+import * as gym from "./gym";
 
 export { lang, locale, LANGS, setLang, type Lang } from "@homelab/i18n";
 
 export const { t, tn } = createI18n({
-  en: { ...core.en, ...plan.en, ...activity.en, ...settings.en, ...tour.en, ...nextweek.en, ...blockplan.en, ...builder.en, ...samesession.en, ...raceresults.en, ...devsettings.en, ...weekreview.en },
-  sv: { ...core.sv, ...plan.sv, ...activity.sv, ...settings.sv, ...tour.sv, ...nextweek.sv, ...blockplan.sv, ...builder.sv, ...samesession.sv, ...raceresults.sv, ...devsettings.sv, ...weekreview.sv },
+  en: { ...core.en, ...plan.en, ...activity.en, ...settings.en, ...tour.en, ...nextweek.en, ...blockplan.en, ...builder.en, ...samesession.en, ...raceresults.en, ...devsettings.en, ...weekreview.en, ...gym.en },
+  sv: { ...core.sv, ...plan.sv, ...activity.sv, ...settings.sv, ...tour.sv, ...nextweek.sv, ...blockplan.sv, ...builder.sv, ...samesession.sv, ...raceresults.sv, ...devsettings.sv, ...weekreview.sv, ...gym.sv },
 });
 export type MsgKey = Parameters<typeof t>[0];
 

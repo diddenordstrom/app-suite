@@ -576,6 +576,56 @@ describe("api", () => {
     expect(taken.planned.match.workJudged).toBe(3);
   });
 
+  it("gym: suggested template from the run week, save once per client id, last time, improvements, Bolt import", async () => {
+    const a = createApp(createDb(":memory:"), config);
+    await a.request("/api/settings");
+    const day = "2026-11-23";
+    await a.request("/api/workouts", json({ date: day, type: "strength" }));
+    await a.request("/api/workouts", json({ date: "2026-11-27", type: "threshold", distanceKm: 9 }));
+    type Day = { planned: { type: string } | null; suggested: { id: string; why: { key: string } }; last: Record<string, { date: string; sets: { kg: number; reps: number }[] }>; logged: unknown[]; recent: { done: number; planned: number } };
+    const d0 = await (await a.request(`/api/gym?date=${day}`)).json() as Day;
+    expect(d0.planned?.type).toBe("strength");
+    // One planned gym session this week: full body. A second one makes it A/B again.
+    expect(d0.suggested).toMatchObject({ id: "F", why: { key: "gym.why.oncePerWeek" } });
+    await a.request("/api/workouts", json({ date: "2026-11-25", type: "strength" }));
+    expect((await (await a.request(`/api/gym?date=${day}`)).json() as Day).suggested).toMatchObject({ id: "A", why: { key: "gym.why.legsBefore" } });
+    expect(d0.last).toEqual({});
+
+    const session = { clientId: "test-session-1", date: day, startedAt: 1, finishedAt: 2, template: "A", feel: "none", workoutId: null, entries: [
+      { exercise: "stiff_leg_deadlift", slot: "hinge", sets: [{ kind: "warmup", kg: 40, reps: 10, seconds: null }, { kind: "work", kg: 60, reps: 10, seconds: null }, { kind: "work", kg: 60, reps: 10, seconds: null }] },
+    ] };
+    const first = await a.request("/api/gym/sessions", json(session));
+    expect(first.status).toBe(201);
+    const again = await a.request("/api/gym/sessions", json(session));
+    expect(again.status).toBe(200);
+    expect((await again.json() as { id: number }).id).toBe((await first.json() as { id: number }).id);
+    expect((await a.request("/api/gym/sessions", json({ ...session, clientId: "x" }))).status).toBe(400);
+
+    const d1 = await (await a.request(`/api/gym?date=${day}`)).json() as Day;
+    expect(d1.last.stiff_leg_deadlift).toEqual({ date: day, sets: [{ kind: "work", kg: 60, reps: 10, seconds: null }, { kind: "work", kg: 60, reps: 10, seconds: null }] });
+    expect(d1.logged).toHaveLength(1);
+    expect(d1.recent).toEqual({ done: 1, planned: 1 });
+    // The day after an A session, B is next.
+    expect((await (await a.request("/api/gym?date=2026-11-25")).json() as Day).suggested.id).toBe("B");
+
+    const better = await (await a.request("/api/gym/sessions", json({ ...session, clientId: "test-session-2", date: "2026-11-30", entries: [{ exercise: "stiff_leg_deadlift", slot: "hinge", sets: [{ kind: "work", kg: 62.5, reps: 8, seconds: null }] }] }))).json() as { improvements: { exercise: string; kg: number }[] };
+    expect(better.improvements).toEqual([expect.objectContaining({ exercise: "stiff_leg_deadlift", kg: 2.5 })]);
+
+    const csv = 'Date,Workout Name,Exercise Name,Set,Weight,Reps,Distance,Duration,Level,Notes\n"2026-01-05 12:00:00","Upper","Bench Press (Barbell)","1","62,5","6","0","0","0",""\n"2026-01-05 12:00:00","Upper","Odd Machine","1","20","12","0","0","0",""';
+    const imp = await (await a.request("/api/gym/import", json({ csv }))).json();
+    expect(imp).toEqual({ added: 1, skipped: 0, sets: 2, unknown: ["Odd Machine"], rowErrors: 0 });
+    expect(await (await a.request("/api/gym/import", json({ csv }))).json()).toMatchObject({ added: 0, skipped: 1 });
+    expect((await a.request("/api/gym/import", json({ csv: "a,b\n1,2" }))).status).toBe(400);
+
+    const list = await (await a.request("/api/gym/sessions")).json() as { id: number; date: string; source: string; volume: number }[];
+    expect(list.map((s) => [s.date, s.source])).toEqual([["2026-11-30", "fartlek"], [day, "fartlek"], ["2026-01-05", "bolt"]]);
+    expect(list[1].volume).toBe(1200);
+    const full = await (await a.request(`/api/gym/sessions/${list[2].id}`)).json() as { entries: { exercise: string }[] };
+    expect(full.entries.map((e) => e.exercise)).toEqual(["bench_press", "x:Odd Machine"]);
+    await a.request(`/api/gym/sessions/${list[2].id}`, { method: "DELETE", headers: { origin: ORIGIN } });
+    expect((await a.request(`/api/gym/sessions/${list[2].id}`)).status).toBe(404);
+  });
+
   it("deleting training data reaches every per-user table except the account's own", () => {
     // intervals.icu rows mirror what was sent there; the next push deletes the events of wiped workouts.
     // Notification devices and the morning time are the account's settings, like the Garmin connection.

@@ -315,3 +315,42 @@ export const morningPush = sqliteTable("morning_push", {
   time: text("time"),
   sentOn: text("sent_on"),
 });
+
+/**
+ * A gym session logged in Fartlek or imported (docs/decisions/fartlek-gym-module.md). `clientId` is made on
+ * the phone when the session starts (or `bolt:<stamp>` for an import), so a resend saves it once.
+ */
+export const gymSessions = sqliteTable("gym_sessions", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: userRef(),
+  clientId: text("client_id").notNull(),
+  date: text("date").notNull(),
+  startedAt: integer("started_at"),
+  finishedAt: integer("finished_at"),
+  /** A, B, C, or null for a free or imported session. */
+  template: text("template"),
+  /** The name another app gave the session (imports). */
+  name: text("name"),
+  /** The joint check-in before the session: none, some, pain. */
+  feel: text("feel"),
+  /** The planned gym session it was started from. */
+  workoutId: integer("workout_id"),
+  source: text("source").notNull().default("fartlek"),
+}, (t) => [uniqueIndex("gym_sessions_client").on(t.userId, t.clientId), index("gym_sessions_user_date").on(t.userId, t.date)]);
+
+/** One set of a gym session. `exercise` is a catalogue id (shared/gym.ts) or `x:<name>`. */
+export const gymSets = sqliteTable("gym_sets", {
+  id: integer("id").primaryKey({ autoIncrement: true }),
+  userId: userRef(),
+  sessionId: integer("session_id").notNull().references(() => gymSessions.id, { onDelete: "cascade" }),
+  /** The exercise's place in the session, and the set's place in the exercise. */
+  position: integer("position").notNull(),
+  setIndex: integer("set_index").notNull(),
+  exercise: text("exercise").notNull(),
+  slot: text("slot"),
+  /** work, warmup, drop. */
+  kind: text("kind").notNull().default("work"),
+  kg: real("kg"),
+  reps: integer("reps"),
+  seconds: integer("seconds"),
+}, (t) => [index("gym_sets_session").on(t.sessionId), index("gym_sets_user_exercise").on(t.userId, t.exercise)]);

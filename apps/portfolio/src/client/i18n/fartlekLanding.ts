@@ -46,6 +46,9 @@ export const en = {
   "fartlek.landing.feature.fuel.title": "Train your gut too",
   "fartlek.landing.feature.fuel.text": "Log the grams of carbs you took and how your stomach coped. Fartlek works out grams per hour and suggests the next step: start around 60 g/h, then add 10 once your stomach has handled a level for 14 days. The chart next to it shows whether runs felt like the numbers said.",
   "fartlek.landing.feature.fuel.label": "Fueling and stomach chart, and felt effort against measured load",
+  "fartlek.landing.feature.gym.title": "The gym, as part of the run week",
+  "fartlek.landing.feature.gym.text": "Log your gym sessions in Fartlek. Each set is filled in with last time's weight and reps, and when you reached the top of the range in every set, the next step up is suggested. Machine taken? Swap the exercise in one tap. Fartlek suggests legs or upper body from your week, like upper body the day before a threshold session, and keeps the session on the phone if the gym has no signal. Coming from Bolt? Import your history.",
+  "fartlek.landing.feature.gym.label": "A gym session in progress: last time, the set being logged and the sets done",
 
   "fartlek.landing.why.title": "Simpler than it looks",
   "fartlek.landing.why.lead": "Plenty of the numbers in TrainingPeaks and Strava rest on well-known, fairly simple maths, and there's nothing wrong with that. TrainingPeaks says openly that its Fitness and Fatigue are weighted averages of your load over 42 and 7 days.",
@@ -113,6 +116,8 @@ export const en = {
   "fartlek.landing.faq.q4.a": "Load from your pace against your threshold, fitness and fatigue as weighted averages over 42 and 7 days, critical speed, Riegel and three marathon models. They're all written out under How we calculate, and in the app the ⓘ next to a value explains that particular number.",
   "fartlek.landing.faq.q5.q": "Is Fartlek open source?",
   "fartlek.landing.faq.q5.a": "Yes. All the code is out in the open under the MIT licence, so you can read it, run it yourself and change what you like. Every formula on this page can be followed line by line in the code.",
+  "fartlek.landing.faq.q6.q": "Can I log the gym too?",
+  "fartlek.landing.faq.q6.a": "Yes. Fartlek has three templates for runners: legs and injury prevention, upper body, and a gentle one. You can also add your own exercises. Sets, weights and history are stored with the rest of your training, and a CSV export from Bolt can be imported.",
 
   "fartlek.landing.cta.title": "Take a lap in the demo",
   "fartlek.landing.cta.text": "18 weeks of training and two races to aim for are already in there. Click around as much as you like.",
@@ -175,6 +180,9 @@ export const sv: Record<keyof typeof en, string> = {
   "fartlek.landing.feature.fuel.title": "Träna magen också",
   "fartlek.landing.feature.fuel.text": "Logga hur många gram kolhydrater du fick i dig och hur magen mådde. Fartlek räknar ut gram per timme och föreslår nästa steg: börja runt 60 g/h och öka med 10 när magen har klarat nivån i 14 dagar. Grafen bredvid visar om passen kändes som siffrorna sa.",
   "fartlek.landing.feature.fuel.label": "Graf över energi och mage, och upplevd ansträngning mot mätt belastning",
+  "fartlek.landing.feature.gym.title": "Gymmet, som en del av löpveckan",
+  "fartlek.landing.feature.gym.text": "Logga gympassen i Fartlek. Varje set är ifyllt med förra gångens vikt och reps, och klarade du toppen av intervallet i alla set föreslås nästa steg upp. Upptagen maskin? Byt övning med ett tryck. Fartlek föreslår ben eller överkropp utifrån veckan, till exempel överkropp dagen före tröskeln, och sparar passet i telefonen om gymmet saknar täckning. Kört Bolt? Importera din historik.",
+  "fartlek.landing.feature.gym.label": "Ett pågående gympass: förra gången, setet som loggas och klara set",
 
   "fartlek.landing.why.title": "Enklare än det ser ut",
   "fartlek.landing.why.lead": "Många siffror i TrainingPeaks och Strava bygger på välkänd och ganska enkel matte, och det är inget fel med det. TrainingPeaks skriver själva att deras Fitness och Fatigue är viktade snitt av belastningen över 42 och 7 dagar.",
@@ -242,6 +250,8 @@ export const sv: Record<keyof typeof en, string> = {
   "fartlek.landing.faq.q4.a": "Belastning från tempot mot din tröskel, kondition och trötthet som viktade snitt över 42 och 7 dagar, kritisk fart, Riegel och tre maratonmodeller. Allihop står utskrivna under Så räknar vi, och i appen förklarar ⓘ vid ett värde hur just det räknas.",
   "fartlek.landing.faq.q5.q": "Är Fartlek öppen källkod?",
   "fartlek.landing.faq.q5.a": "Ja. All kod ligger öppet under MIT-licensen, så du får läsa den, köra den själv och ändra vad du vill. Varje formel på den här sidan går att följa rad för rad i koden.",
+  "fartlek.landing.faq.q6.q": "Kan jag logga gymmet också?",
+  "fartlek.landing.faq.q6.a": "Ja. Fartlek har tre passmallar för löpare: ben och skadeförebyggande, överkropp och ett skonsamt pass. Du kan också lägga till egna övningar. Set, vikter och historik sparas med resten av träningen, och en CSV-export från Bolt går att importera.",
 
   "fartlek.landing.cta.title": "Ta ett varv i demon",
   "fartlek.landing.cta.text": "18 veckors träning och två lopp att sikta mot ligger redan inlagda. Klicka runt hur mycket du vill.",

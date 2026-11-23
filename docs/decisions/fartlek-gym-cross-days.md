@@ -50,7 +50,7 @@ So: gym on Monday and cross on Thursday and Saturday, runs on Tuesday, Wednesday
 
 ## Decisions on the way
 
-- Settled 2026-11-18 with the user: **the app doesn't suggest what to do in the gym**, only the recommendation and the question about days. No focus text, template or session note. *Reopened 2026-11-23:* a gym logger and a rule-based session suggester are planned in [the gym module](fartlek-gym-module.md); until that is built, this still holds for the planner.
+- Settled 2026-11-18 with the user: **the app doesn't suggest what to do in the gym**, only the recommendation and the question about days. No focus text, template or session note. *Reopened 2026-11-23:* the [gym module](fartlek-gym-module.md) now logs sessions and suggests a template on the gym page; the planner itself still only places the day.
 - Settled 2026-11-18: the engine tries to avoid a threshold session directly after gym and puts easy running there instead, as in the reference week.
 
 ## Open questions

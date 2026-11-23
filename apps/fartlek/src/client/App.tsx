@@ -13,6 +13,8 @@ import { Races } from "./pages/Races";
 import { Activities, ActivityPage } from "./pages/Activities";
 import { Trends } from "./pages/Trends";
 import { Settings } from "./pages/Settings";
+import { Gym } from "./pages/Gym";
+import { GymHistory } from "./pages/GymHistory";
 
 const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>
@@ -65,6 +67,8 @@ export function App() {
           <Route path="/activities/:id" element={<ActivityPage />} />
           <Route path="/trends" element={<Trends />} />
           <Route path="/settings" element={<Settings />} />
+          <Route path="/gym" element={<Gym />} />
+          <Route path="/gym/history" element={<GymHistory />} />
           <Route path="*" element={<p className="text-muted-foreground">{t("app.notFound")}</p>} />
         </Routes>
       </AppShell>

@@ -3,7 +3,7 @@ title: Fartlek gets its own landing page on the portfolio, built from live compo
 summary: /fartlek on the portfolio renders Fartlek's real components on hand-tuned demo data (no screenshots), with a theme toggle; the Fartlek card says "Läs mer" instead of "Öppna appen"; "öppen källkod" (present tense) without a GitHub link; about/contact waits for the owner
 type: decision
 status: accepted
-updated: 2026-11-20
+updated: 2026-11-23
 ---
 
 # Fartlek gets its own landing page on the portfolio
@@ -15,6 +15,8 @@ updated: 2026-11-20
 - **Hand-tuned demo data.** The components are fed a snapshot of the demo account's API responses (`components/fartlek/data/demo-snapshot.json`), tuned so the story reads well (a ~3:30 marathoner, no knee pain, a steady fuelling progression) while keeping Fartlek's own formulas. `scripts/fartlek-landing-tune.py` reapplies the tuning to a fresh export; see the data README. Block, run and activity names in the snapshot are translated by the page at render time (`DEMO_NAMES`), so the demo does not mix English and Swedish.
 - **"Läs mer" replaces "Öppna appen"** on the Fartlek card on the portfolio front page (an app with a `page` gets "Testa demon" plus "Läs mer"); the other apps keep "Öppna {name}".
 - **"Öppen källkod", present tense, no GitHub link yet.** The page is merged when Fartlek goes open source, so it talks about open source as a fact (MIT, host it yourself, the source shows how) and never as a promise. It links to no repository for now, in line with [the portfolio showing the apps, not the source](portfolio-app.md).
+
+- **Gym section (2026-11-23):** a phone frame with Fartlek's real `ExerciseCard` from the [gym module](fartlek-gym-module.md), on hand-written data rather than the snapshot (the steppers and ticks work), plus a FAQ entry on logging the gym.
 
 ## Reasons
 

@@ -20,6 +20,9 @@ import { fmtDuration } from "@fartlek/shared/format";
 import { FORM } from "@fartlek/shared/load";
 import { Badge, BarChart, Card, CardTitle, InfoTip, LineChart, Ring, Stat } from "../../../ui";
 import { SNAPSHOT } from "./snapshot";
+import { ExerciseCard } from "@fartlek/client/pages/Gym";
+import type { DraftEntry } from "@fartlek/client/gymlog";
+import type { LastTime } from "@fartlek/shared/gymplan";
 
 const ms = (d: string) => toDate(d).getTime();
 const dayLabel = (x: number) => new Date(x).toLocaleDateString(locale, { day: "numeric", month: "short", timeZone: "UTC" });
@@ -246,5 +249,32 @@ export function FuelScreen() {
           ]} />
       </Card>
     </div>
+  );
+}
+
+/** The gym session (Gym.tsx): one exercise card with last time and the set being logged; the steppers and ticks work. */
+export function GymScreen() {
+  const kg = 57.5;
+  const last: LastTime = { date: "2026-11-16", sets: [1, 2, 3].map(() => ({ kind: "work" as const, kg: 55, reps: 10, seconds: null })) };
+  const [entry, setEntry] = useState<DraftEntry>({
+    exercise: "stiff_leg_deadlift", slot: "hinge", scheme: { sets: 3, low: 8, high: 10 },
+    sets: [{ kind: "work", kg, reps: 8, seconds: null, done: true }, { kind: "work", kg, reps: 8, seconds: null, done: false }, { kind: "work", kg, reps: 8, seconds: null, done: false }],
+  });
+  const [focus, setFocus] = useState<number | null>(1);
+  const tick = (j: number) => {
+    const sets = entry.sets.map((s, i) => (i === j ? { ...s, done: !s.done } : s));
+    setEntry({ ...entry, sets });
+    if (!entry.sets[j].done) { const next = sets.findIndex((s) => !s.done); setFocus(next >= 0 ? next : null); }
+  };
+  return (
+    <>
+      <div className="px-1">
+        <div className="font-semibold">{ft("gym.template.A")} · {ft("gym.templateAbout.A")}</div>
+        <div className="text-xs text-muted-foreground">{ft("gym.exerciseOf", { n: 2, total: 6 })}</div>
+      </div>
+      <ExerciseCard entry={entry} last={last} focus={focus} onFocus={setFocus} onTick={tick} onSwap={() => {}}
+        onChange={(j, patch) => setEntry({ ...entry, sets: entry.sets.map((s, i) => (i === j ? { ...s, ...patch } : s)) })}
+        onAddSet={() => { setEntry({ ...entry, sets: [...entry.sets, { ...entry.sets[entry.sets.length - 1], done: false }] }); setFocus(entry.sets.length); }} />
+    </>
   );
 }
