@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { api, ApiError } from "./http";
 import { locale, t, type MsgKey } from "./i18n";
 import { customName, exercise, isCustom, schemeFor, type Pattern, type Scheme, type TemplateId } from "@/shared/gym";
+import { en as gymEn, sv as gymSv } from "./i18n/gym";
 import { suggestSets, workSets, type GymSet, type GymSessionInput, type JointFeel, type LastTime } from "@/shared/gymplan";
 import type { ISODate } from "@/shared/dates";
 
@@ -13,7 +14,8 @@ import type { ISODate } from "@/shared/dates";
  */
 
 export interface DraftSet extends GymSet { done: boolean }
-export interface DraftEntry { exercise: string; slot: Pattern | null; scheme: Scheme; sets: DraftSet[] }
+/** `uid` keeps a row the same element while the list is reordered (drafts saved before it existed have none). */
+export interface DraftEntry { uid?: string; exercise: string; slot: Pattern | null; scheme: Scheme; sets: DraftSet[] }
 export interface Draft {
   clientId: string;
   date: ISODate;
@@ -49,7 +51,7 @@ export const newClientId = () => `g${Date.now().toString(36)}${Math.random().toS
 /** A new entry for an exercise, its sets filled in from last time. */
 export function entryFor(id: string, slot: Pattern | null, scheme: Scheme | null, last: LastTime | undefined): DraftEntry {
   const sch = scheme ?? schemeFor(id);
-  return { exercise: id, slot, scheme: sch, sets: suggestSets(id, sch, last).sets.map((s) => ({ ...s, done: false })) };
+  return { uid: Math.random().toString(36).slice(2, 10), exercise: id, slot, scheme: sch, sets: suggestSets(id, sch, last).sets.map((s) => ({ ...s, done: false })) };
 }
 
 export function toInput(d: Draft): GymSessionInput {
@@ -57,6 +59,15 @@ export function toInput(d: Draft): GymSessionInput {
     clientId: d.clientId, date: d.date, startedAt: d.startedAt, finishedAt: Date.now(), template: d.template, feel: d.feel, workoutId: d.workoutId,
     entries: d.entries.map((e) => ({ exercise: e.exercise, slot: e.slot, sets: e.sets.filter((s) => s.done).map((s) => ({ kind: s.kind, kg: s.kg, reps: s.reps, seconds: s.seconds })) })).filter((e) => e.sets.length),
   };
+}
+
+/** The list with the item at `from` moved to `to`. */
+export function moveItem<T>(xs: T[], from: number, to: number): T[] {
+  if (from === to || from < 0 || to < 0 || from >= xs.length || to >= xs.length) return xs;
+  const out = [...xs];
+  const [x] = out.splice(from, 1);
+  out.splice(to, 0, x);
+  return out;
 }
 
 export const outbox = () => read<GymSessionInput[]>(OUTBOX_KEY) ?? [];
@@ -97,6 +108,22 @@ export function useOutbox(onSent?: () => void) {
 }
 
 export const exName = (id: string) => isCustom(id) ? customName(id) : t(`ex.${id}` as MsgKey);
+/** Lower case with spaces, hyphens and the like gone, so "Pull up", "pull-ups" and "Pullup" meet. */
+export const normalize = (x: string) => x.toLocaleLowerCase().replace(/[^\p{L}\p{N}]+/gu, "");
+
+/**
+ * Whether an exercise matches a search: its name in both languages, the names other apps export it as
+ * (Bolt), and its movement pattern, so "pull up" finds Chins whatever the UI language.
+ */
+export function matchesSearch(id: string, query: string): boolean {
+  const q = normalize(query);
+  if (!q) return true;
+  const key = `ex.${id}` as keyof typeof gymEn;
+  const terms = isCustom(id) ? [customName(id)] : [gymEn[key], gymSv[key], ...(exercise(id).aliases ?? [])];
+  terms.push(patternName(id, null));
+  return terms.some((x) => x && normalize(x).includes(q));
+}
+
 export const patternName = (id: string, slot: Pattern | null) => isCustom(id) && !slot ? t("gym.pattern.custom") : t(`gym.pattern.${slot ?? exercise(id).pattern}` as MsgKey);
 
 export const fmtKg = (n: number) => n.toLocaleString(locale, { maximumFractionDigits: 2 });

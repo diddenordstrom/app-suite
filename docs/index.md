@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · note · Fartlek gym: search in both languages, reorder exercises ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: one session a week is full body ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Gym on the Fartlek landing page, its own news note ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · decision · Fartlek gym module: flow from Idag, no tab, joint check-in ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek trend cards: today's value on top, key numbers underneath ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Fartlek gym module planned: logger first, then a suggester tied to the run week ([log/2026-11.md](log/2026-11.md))
-- 2026-11-23 · decision · Fartlek durability is one card; Activities gets a runner icon ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
