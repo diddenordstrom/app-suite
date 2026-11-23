@@ -9,6 +9,18 @@ import { api } from "./http";
  */
 export const NEWS: NewsEntry[] = [
   {
+    id: "2026-11-gym",
+    date: "november 2026",
+    title: "Nytt i Fartlek: logga gympassen",
+    items: [
+      "Tryck Öppna pass på dagens gympass i Idag-kortet. Fartlek föreslår pass A (ben och skydd), B (överkropp) eller C (skonsamt) utifrån löpveckan, till exempel överkropp dagen före tröskeln.",
+      "Varje set är ifyllt med förra gångens vikt och reps. Klarade du toppen av intervallet i alla set föreslås nästa steg upp.",
+      "Byt en övning med ett tryck om maskinen är upptagen, eller lägg till en egen. Historiken följer övningen.",
+      "Passet ligger kvar i telefonen om nätet försvinner och sparas när det finns nät igen.",
+      "Kört Bolt? Importera din CSV-export under Aktiviteter → Gymhistorik, så har du förra gångens siffror från första passet.",
+    ],
+  },
+  {
     // One note for the whole November release (steps, planned vs actual, the block coach): only the newest entry is shown.
     // A new id when the note grows, so everyone sees it once more (seen notes are stored by id).
     id: "2026-11-november-4",

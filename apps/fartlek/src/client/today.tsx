@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { Link } from "react-router-dom";
 import { api, useAction } from "./http";
 import { useSync } from "./garminSync";
 import { useFmt } from "./prefs";
@@ -105,6 +106,7 @@ export function Sessions({ data }: { data: HomeData }) {
               <span className="block text-xs">{t(`workout.${s.workout.type}`)}{key && ` · ${t("home.keySession")}`}</span>
               <span className="block font-semibold">{[km ? fmt.dist(km) : null, steps].filter(Boolean).join(" · ") || t(`workout.${s.workout.type}`)}</span>
             </span>
+            {s.workout.type === "strength" && !done && <Link to={`/gym?date=${s.workout.date}`} className="inline-flex h-9 shrink-0 items-center rounded-md bg-primary px-3 text-sm font-semibold text-primary-foreground">{t("gym.openSession")}</Link>}
             {done ? <Badge>{t("today.done")}</Badge> : data.watch && s.workout.steps && <ToWatch id={s.workout.id} sent={data.watch.sent.includes(s.workout.id)} />}
           </li>
         );

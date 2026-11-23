@@ -38,7 +38,10 @@ export function Activities() {
 
   return (
     <div className="mx-auto max-w-5xl space-y-4">
-      <h1 className="text-2xl font-semibold">{t("nav.activities")}</h1>
+      <div className="flex items-center justify-between gap-2">
+        <h1 className="text-2xl font-semibold">{t("nav.activities")}</h1>
+        <Link to="/gym/history" className="text-sm text-primary hover:underline">{t("gym.history")} →</Link>
+      </div>
       <ErrorText>{error ?? flag.error}</ErrorText>
       {!loading && !items.length && <EmptyState title={t("activities.emptyTitle")}>{t("activities.emptyText")}</EmptyState>}
       {items.length > 0 && (

@@ -17,6 +17,7 @@ import { intervalsRoutes } from "./routes/intervals";
 import { templateRoutes } from "./routes/templates";
 import { sameSessionRoutes } from "./routes/samesession";
 import { tuningRoutes } from "./routes/tuning";
+import { gymRoutes } from "./routes/gym";
 import { createIntervalsPusher, type IntervalsPusher } from "./intervals";
 import { createMorning } from "./morning";
 
@@ -67,6 +68,7 @@ export function createApp(db: Db, config: Config, deps: { fetch?: typeof fetch; 
   authed.route("/", templateRoutes(db));
   authed.route("/", sameSessionRoutes(db));
   authed.route("/", tuningRoutes(db, auth.requireAdmin));
+  authed.route("/", gymRoutes(db));
   authed.route("/", push.routes());
   authed.route("/", morning.routes());
   api.route("/", authed);

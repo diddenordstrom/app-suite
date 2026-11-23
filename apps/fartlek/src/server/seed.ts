@@ -7,6 +7,9 @@ import { createDemoProvider, DEMO_PATTERN, demoWeekKm } from "./providers/demo";
 import { syncProvider } from "./sync";
 import { ctxFor } from "./analysis";
 import { parseSteps, plannedFromSteps, type StepRefs } from "../shared/steps";
+import { saveSession } from "./gym";
+import { templateEntries } from "../shared/gymplan";
+import { exercise } from "../shared/gym";
 
 const count = (db: Db, tbl: typeof t.workouts | typeof t.races | typeof t.blocks | typeof t.thresholds | typeof t.painEntries, userId: number) =>
   db.select({ n: sql<number>`count(*)` }).from(tbl).where(eq(tbl.userId, userId)).get()?.n ?? 0;
@@ -71,5 +74,40 @@ export async function loadDemoData(db: Db, userId: number) {
   const today = ctxFor(db, userId).today;
   const result = await syncProvider(db, userId, createDemoProvider(userId, today), { today, maxDetails: 500 });
   seedDemoPlan(db, userId, today);
+  seedDemoGym(db, userId, today);
   return result;
+}
+
+/**
+ * Demo gym: a planned gym session every Monday from four weeks back to four ahead, and logged sessions on
+ * the past Mondays (A) and Wednesdays (B) whose weights creep up, so "last time" and the history have data.
+ */
+export function seedDemoGym(db: Db, userId: number, today: ISODate) {
+  if (db.select({ id: t.gymSessions.id }).from(t.gymSessions).where(eq(t.gymSessions.userId, userId)).get()) return;
+  const thisWeek = weekStartOf(today, "monday");
+  const start: Record<string, number> = {
+    bulgarian_split_squat: 12, stiff_leg_deadlift: 52.5, seated_leg_curl: 50, seated_calf_raise: 35, hip_abduction: 40, pallof_press: 10,
+    bench_press: 55, pull_up: 0, seated_row: 45, shoulder_press: 14, db_curl: 10, triceps_pushdown: 35,
+  };
+  for (let w = -4; w <= 4; w++) {
+    const monday = addDays(thisWeek, w * 7);
+    if (monday >= addDays(today, -28)) db.insert(t.workouts).values({ userId, date: monday, type: "strength", durationMin: 45 }).run();
+  }
+  for (let w = -4; w <= -1; w++) {
+    for (const [off, tpl] of [[0, "A"], [2, "B"]] as const) {
+      const date = addDays(thisWeek, w * 7 + off);
+      if (date >= today || (w === -3 && tpl === "B")) continue; // one week without B: 7 of 8
+      const step = w + 4;
+      saveSession(db, userId, {
+        clientId: `demo-${date}-${tpl}`, date, startedAt: Date.parse(`${date}T16:00:00Z`), finishedAt: Date.parse(`${date}T16:45:00Z`),
+        template: tpl, feel: "none", workoutId: null,
+        entries: templateEntries(tpl).map((e) => {
+          const ex = exercise(e.exercise);
+          const kg = start[e.exercise] ? start[e.exercise] + Math.floor(step / 2) * ex.step : null;
+          const reps = Math.min(e.scheme.high, e.scheme.low + step);
+          return { exercise: e.exercise, slot: e.slot, sets: Array.from({ length: e.scheme.sets }, () => ({ kind: "work" as const, kg, reps, seconds: null })) };
+        }),
+      });
+    }
+  }
 }
