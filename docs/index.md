@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · decision · Fartlek durability is one card; Activities gets a runner icon ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Dependabot auto-merge when the checks pass ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · note · Skeletons instead of "Laddar…" ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-22 · decision · Skymning depth: soft cards and controls ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
-- 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

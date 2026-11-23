@@ -93,6 +93,11 @@ export function fuelAdvice(points: FuelPoint[]): FuelAdvice {
 
 /* ---- Durability ---- */
 
+/** Efficiency drift (% lost from first to last third): under `stable` holds up, from `high` fades a lot. */
+export const DRIFT = { stable: 5, high: 10 } as const;
+export type DriftZone = "stable" | "fading" | "high";
+export const driftZone = (pct: number): DriftZone => (pct < DRIFT.stable ? "stable" : pct < DRIFT.high ? "fading" : "high");
+
 export interface Durability {
   /** Speed per heartbeat (m/s per bpm × 1000) in the first and last third of the run. */
   first: number;

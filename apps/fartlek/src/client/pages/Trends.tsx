@@ -6,6 +6,7 @@ import { TrendsSkeleton } from "../skeletons";
 import { Badge, BarChart, Button, Card, CardTitle, ErrorText, InfoTip, LineChart, SegmentedControl, Sparkline, Spinner, StackedBars, useAutoTour, useTour } from "../ui";
 import { trendsTour } from "../guide";
 import { SameSessionTrends } from "../samesession";
+import { DurabilityCard } from "../durabilitycard";
 import { BestPaceCard, CsBody, Vo2maxBody } from "../perf";
 import { fmtDay, painArea } from "../bits";
 import { locale, t, tm } from "../i18n";
@@ -145,12 +146,7 @@ export function Trends() {
             ]} />
         </Card>
 
-        <Card className="lg:col-span-2">
-          <CardTitle><Titled title={t("durability.title")} info={t("chartInfo.durability")} /></CardTitle>
-          <LineChart height={190} xFormat={dayLabel} yFormat={(v) => `${v.toFixed(1)}%`} emptyText={t("durability.empty")}
-            refLines={[{ y: 0, label: t("durability.noDrift") }]}
-            series={[{ key: "drift", label: t("durability.drift"), color: "var(--chart-3)", dots: true, points: data.log.durability.map((d) => ({ x: ms(d.date), y: d.driftPct })) }]} />
-        </Card>
+        <DurabilityCard className="lg:col-span-2" rows={data.log.durability} info={t("chartInfo.durability")} />
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2">

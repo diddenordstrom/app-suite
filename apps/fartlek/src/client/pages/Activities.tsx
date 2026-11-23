@@ -13,7 +13,7 @@ import { Curves } from "../curves";
 import { PlannedCard, stepBands } from "../stepresults";
 import { fmtDuration } from "@/shared/format";
 import { PAIN_AREAS, type PainEntry } from "@/shared/types";
-import type { ActivityLog } from "@/shared/activitylog";
+import { DRIFT, type ActivityLog } from "@/shared/activitylog";
 
 function PainChips({ pain }: { pain: PainEntry[] }) {
   return <>{pain.map((p) => <Badge key={p.id} tone={p.level >= 5 ? "danger" : "warning"} >{painArea(p.area)} {p.level}/10</Badge>)}</>;
@@ -215,7 +215,7 @@ export function ActivityPage() {
           <CardTitle>{t("durability.title")}</CardTitle>
           <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
             <Stat label={t("durability.drift")} value={`${data.durability.driftPct > 0 ? "+" : ""}${data.durability.driftPct}%`}
-              sub={t("durability.driftSub")} tone={data.durability.driftPct >= 5 ? "warning" : undefined} />
+              sub={t("durability.driftSub")} tone={data.durability.driftPct >= DRIFT.stable ? "warning" : undefined} />
             {data.durability.thirds.map((third, i) => (
               <Stat key={i} label={[t("durability.first"), t("durability.middle"), t("durability.last")][i]} value={fmt.pace(third.pace)} sub={`${third.hr} bpm`} />
             ))}

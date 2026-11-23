@@ -18,10 +18,17 @@ const Icon = ({ d }: { d: string }) => (
   <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d={d} /></svg>
 );
 
+/** A runner, mid-stride: a head and a body line, so it does not read as the trends chart. */
+const RunnerIcon = () => (
+  <svg viewBox="0 0 24 24" className="size-5" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+    <circle cx="15" cy="4.5" r="1.8" /><path d="M13.5 8.5l-2.5 5 3.5 3-1 4.5M11 13.5l-3 3.5-3.5.5M13.5 8.5l-3.5 1.5-1.5 3M13.5 8.5l3.5 2.5 2.5-1" />
+  </svg>
+);
+
 const nav = (): NavItem[] => [
   { to: "/", tour: "nav-home", label: t("nav.home"), icon: <Icon d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
   { to: "/plan", tour: "nav-plan", label: t("nav.plan"), icon: <Icon d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4" /> },
-  { to: "/activities", tour: "nav-activities", label: t("nav.activities"), icon: <Icon d="M3 12h4l3-8 4 16 3-8h4" /> },
+  { to: "/activities", tour: "nav-activities", label: t("nav.activities"), icon: <RunnerIcon /> },
   { to: "/trends", tour: "nav-trends", label: t("nav.trends"), icon: <Icon d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6" /> },
   { to: "/settings", tour: "nav-settings", label: t("nav.settings"), icon: <GearIcon className="size-5" />, desktopOnly: true },
 ];
