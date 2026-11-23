@@ -1,23 +1,28 @@
-import { useMemo, useState } from "react";
+import { useId, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useFmt } from "./prefs";
-import { Card, CardTitle, InfoTip, Stat, niceTicks } from "./ui";
+import { Card, CardTitle, InfoTip, Stat, cn, niceTicks } from "./ui";
 import { fmtDay } from "./bits";
 import { locale, t } from "./i18n";
 import type { DurabilityRow } from "./types";
-import { DRIFT } from "@/shared/activitylog";
+import { DRIFT, driftZone } from "@/shared/activitylog";
 import { toDate } from "@/shared/dates";
 
+const TONE = { stable: "var(--success)", fading: "var(--warning)", high: "var(--danger)" } as const;
+const TEXT = { stable: "text-foreground", fading: "text-warning", high: "text-danger" } as const;
+/** Colour only says something when there is something to watch: holding up stays neutral. */
+const INK = { stable: "var(--foreground)", fading: "var(--warning)", high: "var(--danger)" } as const;
 const signed = (v: number) => v.toLocaleString(locale, { maximumFractionDigits: 1, signDisplay: "exceptZero" });
 const day = (d: string) => fmtDay(d, { day: "numeric", month: "short" });
 
 /**
  * Durability in one card: today's drift as the big number, the drift per long run over time on a
- * quiet plot with the zones named at the edge, and the three thirds of the chosen run underneath.
+ * red-to-green fade (no hard zone edges), and the three thirds of the chosen run underneath.
  */
 export function DurabilityCard({ rows: unsorted, info, className }: { rows: DurabilityRow[]; info: string; className?: string }) {
   const rows = useMemo(() => [...unsorted].sort((a, b) => a.date.localeCompare(b.date)), [unsorted]);
   const fmt = useFmt();
+  const gid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const [picked, setPicked] = useState<string | null>(null);
   const title = t("durability.title");
   const head = (
@@ -36,6 +41,7 @@ export function DurabilityCard({ rows: unsorted, info, className }: { rows: Dura
   const bottom = Math.min(0, Math.floor(Math.min(...rows.map((r) => r.driftPct)) - 1));
   const X = (ms: number) => L + (x1 === x0 ? (W - L - R) / 2 : ((ms - x0) / (x1 - x0)) * (W - L - R));
   const Y = (v: number) => T + ((top - Math.max(bottom, Math.min(top, v))) / (top - bottom)) * (H - T - B);
+  const off = (v: number) => Math.min(1, Math.max(0, (Y(v) - T) / (H - T - B)));
   const ticks = niceTicks(bottom, top, 3);
   const zones = ([["high", (top + DRIFT.high) / 2], ["fading", (DRIFT.stable + DRIFT.high) / 2], ["stable", DRIFT.stable / 2]] as const);
   const pick = (e: React.PointerEvent<SVGSVGElement>) => {
@@ -61,13 +67,23 @@ export function DurabilityCard({ rows: unsorted, info, className }: { rows: Dura
           <p className="mt-1 max-w-xl text-sm text-muted-foreground">{t("durability.sub")}</p>
         </div>
         <div className="shrink-0 text-right">
-          <div className="font-display text-4xl leading-none font-medium tabular-nums">{signed(last.driftPct)} %</div>
+          <div className={cn("font-display text-4xl leading-none font-medium tabular-nums", TEXT[driftZone(last.driftPct)])}>{signed(last.driftPct)} %</div>
           <div className="mt-1.5 text-sm text-muted-foreground">{t("durability.latest", { date: day(last.date) })}</div>
         </div>
       </div>
 
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} onPointerDown={pick} onPointerMove={pick} className="mt-2 block h-auto w-full touch-pan-y select-none">
-        {[...new Set([...ticks, DRIFT.stable, DRIFT.high])].filter((v) => v !== 0 && v <= top).map((v) => (
+        <defs>
+          <linearGradient id={`${gid}-z`} gradientUnits="userSpaceOnUse" x1="0" y1={T} x2="0" y2={H - B}>
+            <stop offset="0" style={{ stopColor: TONE.high, stopOpacity: 0.09 }} />
+            <stop offset={off((top + DRIFT.high) / 2)} style={{ stopColor: TONE.high, stopOpacity: 0.09 }} />
+            <stop offset={off((DRIFT.stable + DRIFT.high) / 2)} style={{ stopColor: TONE.fading, stopOpacity: 0.05 }} />
+            <stop offset={off(DRIFT.stable / 2)} style={{ stopColor: TONE.stable, stopOpacity: 0.03 }} />
+            <stop offset="1" style={{ stopColor: TONE.stable, stopOpacity: 0.04 }} />
+          </linearGradient>
+        </defs>
+        <rect x={L} y={T} width={W - L - R} height={H - T - B} fill={`url(#${gid}-z)`} />
+        {ticks.filter((v) => v !== 0).map((v) => (
           <g key={v}><line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeWidth={1} strokeOpacity={0.6} />
             <text x={L - 6} y={Y(v)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">{v} %</text></g>
         ))}
@@ -82,8 +98,8 @@ export function DurabilityCard({ rows: unsorted, info, className }: { rows: Dura
           const on = r.id === sel.id;
           return (
             <g key={r.id}>
-              {on && <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={9} style={{ fill: "var(--foreground)", fillOpacity: 0.12 }} />}
-              <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={on ? 5.5 : 4} style={{ fill: on ? "var(--foreground)" : "var(--card)", stroke: on ? "var(--card)" : "var(--muted-foreground)" }} strokeWidth={2} />
+              {on && <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={9} style={{ fill: INK[driftZone(r.driftPct)], fillOpacity: 0.18 }} />}
+              <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={on ? 5.5 : 4} style={{ fill: on ? INK[driftZone(r.driftPct)] : "var(--card)", stroke: on ? "var(--card)" : "var(--muted-foreground)" }} strokeWidth={2} />
             </g>
           );
         })}
