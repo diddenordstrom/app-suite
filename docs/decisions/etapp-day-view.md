@@ -33,7 +33,7 @@ Etapp plans a 7–10 day car trip with a roof tent (the trip it was built for: s
 
 ## Open
 
-- The ut.no, eBird and Park4night link formats were written from memory and not yet tested on a phone; at worst they open the service's search page.
+- The ut.no and Park4night link formats were written from memory and not yet tested on a phone; at worst they open the service's search page. The eBird link uses the box parameters (env.minX/minY/maxX/maxY) eBird's map pages are known to take.
 - Editing the plan offline (only ticks queue today).
 
 ## Migration note
