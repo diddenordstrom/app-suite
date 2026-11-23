@@ -33,6 +33,7 @@ export function Input({ className, ...p }: ComponentProps<"input">) {
 }
 
 type Tone = "neutral" | "success" | "warning" | "danger" | "signature";
+export type BadgeTone = Tone;
 const tones: Record<Tone, string> = {
   neutral: "bg-muted text-muted-foreground",
   success: "bg-success/15 text-success",

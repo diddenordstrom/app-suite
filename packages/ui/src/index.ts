@@ -2,6 +2,7 @@ export * from "./components";
 export * from "./forms";
 export * from "./AppShell";
 export * from "./charts";
+export { ChartCard, type ChartHeadline, type KeyStat } from "./chartcard";
 export { Dialog } from "./Dialog";
 export { InfoTip } from "./InfoTip";
 export { cn } from "./cn";

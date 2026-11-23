@@ -3,7 +3,7 @@ import { Link } from "react-router-dom";
 import { useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
 import { TrendsSkeleton } from "../skeletons";
-import { Badge, BarChart, Button, Card, CardTitle, ErrorText, InfoTip, LineChart, SegmentedControl, Sparkline, Spinner, StackedBars, useAutoTour, useTour } from "../ui";
+import { Badge, BarChart, Button, Card, CardTitle, ChartCard, ErrorText, InfoTip, LineChart, SegmentedControl, Sparkline, Spinner, StackedBars, useAutoTour, useTour } from "../ui";
 import { trendsTour } from "../guide";
 import { SameSessionTrends } from "../samesession";
 import { DurabilityCard } from "../durabilitycard";
@@ -13,7 +13,7 @@ import { locale, t, tm } from "../i18n";
 import type { TrendsData } from "../types";
 import { toDate, weekNumber } from "@/shared/dates";
 import { fmtDuration } from "@/shared/format";
-import { FORM } from "@/shared/load";
+import { FORM, formState } from "@/shared/load";
 import { READINESS } from "@/shared/recovery";
 import { EASY_GRADE } from "@/shared/zones";
 
@@ -25,6 +25,8 @@ const indexed = (pts: { x: number; y: number }[]) => {
   return pts.map((p) => ({ x: p.x, y: mean ? (p.y / mean) * 100 : null }));
 };
 const pct = (v: number) => `${Math.round(v * 100)}%`;
+const signedInt = (v: number) => Math.round(v).toLocaleString(locale, { signDisplay: "exceptZero" });
+const FORM_BADGE = { fresh: "neutral", balanced: "neutral", building: "neutral", heavy: "danger" } as const;
 
 export function Trends() {
   const [weeks, setWeeks] = useState<"12" | "26" | "52">("12");
@@ -53,11 +55,32 @@ export function Trends() {
   const raceDay = data.load.race ? series.find((p) => p.date === data.load.race!.date) : null;
   const showRace = !!(raceDay && data.load.race && raceDay.projected && raceDay.date !== planEnd?.date);
 
+  // This week: the last week that isn't in the future. Plan followed = run ÷ planned over the weeks before it.
+  const week = past.at(-1);
+  const before = past.slice(0, -1);
+  const planned = before.filter((w) => w.plannedKm);
+  const followed = planned.length ? planned.reduce((a, w) => a + w.actualKm, 0) / planned.reduce((a, w) => a + w.plannedKm!, 0) : null;
+  const avgBefore = before.length ? before.reduce((a, w) => a + w.actualKm, 0) / before.length : null;
+  const biggest = before.length ? Math.max(...before.map((w) => w.actualKm)) : null;
+
+  const done = series.filter((p) => !p.projected);
+  const today = done.at(-1);
+  const monthAgo = done.at(-29);
+  const hard = done.filter((p) => p.formPct < FORM.building);
+  const inZone = hard.filter((p) => p.formPct >= FORM.heavy).length;
+  const endPoint = showRace ? raceDay : planEnd;
+
   const easyGood = data.easy.filter((r) => r.score != null && r.score >= 0.9 && r.pace);
   const band = data.easy.filter((r) => r.bandPace);
   const thr = data.threshold;
   const wellness = data.wellness;
   const cs = data.cs.latest;
+  const thrPace = thr.current?.paceSecPerKm ?? null;
+  const thrStart = thr.points[0]?.date;
+  const thrThen = thrStart ? thr.estimates.filter((e) => e.paceSecPerKm && e.effectiveDate <= thrStart).sort((a, b) => a.effectiveDate.localeCompare(b.effectiveDate)).at(-1) : undefined;
+  const thrDelta = thrPace && thrThen?.paceSecPerKm && thrThen.id !== thr.current?.id ? Math.round(thrThen.paceSecPerKm - thrPace) : null;
+  const thrLast = thr.points.at(-1);
+  const thrRanged = thr.points.filter((p) => p.inRange != null);
 
   return (
     <div className="mx-auto max-w-6xl space-y-4">
@@ -69,8 +92,18 @@ export function Trends() {
         </div>
       </header>
 
-      <Card data-tour="trends-km">
-        <CardTitle>{fmt.unit === "km" ? t("trends.kmPerWeek") : t("trends.miPerWeek")}</CardTitle>
+      <ChartCard data-tour="trends-km" title={fmt.unit === "km" ? t("trends.kmPerWeek") : t("trends.miPerWeek")} sub={t("trends.kmSub")}
+        headline={week ? {
+          value: Math.round(fmt.distNum(week.actualKm)),
+          unit: fmt.unit,
+          context: <>{week.plannedKm ? <span className="block text-sm text-foreground">{t("trends.ofPlanned", { km: Math.round(fmt.distNum(week.plannedKm)) })}</span> : null}{t("trends.thisWeek", { week: weekNumber(week.weekStart) })}</>,
+          progress: week.plannedKm ? week.actualKm / week.plannedKm : undefined,
+        } : undefined}
+        stats={[
+          ...(avgBefore != null ? [{ label: t("trends.avgWeeks", { count: before.length }), value: fmt.dist(avgBefore) }] : []),
+          ...(biggest != null ? [{ label: t("trends.biggest"), value: fmt.dist(biggest) }] : []),
+          ...(followed != null ? [{ label: t("trends.followed"), value: pct(followed) }] : []),
+        ]}>
         <BarChart
           yFormat={(v) => `${Math.round(v)}`}
           avg={avg != null ? fmt.distNum(avg) : null}
@@ -81,6 +114,7 @@ export function Trends() {
             value: fmt.distNum(w.future ? w.plannedKm ?? 0 : w.actualKm),
             marker: w.future ? null : w.plannedKm != null ? fmt.distNum(w.plannedKm) : null,
             ghost: w.future,
+            current: w === week,
             tip: (
               <>
                 <div className="font-medium">{t("plan.weekOf", { week: weekNumber(w.weekStart) })} · {fmtDay(w.weekStart, { day: "numeric", month: "short" })}{w.future && ` (${t("trends.planned")})`}</div>
@@ -94,24 +128,32 @@ export function Trends() {
             {t("trends.ramps")}: {ramps.map((r) => `${t("plan.weekShort", { week: weekNumber(r.weekStart) })} (+${Math.round((r.ramp - 1) * 100)}%)`).join(", ")}
           </p>
         )}
-      </Card>
+      </ChartCard>
 
-      <Card data-tour="trends-load">
-        <CardTitle><Titled title={t("trends.loadTitle")} info={t("chartInfo.load", { building: FORM.building, heavy: FORM.heavy, fresh: FORM.fresh })} /></CardTitle>
+      <ChartCard data-tour="trends-load" title={t("trends.loadTitle")} sub={t("trends.loadSub")}
+        info={t("chartInfo.load", { building: FORM.building, heavy: FORM.heavy, fresh: FORM.fresh })}
+        headline={today ? {
+          label: t("trends.formToday"),
+          value: <>{signedInt(today.formPct)}<span className="ml-1 text-2xl">%</span></>,
+          tone: formState(today.tsb, today.ctl) === "heavy" ? "danger" : undefined,
+          badge: { label: t(`load.state.${formState(today.tsb, today.ctl)}`), tone: FORM_BADGE[formState(today.tsb, today.ctl)] },
+          context: t("trends.fitFat", { ctl: Math.round(today.ctl), atl: Math.round(today.atl) }),
+        } : undefined}
+        stats={today ? [
+          ...(hard.length ? [{ label: t("trends.inZone"), value: t("trends.inZoneOf", { n: inZone, of: hard.length }), sub: t("trends.hardDays"), tone: inZone === hard.length ? "success" as const : undefined }] : []),
+          { label: t("load.fitness"), value: Math.round(today.ctl), sub: monthAgo ? t("trends.fitnessChange", { change: signedInt(today.ctl - monthAgo.ctl) }) : undefined },
+          ...(endPoint ? [{ label: showRace ? data.load.race!.name : t("trends.planEnd"), value: `${Math.round(endPoint.ctl)} · ${signedInt(endPoint.formPct)} %`, sub: t("trends.fitForm") }] : []),
+        ] : undefined}>
         <LineChart height={220}
           xFormat={dayLabel} yFormat={(v) => `${Math.round(v)}`}
+          bands={[{ from: FORM.heavy, to: FORM.building, color: "var(--success)", label: t("trends.buildZone", { heavy: FORM.heavy, building: FORM.building }) }]}
+          xLines={projFrom && today ? [{ x: ms(today.date), label: t("trends.today"), color: "var(--signature)" }] : []}
           series={[
             { key: "ctl", label: t("load.fitness"), color: "var(--chart-1)", area: true, points: series.map((p) => ({ x: ms(p.date), y: p.ctl })), dashedFrom: projFrom },
             { key: "atl", label: t("load.fatigue"), color: "var(--chart-2)", points: series.map((p) => ({ x: ms(p.date), y: p.atl })), dashedFrom: projFrom },
-            { key: "tsb", label: t("load.form"), color: "var(--chart-3)", points: series.map((p) => ({ x: ms(p.date), y: p.tsb })), dashedFrom: projFrom },
+            { key: "form", label: t("trends.formPct"), color: "var(--chart-3)", points: series.map((p) => ({ x: ms(p.date), y: p.formPct })), dashedFrom: projFrom },
           ]} />
-        {(planEnd || showRace) && (
-          <p className="mt-2 text-xs text-muted-foreground">
-            {planEnd && <>{t("trends.projected", { date: fmtDay(planEnd.date, { day: "numeric", month: "short" }) })} <b>{Math.round(planEnd.ctl)}</b>, {t("trends.formApprox", { form: Math.round(planEnd.tsb) })}</>}
-            {showRace && <> {t("trends.onRace", { race: data.load.race!.name })} <b>{Math.round(raceDay!.ctl)}</b>, {t("trends.formApprox", { form: Math.round(raceDay!.tsb) })}</>}
-          </p>
-        )}
-      </Card>
+      </ChartCard>
 
       <div className="grid gap-4 lg:grid-cols-2">
         <Card>
@@ -169,20 +211,23 @@ export function Trends() {
       <SameSessionTrends />
 
       <div className="grid gap-4 lg:grid-cols-2">
-        <Card data-tour="trends-threshold">
-          <CardTitle><Titled title={t("threshold.pace")} info={t("chartInfo.thresholdPace")} /></CardTitle>
+        <ChartCard data-tour="trends-threshold" title={t("threshold.pace")} info={t("chartInfo.thresholdPace")} sub={t("threshold.sub")}
+          headline={thrPace ? {
+            label: t("threshold.estimated"),
+            value: fmt.pace(thrPace).split("/")[0],
+            unit: `/${fmt.pace(thrPace).split("/")[1]}`,
+            context: thrDelta ? <><span className="block text-sm text-foreground">{t(thrDelta > 0 ? "threshold.faster" : "threshold.slower", { s: Math.abs(thrDelta) })}</span>{t("threshold.since", { date: fmtDay(thrStart!, { day: "numeric", month: "short" }) })}</> : thr.current ? t("threshold.since", { date: fmtDay(thr.current.effectiveDate, { day: "numeric", month: "short" }) }) : undefined,
+          } : undefined}
+          stats={thrLast ? [
+            { label: t("threshold.lastSession"), value: fmt.pace(thrLast.pace).split("/")[0], sub: <Link className="hover:underline" to={`/activities/${encodeURIComponent(thrLast.activityId)}`}>{fmtDay(thrLast.date, { day: "numeric", month: "short" })}{thrLast.hr && ` · ${thrLast.hr} bpm`}</Link> },
+            ...(thr.current?.hr ? [{ label: t("threshold.hrStat"), value: `${thr.current.hr} bpm` }] : []),
+            { label: t("threshold.basis"), value: t("threshold.sessions", { n: thr.points.length }), sub: thrRanged.length ? t("threshold.inRangeCount", { n: thrRanged.filter((p) => p.inRange! > 0 && p.inRange === p.intervals).length }) : undefined },
+          ] : undefined}>
           <LineChart height={190} invert xFormat={dayLabel} yFormat={(v) => fmt.pace(v).split("/")[0]}
             emptyText={t("threshold.paceEmpty")}
-            refLines={thr.current?.paceSecPerKm ? [{ y: thr.current.paceSecPerKm, label: t("threshold.estimate", { pace: fmt.pace(thr.current.paceSecPerKm) }) }] : []}
+            refLines={thrPace ? [{ y: thrPace, label: t("threshold.estimate", { pace: fmt.pace(thrPace) }) }] : []}
             series={[{ key: "pace", label: t("threshold.intervalPace"), color: "var(--chart-1)", dots: true, points: thr.points.map((p) => ({ x: ms(p.date), y: p.pace })) }]} />
-          {thr.points.length > 0 && (
-            <ul className="mt-2 space-y-0.5 text-xs text-muted-foreground">
-              {thr.points.slice(-4).reverse().map((p) => (
-                <li key={p.activityId}><Link className="hover:underline" to={`/activities/${encodeURIComponent(p.activityId)}`}>{fmtDay(p.date)}</Link> · {fmt.pace(p.pace)}{p.hr && ` · ${p.hr} bpm`} · {p.inRange != null ? t("threshold.inRange", { n: p.inRange, of: p.intervals }) : t("threshold.intervals", { n: p.intervals })}</li>
-              ))}
-            </ul>
-          )}
-        </Card>
+        </ChartCard>
         <Card>
           <CardTitle><Titled title={t("threshold.hrTitle")} info={t("chartInfo.thresholdHr")} /></CardTitle>
           <LineChart height={190} xFormat={dayLabel} yFormat={(v) => `${Math.round(v)}`}
