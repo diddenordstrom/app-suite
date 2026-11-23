@@ -14,7 +14,7 @@ export type SetKind = (typeof SET_KINDS)[number];
 export interface GymSet { kind: SetKind; kg: number | null; reps: number | null; seconds: number | null }
 export interface GymEntry { exercise: string; slot: Pattern | null; sets: GymSet[] }
 
-/** The joint check-in before a session: three buttons, not a scale. */
+/** A joint check-in before a session; not asked in the first version, kept so stored sessions can carry it. */
 export const JOINT_FEELS = ["none", "some", "pain"] as const;
 export type JointFeel = (typeof JOINT_FEELS)[number];
 
@@ -91,12 +91,10 @@ export function suggestSets(id: string, scheme: Scheme = schemeFor(id), last: La
 export interface TemplateChoice { id: TemplateId; why: Msg }
 
 /**
- * Which template suits `date` in the run week: the gentle one after "Ont" in the joint check-in; upper
- * body the day before a key session (threshold, intervals, long run, race), so the legs are fresh for it;
+ * Which template suits `date` in the run week (C, the gentle one, is only chosen by hand): upper body the day before a key session (threshold, intervals, long run, race), so the legs are fresh for it;
  * otherwise A and B take turns, with legs first.
  */
-export function chooseTemplate(date: ISODate, workouts: Workout[], lastTemplate: TemplateId | null, feel: JointFeel | null = null): TemplateChoice {
-  if (feel === "pain") return { id: "C", why: { key: "gym.why.pain" } };
+export function chooseTemplate(date: ISODate, workouts: Workout[], lastTemplate: TemplateId | null): TemplateChoice {
   const ahead = workouts.filter((w) => w.status === "planned" && KEY_TYPES.includes(w.type) && w.date > date && w.date <= addDays(date, 7)).sort((a, b) => a.date.localeCompare(b.date));
   const next = ahead[0];
   if (next && daysBetween(date, next.date) === 1) return { id: "B", why: { key: "gym.why.keyTomorrow", params: { type: next.type } } };

@@ -64,8 +64,7 @@ describe("suggested sets", () => {
 });
 
 describe("template for the day", () => {
-  it("gentle after 'Ont', upper body the day before a key session, else legs and then turns", () => {
-    expect(chooseTemplate("2026-11-23", [], null, "pain").id).toBe("C");
+  it("upper body the day before a key session, else legs and then turns", () => {
     expect(chooseTemplate("2026-11-26", [plan("2026-11-27", "threshold")], null)).toEqual({ id: "B", why: { key: "gym.why.keyTomorrow", params: { type: "threshold" } } });
     expect(chooseTemplate("2026-11-23", [plan("2026-11-27", "threshold")], null)).toEqual({ id: "A", why: { key: "gym.why.legsBefore", params: { type: "threshold", days: 4 } } });
     expect(chooseTemplate("2026-11-25", [plan("2026-11-29", "long")], "A").id).toBe("B");

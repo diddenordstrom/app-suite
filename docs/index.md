@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module, first version built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module: flow from Idag, no tab, joint check-in ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Fartlek gym module planned: logger first, then a suggester tied to the run week ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · decision · Dependabot auto-merge when the checks pass ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · note · Skeletons instead of "Laddar…" ([log/2026-11.md](log/2026-11.md))
-- 2026-11-22 · decision · Skymning look: Geist + Newsreader, horizon, chart areas, paper ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

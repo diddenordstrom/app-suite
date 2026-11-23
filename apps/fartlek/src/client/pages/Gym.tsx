@@ -7,20 +7,20 @@ import { fmtDay } from "../bits";
 import { locale, t, tm, type MsgKey } from "../i18n";
 import { clock, entryFor, exName, fmtKg, loadDraft, newClientId, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
 import { alternatives, customId, exercise, EXERCISES, TEMPLATES, type TemplateId } from "@/shared/gym";
-import { JOINT_FEELS, suggestSets, templateEntries, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type JointFeel, type LastTime } from "@/shared/gymplan";
+import { suggestSets, templateEntries, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type LastTime } from "@/shared/gymplan";
 import { todayIn } from "@/shared/dates";
 
 /*
  * The gym session (docs/decisions/fartlek-gym-module.md): the session page asks "start?" with the template,
- * the exercises (swap or add before starting) and the joint check-in; then one card per exercise with set
+ * and the exercises (swap or add before starting); then one card per exercise with set
  * rows pre-filled from last time; then what beat last time. The session in progress is kept on the phone.
  */
 
 interface Finished { input: GymSessionInput; improvements: Improvement[]; offline: boolean; last: Record<string, LastTime> }
 
-function build(day: GymDay, tpl: TemplateId, feel: JointFeel | null): Draft {
+function build(day: GymDay, tpl: TemplateId): Draft {
   return {
-    clientId: newClientId(), date: day.date, template: tpl, feel, workoutId: day.planned?.id ?? null, startedAt: null, lastSetAt: null,
+    clientId: newClientId(), date: day.date, template: tpl, feel: null, workoutId: day.planned?.id ?? null, startedAt: null, lastSetAt: null,
     entries: templateEntries(tpl).map((e) => entryFor(e.exercise, e.slot, e.scheme, day.last[e.exercise])),
   };
 }
@@ -43,7 +43,7 @@ export function Gym() {
   const setDraft = (d: Draft | null) => { saveDraft(d); setDraftState(d); };
 
   useEffect(() => {
-    if (data && !draft && !finished) setDraft(build(data, data.suggested.id, null));
+    if (data && !draft && !finished) setDraft(build(data, data.suggested.id));
   }, [data, draft, finished]);
 
   if (error) return <ErrorText>{error}</ErrorText>;
@@ -51,16 +51,14 @@ export function Gym() {
   if (!data || !draft) return <div className="grid place-items-center py-16"><Spinner /></div>;
   return draft.startedAt
     ? <Active day={data} draft={draft} setDraft={setDraft} onFinished={(f) => { setDraft(null); setFinished(f); window.scrollTo(0, 0); }} />
-    : <Setup day={data} draft={draft} setDraft={setDraft} rebuild={(tpl, feel) => setDraft(build(data, tpl, feel))} />;
+    : <Setup day={data} draft={draft} setDraft={setDraft} rebuild={(tpl) => setDraft(build(data, tpl))} />;
 }
 
-function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; setDraft: (d: Draft | null) => void; rebuild: (tpl: TemplateId, feel: JointFeel | null) => void }) {
+function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; setDraft: (d: Draft | null) => void; rebuild: (tpl: TemplateId) => void }) {
   const tpl = draft.template ?? "A";
-  const [kept, setKept] = useState(false);
   const [swapAt, setSwapAt] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const minutes = TEMPLATES[tpl].minutes;
-  const offerC = draft.feel === "pain" && tpl !== "C" && !kept;
   const replace = (i: number, e: DraftEntry) => setDraft({ ...draft, entries: draft.entries.map((x, j) => (j === i ? e : x)) });
 
   return (
@@ -72,31 +70,9 @@ function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; s
       </div>
       <SegmentedControl aria-label={t("gym.chooseTemplate")} className="w-full" value={tpl}
         options={(["A", "B", "C"] as const).map((v) => ({ value: v, label: t(`gym.templateShort.${v}`) }))}
-        onChange={(v) => { setKept(false); rebuild(v, draft.feel); }} />
-      {tpl === day.suggested.id && draft.feel !== "pain" && <p className="rounded-md bg-accent px-3 py-2.5 text-sm text-accent-foreground">{whyText(day.suggested.why)}</p>}
+        onChange={(v) => rebuild(v)} />
+      {tpl === day.suggested.id && <p className="rounded-md bg-accent px-3 py-2.5 text-sm text-accent-foreground">{whyText(day.suggested.why)}</p>}
       {day.logged.length > 0 && <p className="text-sm text-muted-foreground">{t("gym.loggedToday")} <Link to="/gym/history" className="underline">{t("gym.history")}</Link></p>}
-
-      <Card className="space-y-3">
-        <h2 className="text-sm font-semibold">{t("gym.joints")} <span className="font-normal text-muted-foreground">{t("gym.optional")}</span></h2>
-        <div role="radiogroup" aria-label={t("gym.joints")} className="grid grid-cols-3 gap-2">
-          {JOINT_FEELS.map((f) => (
-            <button key={f} type="button" role="radio" aria-checked={draft.feel === f}
-              onClick={() => { setKept(false); setDraft({ ...draft, feel: draft.feel === f ? null : f }); }}
-              className={`h-11 rounded-md border text-sm ${draft.feel === f ? "border-primary bg-accent font-semibold text-accent-foreground" : "border-border bg-card"}`}>
-              {t(`gym.feel.${f}`)}
-            </button>
-          ))}
-        </div>
-        {offerC && (
-          <div className="space-y-2 rounded-md bg-signature-soft px-3 py-2.5 text-sm text-signature-foreground">
-            <p>{t("gym.painOffer")}</p>
-            <div className="flex flex-wrap gap-2">
-              <Button className="h-9" onClick={() => rebuild("C", draft.feel)}>{t("gym.useC")}</Button>
-              <Button variant="outline" className="h-9" onClick={() => setKept(true)}>{t("gym.keep", { t: tpl })}</Button>
-            </div>
-          </div>
-        )}
-      </Card>
 
       <Card className="p-0">
         <ul>
