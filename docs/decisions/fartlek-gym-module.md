@@ -40,6 +40,28 @@ Most influencer apps are audience monetization on white-label platforms (Trainer
 - Gym is already a session type there: tap Monday's "Gym", start session A, and the synced Garmin `strength_training` activity matches it as today.
 - Keep it in its own tables and its own folders (`shared/gym/`, `client/gym/`) so it could be moved out later if people who don't run want it.
 
+## Flow and navigation (settled 2026-11-23)
+
+Drawn in a private mock with six phone screens. Runna works the same way: strength sits in the plan as an ordinary session, reached from the day, with no tab of its own (and behind its subscription, 1 099 kr a year in Nov 2026).
+
+1. **Home → the Idag card** shows today's gym session: template, number of exercises and time, the first exercises with last time's weights, and one line on *why* today suits it ("threshold Friday, long run Sunday, so heavy legs today"). Buttons: "Öppna pass" and "Annat pass".
+2. **The session page** asks "start?": the exercise list with planned sets and weights, the optional joint check-in (below) and "Starta pass".
+3. **"Annat pass"** opens a sheet: today's session, **a free gym session** (template A, B or C, or empty) for a gym day with nothing planned, and **move today's session** to another day with what it does to the key sessions. No "free run": Fartlek doesn't record runs, Garmin does.
+4. **In the session**: set rows with steppers, swap per slot, rest after each set.
+5. **Done**: time, sets, volume, what beat last time, the Garmin activity matched, and the next gym session with its reason.
+
+- **No gym tab at first.** Templates and the exercise catalogue live under Plan, gym history under Activities next to the runs. A fifth tab fits on a phone and can come later if a shortcut is missed; a tab is easy to add and hard to take away.
+- **Joint check-in**: three buttons before the start, *Inget · Lite · Ont*, not a 0–10 scale. "Ont" offers the gentle template C instead, and the runner can keep A. Optional, and can be turned off in Settings. Ties in with Dagsform on Home.
+- **Rest timer**: nice to have, not needed for the first version.
+
+## Data
+
+Hardly any, and no model to train:
+- the exercise catalogue (60–100 exercises with pattern and purpose tags) and the templates are written by hand once and ship with the app;
+- the runner's own sets (exercise, kg, reps, date) are a few thousand rows a year.
+
+"Last time", the suggested weight and "better than last time" are computed from the runner's own log. The log starts empty, which the CSV import covers. The hard part is the feel on the gym floor, not the data.
+
 ## What to build
 
 ### 1. Logger (first, on its own)
@@ -55,7 +77,7 @@ Most influencer apps are audience monetization on white-label platforms (Trainer
 Rules and data, not an adaptive model:
 - **Exercise catalogue** tagged by pattern (knee-dominant single leg, hip hinge, hamstrings, calves, hip abduction, anti-rotation core, push, vertical and horizontal pull, shoulders, arms) and purpose (hypertrophy, prevention, both), with alternatives per pattern.
 - **Session templates** as slots: A legs and prevention (single-leg work, hinge, knee-friendly quad work, hamstrings, calves, hip abduction, core), B upper body and core, C a short optional prevention session (slow step-downs, isometric wall sits, tibialis raises, Copenhagen plank).
-- **Rules against the run week**: no heavy leg session the day before a threshold, interval or long run (B instead); a lighter run week gives a lighter gym week; a runner who reports joint pain above 3/10 before the session gets C instead of A. Fartlek suggests and the runner decides, as everywhere else ([suggest a week](fartlek-suggest-week.md)).
+- **Rules against the run week**: no heavy leg session the day before a threshold, interval or long run (B instead); a lighter run week gives a lighter gym week; a runner who answers "Ont" in the joint check-in is offered C instead of A. Fartlek suggests and the runner decides, as everywhere else ([suggest a week](fartlek-suggest-week.md)).
 
 ## What changes in earlier decisions
 
@@ -68,7 +90,7 @@ Rules and data, not an adaptive model:
 
 ## Open questions
 
-- Is the rest timer in the first version, and push or screen awake?
+- When the rest timer comes: push or screen awake?
 - Does a Garmin `strength_training` FIT file carry sets, reps and weights that could pre-fill the log? Check one real file before relying on it.
 - Templates in block text (like the run sessions) or only in the UI?
 - How much of the catalogue ships with the app versus what the runner adds.
