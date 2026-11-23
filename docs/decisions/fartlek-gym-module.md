@@ -53,6 +53,7 @@ Drawn in a private mock with six phone screens. Runna works the same way: streng
 - **No gym tab at first.** Templates and the exercise catalogue live under Plan, gym history under Activities next to the runs. A fifth tab fits on a phone and can come later if a shortcut is missed; a tab is easy to add and hard to take away.
 - **No joint check-in in the first version** (dropped 2026-11-23, after first planning three buttons *Inget · Lite · Ont* where "Ont" offered C). The runner picks A, B or C on the session page; the suggestion only preselects one. The `feel` column stays so the question can come back without a migration.
 - **Rest timer**: nice to have, not needed for the first version.
+- **One gym session a week gets the full-body template F** (settled 2026-11-23): legs and prevention first (single leg, hinge, calves, outer hip), then a press and a row. With A and B in turns the legs would only come every other week, and they are what protects the running. Chosen when the week holds exactly one planned gym session; two or more go back to A/B.
 - **Not only legs and prevention.** Upper-body work (bench press, pulls, arms) is logged in the same module through template B or a free session, so the runner needs no second log app.
 
 ## Data
@@ -66,7 +67,7 @@ Hardly any, and no model to train:
 ## Built (first version, 2026-11-23)
 
 - **Catalogue and templates** in [`shared/gym.ts`](../../apps/fartlek/src/shared/gym.ts): about 60 exercises with pattern, load kind (kg, body weight, held), purpose and weight step, plus the names other apps export (Bolt) as aliases. Templates A, B and C as slots with ranked choices. Names are i18n keys `ex.<id>`; an exercise the catalogue doesn't know is stored as `x:<name>` and keeps its name.
-- **Logic** in [`shared/gymplan.ts`](../../apps/fartlek/src/shared/gymplan.ts): double progression (every work set at the top of the range: one step up and back to the bottom; else repeat last time set by set; body weight +1 rep, holds +5 s), the template for the day (C only by hand; B the day before a threshold, interval, long run or race; else A and B take turns, legs first), improvements over last time, and a check of what the client sends. Warm-up and drop sets are stored but never count as "last time" or volume.
+- **Logic** in [`shared/gymplan.ts`](../../apps/fartlek/src/shared/gymplan.ts): double progression (every work set at the top of the range: one step up and back to the bottom; else repeat last time set by set; body weight +1 rep, holds +5 s), the template for the day (F when the week has one planned gym session; C only by hand; B the day before a threshold, interval, long run or race; else A and B take turns, legs first), improvements over last time, and a check of what the client sends. Warm-up and drop sets are stored but never count as "last time" or volume.
 - **Storage**: `gym_sessions` and `gym_sets` (migration `0022_gym`), part of "delete training data". A session is saved once per `clientId` made on the phone, so a resend is harmless. Routes in [`routes/gym.ts`](../../apps/fartlek/src/server/routes/gym.ts): `GET /gym?date=` (planned session, suggested template with its reason, last time per exercise, sessions logged that day, done/planned the last four weeks), `POST /gym/sessions`, list, one, delete, and `POST /gym/import` for a Bolt CSV (sessions already imported are skipped).
 - **Pages**: `/gym` (session page, session in progress, done) and `/gym/history` (sessions, detail, Bolt import). Reached from "Öppna pass" on today's gym session in the Idag card, "Nytt pass" in the history, and a link from Activities. No tab.
 - **On the gym floor**: steppers and a typed value for kg, reps and seconds, the next open set focused after each tick, a count-up rest clock since the last set, the screen kept awake (Wake Lock) where the browser allows it.
@@ -109,7 +110,6 @@ Rules and data, not an adaptive model:
 
 ## Open questions
 
-- **One gym session a week.** A and B taking turns gives legs only every other week. Options: keep A every week (prevention first), a full-body template for that week, or ask once whether to run an A/B routine. Not decided; today A and B always take turns.
 
 - When the rest timer comes: push or screen awake?
 - Does a Garmin `strength_training` FIT file carry sets, reps and weights that could pre-fill the log? Check one real file before relying on it.

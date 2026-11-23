@@ -1,5 +1,5 @@
 import { addDays, daysBetween, type ISODate } from "./dates";
-import { exercise, schemeFor, TEMPLATES, type Pattern, type Scheme, type TemplateId } from "./gym";
+import { exercise, schemeFor, TEMPLATE_IDS, TEMPLATES, type Pattern, type Scheme, type TemplateId } from "./gym";
 import { KEY_TYPES, type Msg, type Workout } from "./types";
 
 /*
@@ -91,10 +91,12 @@ export function suggestSets(id: string, scheme: Scheme = schemeFor(id), last: La
 export interface TemplateChoice { id: TemplateId; why: Msg }
 
 /**
- * Which template suits `date` in the run week (C, the gentle one, is only chosen by hand): upper body the day before a key session (threshold, intervals, long run, race), so the legs are fresh for it;
+ * Which template suits `date` in the run week (C, the gentle one, is only chosen by hand): full body when the
+ * week has one planned gym session (`perWeek`), so the legs get their turn every week; upper body the day before a key session (threshold, intervals, long run, race), so the legs are fresh for it;
  * otherwise A and B take turns, with legs first.
  */
-export function chooseTemplate(date: ISODate, workouts: Workout[], lastTemplate: TemplateId | null): TemplateChoice {
+export function chooseTemplate(date: ISODate, workouts: Workout[], lastTemplate: TemplateId | null, perWeek = 0): TemplateChoice {
+  if (perWeek === 1) return { id: "F", why: { key: "gym.why.oncePerWeek" } };
   const ahead = workouts.filter((w) => w.status === "planned" && KEY_TYPES.includes(w.type) && w.date > date && w.date <= addDays(date, 7)).sort((a, b) => a.date.localeCompare(b.date));
   const next = ahead[0];
   if (next && daysBetween(date, next.date) === 1) return { id: "B", why: { key: "gym.why.keyTomorrow", params: { type: next.type } } };
@@ -148,7 +150,7 @@ export function checkSession(s: unknown): string[] {
   const x = s as Record<string, unknown>;
   if (typeof x.clientId !== "string" || !/^[A-Za-z0-9:_-]{6,80}$/.test(x.clientId)) errs.push("clientId is required");
   if (typeof x.date !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(x.date)) errs.push("date must be YYYY-MM-DD");
-  if (x.template != null && !["A", "B", "C"].includes(x.template as string)) errs.push("template must be A, B or C");
+  if (x.template != null && !TEMPLATE_IDS.includes(x.template as TemplateId)) errs.push("template must be A, B, C or F");
   if (x.feel != null && !JOINT_FEELS.includes(x.feel as JointFeel)) errs.push("feel must be none, some or pain");
   for (const k of ["startedAt", "finishedAt", "workoutId"] as const) if (x[k] != null && (typeof x[k] !== "number" || !Number.isFinite(x[k]))) errs.push(`${k} must be a number`);
   if (!Array.isArray(x.entries) || x.entries.length > 40) return [...errs, "entries must be a list of at most 40"];

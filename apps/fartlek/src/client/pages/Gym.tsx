@@ -6,7 +6,7 @@ import { Button, Card, CardTitle, Dialog, ErrorText, IconButton, Input, Segmente
 import { fmtDay } from "../bits";
 import { locale, t, tm, type MsgKey } from "../i18n";
 import { clock, entryFor, exName, fmtKg, loadDraft, newClientId, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
-import { alternatives, customId, exercise, EXERCISES, TEMPLATES, type TemplateId } from "@/shared/gym";
+import { alternatives, customId, exercise, EXERCISES, TEMPLATE_IDS, TEMPLATES, type TemplateId } from "@/shared/gym";
 import { suggestSets, templateEntries, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type LastTime } from "@/shared/gymplan";
 import { todayIn } from "@/shared/dates";
 
@@ -68,8 +68,8 @@ function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; s
         <h1 className="font-display text-3xl font-medium">{t("gym.title")} · {t(`gym.template.${tpl}`)}</h1>
         <p className="text-sm text-muted-foreground">{t(`gym.templateAbout.${tpl}`)} · {t("gym.meta", { n: draft.entries.length, min: minutes })}</p>
       </div>
-      <SegmentedControl aria-label={t("gym.chooseTemplate")} className="w-full" value={tpl}
-        options={(["A", "B", "C"] as const).map((v) => ({ value: v, label: t(`gym.templateShort.${v}`) }))}
+      <SegmentedControl aria-label={t("gym.chooseTemplate")} className="w-full [&>button]:px-1.5" value={tpl}
+        options={TEMPLATE_IDS.map((v) => ({ value: v, label: t(`gym.templateShort.${v}`) }))}
         onChange={(v) => rebuild(v)} />
       {tpl === day.suggested.id && <p className="rounded-md bg-accent px-3 py-2.5 text-sm text-accent-foreground">{whyText(day.suggested.why)}</p>}
       {day.logged.length > 0 && <p className="text-sm text-muted-foreground">{t("gym.loggedToday")} <Link to="/gym/history" className="underline">{t("gym.history")}</Link></p>}

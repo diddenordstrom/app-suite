@@ -69,6 +69,8 @@ describe("template for the day", () => {
     expect(chooseTemplate("2026-11-23", [plan("2026-11-27", "threshold")], null)).toEqual({ id: "A", why: { key: "gym.why.legsBefore", params: { type: "threshold", days: 4 } } });
     expect(chooseTemplate("2026-11-25", [plan("2026-11-29", "long")], "A").id).toBe("B");
     expect(chooseTemplate("2026-11-25", [{ ...plan("2026-11-26", "long"), status: "dropped" }], null).id).toBe("A");
+    // One gym session in the week: full body, whatever comes next.
+    expect(chooseTemplate("2026-11-26", [plan("2026-11-27", "threshold")], "A", 1)).toEqual({ id: "F", why: { key: "gym.why.oncePerWeek" } });
   });
 });
 

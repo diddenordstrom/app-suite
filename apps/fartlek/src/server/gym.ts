@@ -2,7 +2,7 @@ import { and, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import type { Db } from "./db";
 import * as t from "./db/schema";
 import * as repo from "./repo";
-import { addDays, type ISODate } from "../shared/dates";
+import { addDays, weekStartOf, type ISODate } from "../shared/dates";
 import { chooseTemplate, latestByExercise, volume, workSetCount, type GymDay, type GymEntry, type GymSessionFull, type GymSessionInput, type GymSummary, type JointFeel, type LastTime, type SetKind } from "../shared/gymplan";
 import type { Pattern, TemplateId } from "../shared/gym";
 import type { ImportedSession } from "../shared/boltcsv";
@@ -57,9 +57,11 @@ export function gymDay(db: Db, userId: number, date: ISODate): GymDay {
   const from = addDays(date, -27);
   const doneDays = new Set(sessions.filter((s) => s.date >= from).map((s) => s.date));
   const plannedDays = new Set(workouts.filter((w) => w.type === "strength" && w.date >= from && w.date <= date && w.status !== "dropped").map((w) => w.date));
+  const weekFrom = weekStartOf(date, repo.getSettings(db, userId).weekStart);
+  const perWeek = workouts.filter((w) => w.type === "strength" && w.status !== "dropped" && w.date >= weekFrom && w.date <= addDays(weekFrom, 6)).length;
   return {
     date, planned,
-    suggested: chooseTemplate(date, workouts.filter((w) => w.date > date), (previous?.template as TemplateId | undefined) ?? null),
+    suggested: chooseTemplate(date, workouts.filter((w) => w.date > date), (previous?.template as TemplateId | undefined) ?? null, perWeek),
     last: lastTimes(db, userId),
     logged: todays.map((s) => summary(s, entriesOf(sets.filter((x) => x.sessionId === s.id)))),
     recent: { done: doneDays.size, planned: Math.max(plannedDays.size, doneDays.size) },

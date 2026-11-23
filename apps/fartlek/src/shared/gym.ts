@@ -122,7 +122,7 @@ export interface Scheme { sets: number; low: number; high: number }
 
 export interface Slot { pattern: Pattern; scheme: Scheme; choices: string[] }
 
-export const TEMPLATE_IDS = ["A", "B", "C"] as const;
+export const TEMPLATE_IDS = ["A", "B", "C", "F"] as const;
 export type TemplateId = (typeof TEMPLATE_IDS)[number];
 
 export interface Template { id: TemplateId; minutes: number; slots: Slot[]; extras: string[] }
@@ -132,6 +132,7 @@ const s = (pattern: Pattern, sets: number, low: number, high: number, choices: s
 /**
  * A: legs and prevention (single-leg work, a hinge, hamstrings, calves, hip abductors, anti-rotation core).
  * B: upper body. C: gentle, for a day with a niggle (slow step-downs, holds, no heavy load on the knee).
+ * F: full body, for a week with one gym session: legs and prevention first, then a press and a row.
  */
 export const TEMPLATES: Record<TemplateId, Template> = {
   A: {
@@ -152,6 +153,16 @@ export const TEMPLATES: Record<TemplateId, Template> = {
       s("shoulder", 3, 8, 12, ["shoulder_press", "seated_db_press"]),
       s("biceps", 3, 8, 12, ["db_curl", "cable_curl", "hammer_curl"]),
       s("triceps", 3, 8, 12, ["triceps_pushdown", "triceps_extension_db"]),
+    ],
+  },
+  F: {
+    id: "F", minutes: 50, extras: ["pull_up", "seated_leg_curl", "pallof_press"], slots: [
+      s("knee_single", 3, 8, 10, ["bulgarian_split_squat", "step_up", "single_leg_press"]),
+      s("hinge", 3, 8, 10, ["stiff_leg_deadlift", "rdl_dumbbell", "single_leg_rdl"]),
+      s("calf", 3, 12, 15, ["seated_calf_raise", "single_leg_calf_raise"]),
+      s("hip_abd", 3, 12, 15, ["hip_abduction", "side_plank_leg_lift"]),
+      s("push", 3, 6, 10, ["bench_press", "incline_db_press", "push_up"]),
+      s("pull_h", 3, 8, 12, ["seated_row", "one_arm_db_row"]),
     ],
   },
   C: {

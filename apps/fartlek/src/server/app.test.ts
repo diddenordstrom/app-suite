@@ -585,7 +585,10 @@ describe("api", () => {
     type Day = { planned: { type: string } | null; suggested: { id: string; why: { key: string } }; last: Record<string, { date: string; sets: { kg: number; reps: number }[] }>; logged: unknown[]; recent: { done: number; planned: number } };
     const d0 = await (await a.request(`/api/gym?date=${day}`)).json() as Day;
     expect(d0.planned?.type).toBe("strength");
-    expect(d0.suggested).toMatchObject({ id: "A", why: { key: "gym.why.legsBefore" } });
+    // One planned gym session this week: full body. A second one makes it A/B again.
+    expect(d0.suggested).toMatchObject({ id: "F", why: { key: "gym.why.oncePerWeek" } });
+    await a.request("/api/workouts", json({ date: "2026-11-25", type: "strength" }));
+    expect((await (await a.request(`/api/gym?date=${day}`)).json() as Day).suggested).toMatchObject({ id: "A", why: { key: "gym.why.legsBefore" } });
     expect(d0.last).toEqual({});
 
     const session = { clientId: "test-session-1", date: day, startedAt: 1, finishedAt: 2, template: "A", feel: "none", workoutId: null, entries: [

@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · decision · Fartlek gym: one session a week is full body ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Gym on the Fartlek landing page, its own news note ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module, first version built ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · note · Fartlek gym module planned: logger first, then a suggester tied to the run week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek durability is one card; Activities gets a runner icon ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Dependabot auto-merge when the checks pass ([log/2026-11.md](log/2026-11.md))
-- 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
