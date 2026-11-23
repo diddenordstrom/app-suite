@@ -1,120 +1,155 @@
-import { useId, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useFmt } from "./prefs";
-import { Card, CardTitle, InfoTip, Stat, cn, niceTicks } from "./ui";
+import { Card, CardTitle, ChartCard, InfoTip, cn, useWidth } from "./ui";
 import { fmtDay } from "./bits";
 import { locale, t } from "./i18n";
 import type { DurabilityRow } from "./types";
-import { DRIFT, driftZone } from "@/shared/activitylog";
+import { DRIFT, driftZone, type DriftZone } from "@/shared/activitylog";
 import { toDate } from "@/shared/dates";
 
 const TONE = { stable: "var(--success)", fading: "var(--warning)", high: "var(--danger)" } as const;
-const TEXT = { stable: "text-foreground", fading: "text-warning", high: "text-danger" } as const;
 /** Colour only says something when there is something to watch: holding up stays neutral. */
 const INK = { stable: "var(--foreground)", fading: "var(--warning)", high: "var(--danger)" } as const;
+const HEAD = { stable: undefined, fading: "warning", high: "danger" } as const;
+const BADGE = { stable: "neutral", fading: "warning", high: "danger" } as const;
+const ZONES: DriftZone[] = ["stable", "fading", "high"];
 const signed = (v: number) => v.toLocaleString(locale, { maximumFractionDigits: 1, signDisplay: "exceptZero" });
 const day = (d: string) => fmtDay(d, { day: "numeric", month: "short" });
 
 /**
- * Durability in one card: today's drift as the big number, the drift per long run over time on a
- * red-to-green fade (no hard zone edges), and the three thirds of the chosen run underneath.
+ * Durability in one card: the latest drift as the big number, the drift per long run on zone bands
+ * (named in a small scale under the chart, so the plot keeps the card's full width on a phone) and the
+ * three thirds of the picked run underneath.
  */
 export function DurabilityCard({ rows: unsorted, info, className }: { rows: DurabilityRow[]; info: string; className?: string }) {
   const rows = useMemo(() => [...unsorted].sort((a, b) => a.date.localeCompare(b.date)), [unsorted]);
   const fmt = useFmt();
-  const gid = useId().replace(/[^a-zA-Z0-9_-]/g, "");
   const [picked, setPicked] = useState<string | null>(null);
   const title = t("durability.title");
-  const head = (
-    <CardTitle className="mb-0"><span className="flex items-center gap-1">{title}<InfoTip label={title}>{info}</InfoTip></span></CardTitle>
-  );
   if (rows.length < 2) {
-    return <Card className={className}>{head}<p className="py-8 text-center text-sm text-muted-foreground">{t("durability.empty")}</p></Card>;
+    return (
+      <Card className={className}>
+        <CardTitle className="mb-0"><span className="flex items-center gap-1">{title}<InfoTip label={title}>{info}</InfoTip></span></CardTitle>
+        <p className="py-8 text-center text-sm text-muted-foreground">{t("durability.empty")}</p>
+      </Card>
+    );
   }
 
   const last = rows[rows.length - 1];
   const sel = rows.find((r) => r.id === picked) ?? last;
-  const W = 600, H = 190, L = 40, R = 92, T = 10, B = 24;
+  const zone = driftZone(last.driftPct);
+  const first = sel.thirds[0];
+
+  return (
+    <ChartCard className={className} title={title} info={info} sub={t("durability.sub")}
+      headline={{
+        value: <>{signed(last.driftPct)}<span className="ml-1 text-2xl">%</span></>,
+        tone: HEAD[zone],
+        badge: { label: t(`durability.zone.${zone}`), tone: BADGE[zone] },
+        context: t("durability.latest", { date: day(last.date) }),
+      }}>
+      <DriftChart rows={rows} sel={sel} onPick={setPicked} />
+      <div className="mt-2 grid grid-cols-3 gap-1 pl-7" role="img" aria-label={ZONES.map((z) => `${t(`durability.zone.${z}`)} ${range(z)}`).join(", ")}>
+        {ZONES.map((z) => (
+          <div key={z} className="flex flex-col gap-1">
+            <span className={cn("h-1 rounded-full", z !== zone && "opacity-60")} style={{ background: TONE[z] }} />
+            <span className={cn("text-[11px] leading-tight", z === zone ? "font-semibold" : "text-muted-foreground")} style={z === zone ? { color: INK[z] } : undefined}>
+              {t(`durability.zone.${z}`)}<br />{range(z)}
+            </span>
+          </div>
+        ))}
+      </div>
+      <p className="mt-1 text-xs text-muted-foreground">{t("durability.pick")}</p>
+
+      <div className="mt-3 border-t border-border pt-3">
+        <div className="flex items-baseline justify-between gap-2">
+          <Link to={`/activities/${encodeURIComponent(sel.id)}`} className="truncate text-sm font-medium hover:underline">{day(sel.date)} · {sel.name}</Link>
+          <span className="shrink-0 text-xs text-muted-foreground tabular-nums">{signed(sel.driftPct)} % · {fmt.dist(sel.km)}</span>
+        </div>
+        <div className="mt-2 grid grid-cols-3 gap-2">
+          {sel.thirds.map((third, i) => {
+            const dPace = Math.round(third.pace - first.pace), dHr = third.hr - first.hr;
+            const worse = i === 2 && driftZone(sel.driftPct) !== "stable";
+            return (
+              <div key={i} className="min-w-0">
+                <div className="text-xs text-muted-foreground">{[t("durability.firstShort"), t("durability.middleShort"), t("durability.lastShort")][i]}</div>
+                <div className="font-display text-2xl leading-tight font-medium tabular-nums" style={worse ? { color: INK[driftZone(sel.driftPct)] } : undefined}>
+                  {fmt.pace(third.pace).split("/")[0]}<span className="ml-0.5 font-sans text-xs text-muted-foreground">/{fmt.pace(third.pace).split("/")[1]}</span>
+                </div>
+                <div className="truncate text-xs text-muted-foreground tabular-nums" style={worse ? { color: INK[driftZone(sel.driftPct)] } : undefined}>
+                  {i === 0 ? `${third.hr} bpm` : t("durability.vsFirst", { pace: signed(dPace), hr: signed(dHr) })}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </ChartCard>
+  );
+}
+
+function range(z: DriftZone) {
+  return z === "stable" ? t("durability.range.below", { n: DRIFT.stable })
+    : z === "fading" ? t("durability.range.between", { a: DRIFT.stable, b: DRIFT.high })
+    : t("durability.range.above", { n: DRIFT.high });
+}
+
+/** Drift per long run on the three zone bands, drawn at the card's real width. */
+function DriftChart({ rows, sel, onPick }: { rows: DurabilityRow[]; sel: DurabilityRow; onPick: (id: string) => void }) {
+  const [ref, W] = useWidth<HTMLDivElement>();
+  const H = 172, L = 28, R = 4, T = 8, B = 22, pad = 8;
   const xs = rows.map((r) => toDate(r.date).getTime());
   const x0 = xs[0], x1 = xs[xs.length - 1];
-  const top = Math.max(DRIFT.high + 2, Math.ceil(Math.max(...rows.map((r) => r.driftPct)) + 1));
+  const top = Math.max(DRIFT.high + 4, Math.ceil(Math.max(...rows.map((r) => r.driftPct)) + 1));
   const bottom = Math.min(0, Math.floor(Math.min(...rows.map((r) => r.driftPct)) - 1));
-  const X = (ms: number) => L + (x1 === x0 ? (W - L - R) / 2 : ((ms - x0) / (x1 - x0)) * (W - L - R));
+  const X = (ms: number) => L + pad + (x1 === x0 ? (W - L - R - 2 * pad) / 2 : ((ms - x0) / (x1 - x0)) * (W - L - R - 2 * pad));
   const Y = (v: number) => T + ((top - Math.max(bottom, Math.min(top, v))) / (top - bottom)) * (H - T - B);
-  const off = (v: number) => Math.min(1, Math.max(0, (Y(v) - T) / (H - T - B)));
-  const ticks = niceTicks(bottom, top, 3);
-  const zones = ([["high", (top + DRIFT.high) / 2], ["fading", (DRIFT.stable + DRIFT.high) / 2], ["stable", DRIFT.stable / 2]] as const);
+  const bands = [["high", top, DRIFT.high], ["fading", DRIFT.high, DRIFT.stable], ["stable", DRIFT.stable, bottom]] as const;
   const pick = (e: React.PointerEvent<SVGSVGElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
-    const px = ((e.clientX - rect.left) / rect.width) * W;
+    const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
     let best = rows[0], bd = Infinity;
     rows.forEach((r, i) => { const d = Math.abs(X(xs[i]) - px); if (d < bd) { bd = d; best = r; } });
-    setPicked(best.id);
+    onPick(best.id);
   };
-  type XLabel = { ms: number; d: string; a: "start" | "middle" | "end" };
   const mid = Math.floor(rows.length / 2);
-  const xLabels: XLabel[] = [
-    { ms: x0, d: rows[0].date, a: "start" },
-    ...(rows.length > 2 ? [{ ms: xs[mid], d: rows[mid].date, a: "middle" } as XLabel] : []),
-    { ms: x1, d: last.date, a: "end" },
+  const xLabels = [
+    { i: 0, a: "start" as const },
+    ...(rows.length > 2 ? [{ i: mid, a: "middle" as const }] : []),
+    { i: rows.length - 1, a: "end" as const },
   ];
 
   return (
-    <Card className={className}>
-      <div className="flex items-start justify-between gap-4">
-        <div className="min-w-0">
-          {head}
-          <p className="mt-1 max-w-xl text-sm text-muted-foreground">{t("durability.sub")}</p>
-        </div>
-        <div className="shrink-0 text-right">
-          <div className={cn("font-display text-4xl leading-none font-medium tabular-nums", TEXT[driftZone(last.driftPct)])}>{signed(last.driftPct)} %</div>
-          <div className="mt-1.5 text-sm text-muted-foreground">{t("durability.latest", { date: day(last.date) })}</div>
-        </div>
-      </div>
-
-      <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} onPointerDown={pick} onPointerMove={pick} className="mt-2 block h-auto w-full touch-pan-y select-none">
-        <defs>
-          <linearGradient id={`${gid}-z`} gradientUnits="userSpaceOnUse" x1="0" y1={T} x2="0" y2={H - B}>
-            <stop offset="0" style={{ stopColor: TONE.high, stopOpacity: 0.09 }} />
-            <stop offset={off((top + DRIFT.high) / 2)} style={{ stopColor: TONE.high, stopOpacity: 0.09 }} />
-            <stop offset={off((DRIFT.stable + DRIFT.high) / 2)} style={{ stopColor: TONE.fading, stopOpacity: 0.05 }} />
-            <stop offset={off(DRIFT.stable / 2)} style={{ stopColor: TONE.stable, stopOpacity: 0.03 }} />
-            <stop offset="1" style={{ stopColor: TONE.stable, stopOpacity: 0.04 }} />
-          </linearGradient>
-        </defs>
-        <rect x={L} y={T} width={W - L - R} height={H - T - B} fill={`url(#${gid}-z)`} />
-        {ticks.filter((v) => v !== 0).map((v) => (
-          <g key={v}><line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeWidth={1} strokeOpacity={0.6} />
-            <text x={L - 6} y={Y(v)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">{v} %</text></g>
-        ))}
-        <line x1={L} x2={W - R} y1={Y(0)} y2={Y(0)} stroke="var(--muted-foreground)" strokeDasharray="4 3" strokeWidth={1} />
-        <text x={L - 6} y={Y(0)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">0 %</text>
-        <text x={W - R - 4} y={Y(0) - 4} textAnchor="end" fontSize={10} fill="var(--muted-foreground)">{t("durability.noDrift")}</text>
-        {zones.map(([z, mid]) => (
-          <text key={z} x={W - R + 8} y={Y(mid)} textAnchor="start" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">{t(`durability.zone.${z}`)}</text>
-        ))}
-        <polyline points={rows.map((r, i) => `${X(xs[i]).toFixed(1)},${Y(r.driftPct).toFixed(1)}`).join(" ")} fill="none" stroke="var(--muted-foreground)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
-        {rows.map((r, i) => {
-          const on = r.id === sel.id;
-          return (
-            <g key={r.id}>
-              {on && <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={9} style={{ fill: INK[driftZone(r.driftPct)], fillOpacity: 0.18 }} />}
-              <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={on ? 5.5 : 4} style={{ fill: on ? INK[driftZone(r.driftPct)] : "var(--card)", stroke: on ? "var(--card)" : "var(--muted-foreground)" }} strokeWidth={2} />
+    <div ref={ref} className="w-full" style={{ height: H }}>
+      {W > 0 && (
+        <svg width={W} height={H} role="img" aria-label={t("durability.title")} onPointerDown={pick} onPointerMove={pick} className="block touch-pan-y select-none">
+          {bands.map(([z, hi, lo]) => (
+            <rect key={z} x={L} y={Y(hi)} width={W - L - R} height={Y(lo) - Y(hi)} fill={TONE[z]} fillOpacity={z === "high" ? 0.08 : z === "fading" ? 0.06 : 0.05} />
+          ))}
+          {[DRIFT.high, DRIFT.stable].map((v) => (
+            <g key={v}>
+              <line x1={L} x2={W - R} y1={Y(v)} y2={Y(v)} stroke="var(--border)" strokeWidth={1} />
+              <text x={L - 6} y={Y(v)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">{v}</text>
             </g>
-          );
-        })}
-        {xLabels.map((l) => <text key={l.ms} x={X(l.ms)} y={H - 6} textAnchor={l.a} fontSize={11} fill="var(--muted-foreground)">{day(l.d)}</text>)}
-      </svg>
-
-      <div className="mt-2 grid grid-cols-2 items-end gap-x-6 gap-y-3 border-t border-border pt-3 sm:grid-cols-4">
-        <div className="col-span-2 sm:col-span-1">
-          <Link to={`/activities/${encodeURIComponent(sel.id)}`} className="block truncate text-sm font-medium hover:underline">{day(sel.date)} · {sel.name}</Link>
-          <div className="text-xs text-muted-foreground">{sel.id === last.id && picked == null ? t("durability.pick") : `${signed(sel.driftPct)} % · ${fmt.dist(sel.km)}`}</div>
-        </div>
-        {sel.thirds.map((third, i) => (
-          <Stat key={i} label={[t("durability.first"), t("durability.middle"), t("durability.last")][i]} value={fmt.pace(third.pace)} sub={`${third.hr} bpm`} />
-        ))}
-      </div>
-    </Card>
+          ))}
+          <line x1={L} x2={W - R} y1={Y(0)} y2={Y(0)} stroke="var(--muted-foreground)" strokeDasharray="3 3" strokeWidth={1} />
+          <text x={L - 6} y={Y(0)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">0 %</text>
+          <polyline points={rows.map((r, i) => `${X(xs[i]).toFixed(1)},${Y(r.driftPct).toFixed(1)}`).join(" ")} fill="none" stroke="var(--muted-foreground)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
+          {rows.map((r, i) => {
+            const on = r.id === sel.id;
+            const ink = INK[driftZone(r.driftPct)];
+            return (
+              <g key={r.id}>
+                {on && <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={10} style={{ fill: ink, fillOpacity: 0.2 }} />}
+                <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={on ? 5.5 : 4} style={{ fill: on ? ink : "var(--card)", stroke: on ? "var(--card)" : "var(--muted-foreground)" }} strokeWidth={2} />
+              </g>
+            );
+          })}
+          {xLabels.map((l) => (
+            <text key={l.i} x={l.a === "start" ? L + pad : l.a === "end" ? W - R : X(xs[l.i])} y={H - 6} textAnchor={l.a} fontSize={11} fill="var(--muted-foreground)">{day(rows[l.i].date)}</text>
+          ))}
+        </svg>
+      )}
+    </div>
   );
 }
