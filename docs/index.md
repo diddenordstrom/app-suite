@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · decision · Fartlek trend cards: today's value on top, key numbers underneath ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek durability is one card; Activities gets a runner icon ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Dependabot auto-merge when the checks pass ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-22 · decision · Skymning look: Geist + Newsreader, horizon, chart areas, paper ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Skymning depth: soft cards and controls ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
-- 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -19,7 +19,7 @@
 
 - [Swedish app names: runplan became Fartlek, shopsplit became Kvitt](decisions/app-names.md): Why the two English-named apps were renamed, what changed and which old names were kept on purpose _(decision · accepted · 2026-11-10)_
 - [Porting Autarki (garden) to the suite stack](decisions/autarki-port.md): Autarki moves from Nuxt/Vue/Nitro to Hono + server-kit + React in three steps, server first, without keeping any data _(decision · accepted · 2026-11-12)_
-- [How Fartlek charts are laid out](decisions/chart-layout.md): One y-axis per chart; stacked panels for a single activity's curves; a pill switch for related trends; no dual axes _(decision · accepted · 2026-11-14)_
+- [How Fartlek charts are laid out](decisions/chart-layout.md): One y-axis per chart; stacked panels for a single activity's curves; a pill switch for related trends; no dual axes; trend cards share one anatomy (today's value on top, key numbers underneath) _(decision · accepted · 2026-11-23)_
 - [CI always audits production dependencies](decisions/ci-audit-gate.md): The audit job runs on every push and PR, independent of what changed, with the same gate as the garden repo _(decision · accepted · 2026-11-09)_
 - [CI starts every app's image on pull requests](decisions/ci-image-smoke.md): A smoke job builds each image and waits for /api/health, because tests run the source and never the production bundle _(decision · accepted · 2026-11-22)_
 - [Demo mode with a throwaway database per visitor](decisions/demo-mode.md): Portfolio visitors without an account try runplan, shopsplit and Etapp through /demo, each in their own capped, short-lived SQLite file _(decision · accepted · 2026-11-10)_
