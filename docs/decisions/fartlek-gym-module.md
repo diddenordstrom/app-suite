@@ -45,7 +45,7 @@ Most influencer apps are audience monetization on white-label platforms (Trainer
 Drawn in a private mock with six phone screens. Runna works the same way: strength sits in the plan as an ordinary session, reached from the day, with no tab of its own (and behind its subscription, 1 099 kr a year in Nov 2026).
 
 1. **Home → the Idag card** shows today's gym session: template, number of exercises and time, the first exercises with last time's weights, and one line on *why* today suits it ("threshold Friday, long run Sunday, so heavy legs today"). Buttons: "Öppna pass" and "Annat pass".
-2. **The session page** asks "start?": the exercise list with planned sets and weights, the optional joint check-in (below) and "Starta pass".
+2. **The session page** asks "start?": tabs for templates A, B and C, the exercise list with planned sets and weights, a swap button on each exercise and "Lägg till övning" (so the session can be changed before it starts, not only during it), the optional joint check-in (below) and "Starta pass".
 3. **"Annat pass"** opens a sheet: today's session, **a free gym session** (template A, B or C, or empty) for a gym day with nothing planned, and **move today's session** to another day with what it does to the key sessions. No "free run": Fartlek doesn't record runs, Garmin does.
 4. **In the session**: set rows with steppers, swap per slot, rest after each set.
 5. **Done**: time, sets, volume, what beat last time, the Garmin activity matched, and the next gym session with its reason.
@@ -53,6 +53,7 @@ Drawn in a private mock with six phone screens. Runna works the same way: streng
 - **No gym tab at first.** Templates and the exercise catalogue live under Plan, gym history under Activities next to the runs. A fifth tab fits on a phone and can come later if a shortcut is missed; a tab is easy to add and hard to take away.
 - **Joint check-in**: three buttons before the start, *Inget · Lite · Ont*, not a 0–10 scale. "Ont" offers the gentle template C instead, and the runner can keep A. Optional, and can be turned off in Settings. Ties in with Dagsform on Home.
 - **Rest timer**: nice to have, not needed for the first version.
+- **Not only legs and prevention.** Upper-body work (bench press, pulls, arms) is logged in the same module through template B or a free session, so the runner needs no second log app.
 
 ## Data
 
