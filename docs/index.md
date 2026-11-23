@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · decision · Dependabot auto-merge when the checks pass ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · note · Skeletons instead of "Laddar…" ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Skymning look: Geist + Newsreader, horizon, chart areas, paper ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-22 · decision · Kvitt landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · CI starts every image on pull requests ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Kvitt: plånböcker and a car calculator for trips ([log/2026-11.md](log/2026-11.md))
-- 2026-11-20 · decision · Fartlek landing page on the portfolio ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -23,6 +23,7 @@
 - [CI always audits production dependencies](decisions/ci-audit-gate.md): The audit job runs on every push and PR, independent of what changed, with the same gate as the garden repo _(decision · accepted · 2026-11-09)_
 - [CI starts every app's image on pull requests](decisions/ci-image-smoke.md): A smoke job builds each image and waits for /api/health, because tests run the source and never the production bundle _(decision · accepted · 2026-11-22)_
 - [Demo mode with a throwaway database per visitor](decisions/demo-mode.md): Portfolio visitors without an account try runplan, shopsplit and Etapp through /demo, each in their own capped, short-lived SQLite file _(decision · accepted · 2026-11-10)_
+- [Dependabot auto-merge when the checks pass](decisions/dependabot-automerge.md): How non-major Dependabot PRs merge themselves, and the repo settings the workflow depends on _(decision · accepted · 2026-11-23)_
 - [Komodo deploys the stack from git; Traefik and a wildcard tunnel route the hostnames](decisions/deploy-komodo.md): Why a new app is now only a pull request (no ssh, no Cloudflare change), what replaced watchtower, and where secrets live _(decision · accepted · 2026-11-11)_
 - [The wiki lives in docs/ of the monorepo](decisions/docs-wiki-in-monorepo.md): Why notes and decisions are kept in this repo, how index and log work, and when to split them out _(decision · accepted · 2026-11-09)_
 - [Etapp day view: read first, live editing, vias, idea bank](decisions/etapp-day-view.md): Why Etapp's day became a read-mode timeline with live editing, vias, an idea bank, discover links, stop photos and a typed-in drive time _(decision · accepted · 2026-11-22)_
