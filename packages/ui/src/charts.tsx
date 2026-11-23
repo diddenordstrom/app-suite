@@ -7,7 +7,8 @@ import { useEffect, useId, useMemo, useRef, useState, type ReactNode } from "rea
  * crosshair tooltip on lines, per-mark tooltip on bars, legend for ≥ 2 series (opt-in direct labels).
  */
 
-function useWidth<T extends HTMLElement>() {
+/** Width of an element in CSS px, so a chart draws at its real size (text stays 11 px on a phone). */
+export function useWidth<T extends HTMLElement>() {
   const ref = useRef<T>(null);
   const [w, setW] = useState(0);
   useEffect(() => {
@@ -33,12 +34,14 @@ export function niceTicks(min: number, max: number, count = 4): number[] {
 const AXIS = "var(--muted-foreground)";
 const GRID = "var(--border)";
 
-function Legend({ items }: { items: { label: string; color: string; dashed?: boolean }[] }) {
+function Legend({ items }: { items: { label: string; color: string; dashed?: boolean; band?: boolean }[] }) {
   return (
     <div className="mb-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
       {items.map((i) => (
         <span key={i.label} className="inline-flex items-center gap-1.5">
-          <svg width="16" height="8" aria-hidden><line x1="0" y1="4" x2="16" y2="4" stroke={i.color} strokeWidth="2" strokeDasharray={i.dashed ? "3 2" : undefined} /></svg>
+          {i.band
+            ? <span className="inline-block h-2.5 w-4 rounded-sm" style={{ background: i.color, opacity: 0.3 }} />
+            : <svg width="16" height="8" aria-hidden><line x1="0" y1="4" x2="16" y2="4" stroke={i.color} strokeWidth="2" strokeDasharray={i.dashed ? "3 2" : undefined} /></svg>}
           {i.label}
         </span>
       ))}
@@ -100,7 +103,7 @@ export interface LineSeries {
 }
 
 export function LineChart({
-  series, height = 200, xFormat, yFormat, invert = false, yPad = 0.08, refLines = [], xLines = [], legend, directLabels = false, emptyText = tShared("chart.notEnough"),
+  series, height = 200, xFormat, yFormat, invert = false, yPad = 0.08, refLines = [], xLines = [], bands = [], legend, directLabels = false, emptyText = tShared("chart.notEnough"),
 }: {
   series: LineSeries[];
   height?: number;
@@ -110,8 +113,10 @@ export function LineChart({
   invert?: boolean;
   yPad?: number;
   refLines?: { y: number; label: string }[];
-  /** Vertical dashed markers (events on the x axis), labelled at the top. */
-  xLines?: { x: number; label: string }[];
+  /** Vertical markers (events on the x axis), labelled at the top. Dashed and muted unless given a colour ("idag" in signature). */
+  xLines?: { x: number; label: string; color?: string }[];
+  /** Shaded y ranges behind the lines (a goal zone), named in the legend. */
+  bands?: { from: number; to: number; color: string; label?: string }[];
   legend?: boolean;
   /** Label each line at its end (≥ 2 series). Off by default: end labels collide when lines finish close together or have a single point, so the legend carries the names. */
   directLabels?: boolean;
@@ -125,7 +130,7 @@ export function LineChart({
   const m = { l: 44, r: series.length > 1 && directLabels ? 52 : 12, t: 8, b: 22 };
   const geo = useMemo(() => {
     if (!all.length) return null;
-    const ys = [...all.map((p) => p.y), ...refLines.map((r) => r.y)];
+    const ys = [...all.map((p) => p.y), ...refLines.map((r) => r.y), ...bands.flatMap((b) => [b.from, b.to])];
     let lo = Math.min(...ys), hi = Math.max(...ys);
     const pad = (hi - lo || Math.abs(hi) || 1) * yPad;
     lo -= pad; hi += pad;
@@ -136,7 +141,7 @@ export function LineChart({
     const sx = (x: number) => m.l + (x1 === x0 ? iw / 2 : ((x - x0) / (x1 - x0)) * iw);
     const sy = (y: number) => m.t + (invert ? (y - lo) / (hi - lo) : 1 - (y - lo) / (hi - lo)) * ih;
     return { sx, sy, ticks, iw, x0, x1 };
-  }, [all, xs, width, height, invert, yPad, refLines, m.l, m.r, m.t, m.b]);
+  }, [all, xs, width, height, invert, yPad, refLines, bands, m.l, m.r, m.t, m.b]);
 
   if (!all.length || (all.length < 2 && xs.length < 2)) return <p className="py-8 text-center text-sm text-muted-foreground">{emptyText}</p>;
   const showLegend = legend ?? series.length > 1;
@@ -186,7 +191,7 @@ export function LineChart({
 
   return (
     <div>
-      {showLegend && <Legend items={series.map((s) => ({ label: s.label, color: s.color }))} />}
+      {(showLegend || bands.some((b) => b.label)) && <Legend items={[...series.map((s) => ({ label: s.label, color: s.color })), ...bands.flatMap((b) => (b.label ? [{ label: b.label, color: b.color, band: true }] : []))]} />}
       <div ref={ref} className="relative w-full" style={{ height }}>
         {geo && width > 0 && (
           <svg width={width} height={height} onPointerMove={onMove} onPointerLeave={() => setHover(null)} role="img"
@@ -197,6 +202,13 @@ export function LineChart({
                 <text x={m.l - 6} y={geo.sy(t)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill={AXIS}>{yFormat(t)}</text>
               </g>
             ))}
+            {bands.map((b) => {
+              const y0 = geo.sy(Math.max(b.from, b.to)), y1 = geo.sy(Math.min(b.from, b.to));
+              const top = Math.min(y0, y1), h = Math.abs(y1 - y0);
+              return (
+                <rect key={`${b.from}-${b.to}`} x={m.l} y={top} width={Math.max(width - m.l - m.r, 0)} height={h} fill={b.color} fillOpacity={0.14} />
+              );
+            })}
             {xTicks.map((x, i) => (
               <text key={x} x={geo.sx(x)} y={height - 6} fontSize={11} fill={AXIS} textAnchor={i === 0 ? "start" : i === xTicks.length - 1 ? "end" : "middle"}>{xFormat(x)}</text>
             ))}
@@ -211,8 +223,8 @@ export function LineChart({
               const right = x > width - m.r - 90;
               return (
                 <g key={`${l.label}-${l.x}`}>
-                  <line x1={x} x2={x} y1={m.t} y2={height - m.b} stroke={AXIS} strokeDasharray="4 3" strokeWidth={1} />
-                  <text x={right ? x - 4 : x + 4} y={m.t + 10 + i * 13} textAnchor={right ? "end" : "start"} fontSize={10} fill="var(--foreground)">{l.label}</text>
+                  <line x1={x} x2={x} y1={m.t} y2={height - m.b} stroke={l.color ?? AXIS} strokeDasharray={l.color ? undefined : "4 3"} strokeWidth={l.color ? 1.5 : 1} />
+                  <text x={right ? x - 4 : x + 4} y={m.t + 10 + i * 13} textAnchor={right ? "end" : "start"} fontSize={10} fontWeight={l.color ? 600 : undefined} fill={l.color ?? "var(--foreground)"}>{l.label}</text>
                 </g>
               );
             })}
@@ -283,6 +295,8 @@ export interface Bar {
   marker?: number | null;
   /** Drawn as an outline (e.g. future planned weeks). */
   ghost?: boolean;
+  /** The bar in progress (this week): signature colour, with what is left to the marker as a dashed outline. */
+  current?: boolean;
   tip: ReactNode;
 }
 
@@ -336,8 +350,11 @@ export function BarChart({ bars, height = 200, yFormat, color = "var(--chart-1)"
               return (
                 <g key={b.key} onPointerEnter={() => setHover(i)}>
                   <rect x={m.l + slot * i} y={m.t} width={slot} height={ih} fill="transparent" />
-                  {d && <path d={d} fill={b.ghost ? "none" : color} stroke={b.ghost ? color : "none"} strokeWidth={b.ghost ? 1.5 : 0} strokeDasharray={b.ghost ? "3 2" : undefined} opacity={hover != null && hover !== i ? 0.55 : 1} />}
-                  {b.marker != null && b.marker > 0 && <line x1={cx - bw / 2 - 2} x2={cx + bw / 2 + 2} y1={sy(b.marker)} y2={sy(b.marker)} stroke="var(--foreground)" strokeWidth={2} strokeLinecap="round" />}
+                  {b.current && b.marker != null && b.marker > b.value && (
+                    <rect x={cx - bw / 2} y={sy(b.marker)} width={bw} height={Math.max(sy(b.value) - sy(b.marker), 0)} rx={Math.min(4, bw / 2)} fill="none" stroke="var(--signature)" strokeWidth={1.5} strokeDasharray="3 2" />
+                  )}
+                  {d && <path d={d} fill={b.ghost ? "none" : b.current ? "var(--signature)" : color} stroke={b.ghost ? (b.current ? "var(--signature)" : color) : "none"} strokeWidth={b.ghost ? 1.5 : 0} strokeDasharray={b.ghost ? "3 2" : undefined} opacity={hover != null && hover !== i ? 0.55 : 1} />}
+                  {b.marker != null && b.marker > 0 && (!b.current || b.value >= b.marker) && <line x1={cx - bw / 2 - 2} x2={cx + bw / 2 + 2} y1={sy(b.marker)} y2={sy(b.marker)} stroke="var(--foreground)" strokeWidth={2} strokeLinecap="round" />}
                   {i % every === 0 && <text x={cx} y={height - 6} fontSize={11} fill={AXIS} textAnchor="middle">{b.label}</text>}
                 </g>
               );
