@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-23 · note · Gym on the Fartlek landing page, its own news note ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module, first version built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module: flow from Idag, no tab, joint check-in ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · decision · Fartlek durability is one card; Activities gets a runner icon ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Dependabot auto-merge when the checks pass ([log/2026-11.md](log/2026-11.md))
 - 2026-11-22 · decision · Etapp day view: read first, live editing, vias, idea bank ([log/2026-11.md](log/2026-11.md))
-- 2026-11-22 · note · Skeletons instead of "Laddar…" ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -40,7 +40,7 @@
 - [Fartlek plans gym as its own session type, apart from cross-training](decisions/fartlek-gym-sessions.md): A planned "Gym" (strength) session matches only gym activities, and cross-train sessions never take a gym activity, so gym on Monday and swimming on Thursday each fill their own day _(decision · accepted · 2026-11-18)_
 - [Fartlek finds interval laps against the threshold estimate](decisions/fartlek-interval-laps.md): Interval laps are ≥ 3 min and at most 10 % slower than the threshold estimate; without one, near the median of the work laps instead of the fastest lap _(decision · accepted · 2026-11-11)_
 - [Fartlek plans the key sessions first, with the long run on a 30-day ladder](decisions/fartlek-key-sessions-first.md): Week and block suggestions place the long run (longest run of 30 days + 1 km, never more than 10 % over it), then the next threshold rung, then fill with zone 2; one dial; the 35 % long-run share is gone; Home offers to fix a key session ahead after a missed one _(decision · accepted · 2026-11-14)_
-- [Fartlek gets its own landing page on the portfolio, built from live components](decisions/fartlek-landing-page.md): /fartlek on the portfolio renders Fartlek's real components on hand-tuned demo data (no screenshots), with a theme toggle; the Fartlek card says "Läs mer" instead of "Öppna appen"; "öppen källkod" (present tense) without a GitHub link; about/contact waits for the owner _(decision · accepted · 2026-11-20)_
+- [Fartlek gets its own landing page on the portfolio, built from live components](decisions/fartlek-landing-page.md): /fartlek on the portfolio renders Fartlek's real components on hand-tuned demo data (no screenshots), with a theme toggle; the Fartlek card says "Läs mer" instead of "Öppna appen"; "öppen källkod" (present tense) without a GitHub link; about/contact waits for the owner _(decision · accepted · 2026-11-23)_
 - [Fartlek's morning notification: today's session and today's form](decisions/fartlek-morning-push.md): A push at a time the runner picks with today's sessions and form score; with Garmin it syncs first and waits up to two hours for last night's HRV or sleep _(decision · accepted · 2026-11-20)_
 - [Fartlek plans the weeks up to an A or B race backwards (peak builds, then a two-week taper)](decisions/fartlek-race-blocks.md): Spec for race-mode block planning: from the race date, two taper weeks, up to three build weeks before them, a lighter week ahead of those, and the base engine's guards kept; replaces the "race within 16 weeks refuses" rule _(decision · accepted · 2026-11-16)_
 - [Fartlek uses races as the answer key for its predictions](decisions/fartlek-race-results.md): Races get results (from "Was this a race?" on a run, or added by hand), and each is logged with what every prediction model said the day before and the inputs, per model version; shown as an answer key, never changing the prediction _(decision · accepted · 2026-11-13)_

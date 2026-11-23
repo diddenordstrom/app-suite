@@ -99,4 +99,4 @@ export const FORMULAS: readonly { id: FormulaId; source?: SourceId }[] = [
   { id: "smyth", source: "smyth2022" },
 ];
 
-export const FAQ = ["q1", "q2", "q3", "q4", "q5"] as const;
+export const FAQ = ["q1", "q2", "q3", "q4", "q5", "q6"] as const;

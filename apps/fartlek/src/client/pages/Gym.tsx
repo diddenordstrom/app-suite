@@ -194,7 +194,7 @@ function Active({ day, draft, setDraft, onFinished }: { day: GymDay; draft: Draf
   );
 }
 
-function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, onSwap, onAddSet }: {
+export function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, onSwap, onAddSet }: {
   entry: DraftEntry; last: LastTime | undefined; focus: number | null;
   onFocus: (s: number) => void; onTick: (s: number) => void; onChange: (s: number, patch: Partial<DraftEntry["sets"][number]>) => void; onSwap: () => void; onAddSet: () => void;
 }) {
@@ -232,18 +232,18 @@ function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, onSwap, o
               ) : (
                 <>
                   <Stepper what={t("gym.kg")} value={s.kg} step={ex.step || 2.5} decimals onChange={(v) => onChange(j, { kg: v })} className="flex-1" />
-                  <Stepper what={t("gym.reps")} value={s.reps} step={1} onChange={(v) => onChange(j, { reps: v })} className="w-32" />
+                  <Stepper what={t("gym.reps")} value={s.reps} step={1} onChange={(v) => onChange(j, { reps: v })} className="flex-1" />
                 </>
               )}
-              <button type="button" aria-label={t("gym.doneSet")} onClick={() => onTick(j)} className="grid size-12 shrink-0 place-items-center rounded-md bg-primary text-primary-foreground"><CheckIcon /></button>
             </div>
+            <button type="button" onClick={() => onTick(j)} className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground"><CheckIcon /> {t("gym.doneSet")}</button>
           </li>
         ) : (
           <li key={j} className="flex items-center gap-2 px-1">
             <button type="button" onClick={() => onFocus(j)} className="flex min-h-10 flex-1 items-center gap-3 text-left">
-              <span className="w-6 text-sm font-semibold tabular-nums">{j + 1}</span>
-              <span className="w-20 text-xs text-muted-foreground tabular-nums">{lastOf(j)}</span>
-              <span className={`tabular-nums ${s.done ? "font-semibold" : "text-muted-foreground"}`}>{amountOf(s)}</span>
+              <span className="w-5 shrink-0 text-sm font-semibold tabular-nums">{j + 1}</span>
+              <span className="w-16 shrink-0 text-xs text-muted-foreground tabular-nums">{lastOf(j)}</span>
+              <span className={`whitespace-nowrap tabular-nums ${s.done ? "font-semibold" : "text-muted-foreground"}`}>{amountOf(s)}</span>
             </button>
             {s.done
               ? <button type="button" aria-label={t("gym.undoSet")} onClick={() => onTick(j)} className="grid size-10 place-items-center rounded-md bg-success text-background"><CheckIcon /></button>
@@ -262,12 +262,12 @@ function Stepper({ what, value, step, decimals, onChange, className }: { what: s
   const set = (n: number | null) => onChange(n == null ? null : Math.max(0, Math.round(n * 100) / 100));
   return (
     <div className={`flex h-12 items-center rounded-md border border-border bg-card text-foreground ${className ?? ""}`}>
-      <button type="button" aria-label={t("gym.minus", { what })} onClick={() => set((value ?? 0) - step)} className="h-full w-10 shrink-0 text-xl">−</button>
+      <button type="button" aria-label={t("gym.minus", { what })} onClick={() => set((value ?? 0) - step)} className="h-full w-9 shrink-0 text-xl">−</button>
       <input aria-label={what} inputMode={decimals ? "decimal" : "numeric"} value={text}
         onChange={(e) => setText(e.target.value)}
         onBlur={() => { const n = Number(text.replace(",", ".")); set(text.trim() === "" || !Number.isFinite(n) ? null : n); }}
         className="h-full w-full min-w-0 bg-transparent text-center text-lg font-semibold tabular-nums outline-none" />
-      <button type="button" aria-label={t("gym.plus", { what })} onClick={() => set((value ?? 0) + step)} className="h-full w-10 shrink-0 text-xl">+</button>
+      <button type="button" aria-label={t("gym.plus", { what })} onClick={() => set((value ?? 0) + step)} className="h-full w-9 shrink-0 text-xl">+</button>
     </div>
   );
 }

@@ -1,5 +1,5 @@
 import type { ComponentType } from "react";
-import { ActivityScreen, BlockScreen, FuelScreen, LoadScreen, PaceScreen, RaceScreen, WeekScreen } from "./screens";
+import { ActivityScreen, BlockScreen, FuelScreen, GymScreen, LoadScreen, PaceScreen, RaceScreen, WeekScreen } from "./screens";
 
 /**
  * The feature sections of the Fartlek page, in order: each one's copy (`fartlek.landing.feature.<id>.*`),
@@ -14,4 +14,5 @@ export const FEATURES = [
   { id: "block", frame: "card", Screen: BlockScreen },
   { id: "activity", frame: "card", Screen: ActivityScreen, tall: true },
   { id: "fuel", frame: "card", Screen: FuelScreen },
+  { id: "gym", frame: "phone", Screen: GymScreen },
 ] as const satisfies readonly { id: string; frame: "phone" | "card"; Screen: ComponentType; tall?: boolean }[];

@@ -9,8 +9,9 @@ import { api } from "./http";
  */
 export const NEWS: NewsEntry[] = [
   {
-    id: "2026-11-gym",
-    date: "november 2026",
+    // Its own note, not part of the November one.
+    id: "2026-12-gym",
+    date: "december 2026",
     title: "Nytt i Fartlek: logga gympassen",
     items: [
       "Tryck Öppna pass på dagens gympass i Idag-kortet. Fartlek föreslår pass A (ben och skydd), B (överkropp) eller C (skonsamt) utifrån löpveckan, till exempel överkropp dagen före tröskeln.",

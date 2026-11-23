@@ -71,6 +71,7 @@ Hardly any, and no model to train:
 - **Pages**: `/gym` (session page, session in progress, done) and `/gym/history` (sessions, detail, Bolt import). Reached from "Öppna pass" on today's gym session in the Idag card, "Nytt pass" in the history, and a link from Activities. No tab.
 - **On the gym floor**: steppers and a typed value for kg, reps and seconds, the next open set focused after each tick, a count-up rest clock since the last set, the screen kept awake (Wake Lock) where the browser allows it.
 - **Offline**: the session in progress is kept in the browser's `localStorage`, not IndexedDB as first planned (one small JSON object is all it needs). A finished session that can't be sent waits in an outbox and is sent when the gym pages open or the phone comes online.
+- **News and landing page**: its own "what's new" note (December 2026, not part of the November one) and a gym section with a FAQ entry on the [Fartlek landing page](fartlek-landing-page.md).
 - **Demo**: gym planned on Mondays and logged A/B sessions with weights that creep up.
 
 ## Left to build
