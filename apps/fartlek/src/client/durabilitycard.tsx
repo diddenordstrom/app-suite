@@ -9,7 +9,9 @@ import { DRIFT, driftZone } from "@/shared/activitylog";
 import { toDate } from "@/shared/dates";
 
 const TONE = { stable: "var(--success)", fading: "var(--warning)", high: "var(--danger)" } as const;
-const TEXT = { stable: "text-success", fading: "text-warning", high: "text-danger" } as const;
+const TEXT = { stable: "text-foreground", fading: "text-warning", high: "text-danger" } as const;
+/** Colour only says something when there is something to watch: holding up stays neutral. */
+const INK = { stable: "var(--foreground)", fading: "var(--warning)", high: "var(--danger)" } as const;
 const signed = (v: number) => v.toLocaleString(locale, { maximumFractionDigits: 1, signDisplay: "exceptZero" });
 const day = (d: string) => fmtDay(d, { day: "numeric", month: "short" });
 
@@ -73,11 +75,11 @@ export function DurabilityCard({ rows: unsorted, info, className }: { rows: Dura
       <svg viewBox={`0 0 ${W} ${H}`} role="img" aria-label={title} onPointerDown={pick} onPointerMove={pick} className="mt-2 block h-auto w-full touch-pan-y select-none">
         <defs>
           <linearGradient id={`${gid}-z`} gradientUnits="userSpaceOnUse" x1="0" y1={T} x2="0" y2={H - B}>
-            <stop offset="0" style={{ stopColor: TONE.high, stopOpacity: 0.16 }} />
-            <stop offset={off((top + DRIFT.high) / 2)} style={{ stopColor: TONE.high, stopOpacity: 0.16 }} />
-            <stop offset={off((DRIFT.stable + DRIFT.high) / 2)} style={{ stopColor: TONE.fading, stopOpacity: 0.13 }} />
-            <stop offset={off(DRIFT.stable / 2)} style={{ stopColor: TONE.stable, stopOpacity: 0.12 }} />
-            <stop offset="1" style={{ stopColor: TONE.stable, stopOpacity: 0.14 }} />
+            <stop offset="0" style={{ stopColor: TONE.high, stopOpacity: 0.09 }} />
+            <stop offset={off((top + DRIFT.high) / 2)} style={{ stopColor: TONE.high, stopOpacity: 0.09 }} />
+            <stop offset={off((DRIFT.stable + DRIFT.high) / 2)} style={{ stopColor: TONE.fading, stopOpacity: 0.05 }} />
+            <stop offset={off(DRIFT.stable / 2)} style={{ stopColor: TONE.stable, stopOpacity: 0.03 }} />
+            <stop offset="1" style={{ stopColor: TONE.stable, stopOpacity: 0.04 }} />
           </linearGradient>
         </defs>
         <rect x={L} y={T} width={W - L - R} height={H - T - B} fill={`url(#${gid}-z)`} />
@@ -89,15 +91,15 @@ export function DurabilityCard({ rows: unsorted, info, className }: { rows: Dura
         <text x={L - 6} y={Y(0)} textAnchor="end" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">0 %</text>
         <text x={W - R - 4} y={Y(0) - 4} textAnchor="end" fontSize={10} fill="var(--muted-foreground)">{t("durability.noDrift")}</text>
         {zones.map(([z, mid]) => (
-          <text key={z} x={W - R + 8} y={Y(mid)} textAnchor="start" dominantBaseline="middle" fontSize={11} style={{ fill: TONE[z] }}>{t(`durability.zone.${z}`)}</text>
+          <text key={z} x={W - R + 8} y={Y(mid)} textAnchor="start" dominantBaseline="middle" fontSize={11} fill="var(--muted-foreground)">{t(`durability.zone.${z}`)}</text>
         ))}
         <polyline points={rows.map((r, i) => `${X(xs[i]).toFixed(1)},${Y(r.driftPct).toFixed(1)}`).join(" ")} fill="none" stroke="var(--muted-foreground)" strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" />
         {rows.map((r, i) => {
           const on = r.id === sel.id;
           return (
             <g key={r.id}>
-              {on && <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={9} style={{ fill: TONE[driftZone(r.driftPct)], fillOpacity: 0.25 }} />}
-              <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={on ? 5.5 : 4} style={{ fill: on ? TONE[driftZone(r.driftPct)] : "var(--card)", stroke: on ? "var(--card)" : "var(--muted-foreground)" }} strokeWidth={2} />
+              {on && <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={9} style={{ fill: INK[driftZone(r.driftPct)], fillOpacity: 0.18 }} />}
+              <circle cx={X(xs[i])} cy={Y(r.driftPct)} r={on ? 5.5 : 4} style={{ fill: on ? INK[driftZone(r.driftPct)] : "var(--card)", stroke: on ? "var(--card)" : "var(--muted-foreground)" }} strokeWidth={2} />
             </g>
           );
         })}
