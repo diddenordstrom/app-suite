@@ -3,7 +3,7 @@ title: Fartlek structured workouts and planned vs actual
 summary: Planned sessions get optional steps with pace/HR targets; laps are matched to the steps and each step is judged in target / near / off, with a lap split for forgotten presses and step changes found in the stream (built); the session library put off
 type: decision
 status: accepted
-updated: 2026-11-12
+updated: 2026-11-24
 ---
 
 # Fartlek structured workouts and planned vs actual
@@ -26,9 +26,10 @@ The proposal below was mocked as a Claude Design canvas ("Fartlek – strukturer
 - **Language.** All code stays English; Swedish is only UI. The step keywords follow the UI language: the parser reads both (`@tröskel` and `@threshold`, `lugnt` and `easy`) and steps are written back in the user's language. The block text should work the same way; today it is English only, which is its own fix.
 - **Targets come from what Fartlek already knows**, nothing invented:
   - Easy, long, warm-up and cool-down steps are judged on the **easy HR band** from Settings; pace is shown as the outcome, there is no easy pace target.
+  - The easy band is a **ceiling** when judging (2026-11-24): below it is in target, as in the easy score. Without a band in Settings the ceiling is the top of zone 2. Before this, a run held below a band built from LTHR zones (Friel Z2, 85–89 % of LTHR) was marked "near, 4 bpm under" although it was exactly the easy run asked for.
   - Threshold reps are judged on **pace in the existing threshold window** (estimate −15/+20 s/km, as `rangeCheck`). HR is shown beside it with the threshold HR as a reference, not as a range.
   - The runner can switch what a step is judged on by tapping it; there is no row of toggles.
-- **Near** = at most 5 s/km or 5 bpm outside the target. Results are *in target / near / off*; the summary ("2 av 3 drag i mål") is only green when every rep is in target, and the week view uses the same colour.
+- **Near** = at most 5 s/km or 5 bpm outside the target. Strides have no target and are left out of the rep count and the HR drift (2026-11-24); before, an easy run with strides read "0 of 3 reps in target". Results are *in target / near / off*; the summary ("2 av 3 drag i mål") is only green when every rep is in target, and the week view uses the same colour.
 - **Amount.** A workout with steps takes its planned amount from them (`9.8 threshold*` in the block text). Writing another amount on that line asks whether to drop the steps; changing the type drops them. Since the block coach the steps are written inline instead, `9.8 tröskel (2 km lugnt, 3x8 min @tröskel / 2 min jogg, 1.5 km lugnt)`; the `*` is still read ([fartlek-block-coach](fartlek-block-coach.md)).
 - **Lap matching, phase 1.** Auto-laps (distance, time, position) inside one step are merged; only manual laps mark a step change. A step whose lap is too long (a forgotten lap press) is fixed by **splitting the lap at a time that defaults to the planned step duration**, which needs no stream analysis. Fixes change only how steps are judged, never the Garmin data.
 - **Curves.** Pace with **elevation shaded behind it** (the usual reason a rep went slow), heart rate, and cadence as three stacked panels on one time axis with **one shared crosshair** and a readout line of every value at that moment. No dual y-axes: each panel stays readable on its own.

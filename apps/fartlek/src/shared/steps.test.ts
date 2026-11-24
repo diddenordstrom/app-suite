@@ -71,8 +71,8 @@ describe("steps in order", () => {
 describe("targets", () => {
   const step = (text: string) => flattenSteps(ok(text))[0].def;
   it("resolves against the numbers Fartlek has and judges hard efforts on pace, easy on HR", () => {
-    expect(resolveTarget(step("2 km lugnt"), refs)).toEqual({ pace: null, hr: [130, 148], hrRef: null, judge: "hr" });
-    expect(resolveTarget(step("8 min @tröskel"), refs)).toEqual({ pace: [240, 275], hr: [164, 174], hrRef: 169, judge: "pace" });
+    expect(resolveTarget(step("2 km lugnt"), refs)).toEqual({ pace: null, hr: [130, 148], hrRef: null, hrCeiling: true, judge: "hr" });
+    expect(resolveTarget(step("8 min @tröskel"), refs)).toEqual({ pace: [240, 275], hr: [164, 174], hrRef: 169, hrCeiling: false, judge: "pace" });
     expect(resolveTarget(step("8 min @tröskel:puls"), refs).judge).toBe("hr");
     expect(resolveTarget(step("20 min @z2"), refs).hr).toEqual([131, 148]);
     expect(resolveTarget(step("2 min jogg"), refs).judge).toBeNull();

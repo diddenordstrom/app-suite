@@ -86,7 +86,7 @@ export function PlannedCard({ activityId, planned, lapStarts, onChange }: {
   const range = (r: StepResult, kind: "pace" | "hr") => {
     const x = kind === "pace" ? r.target.pace : r.target.hr;
     if (!x) return null;
-    return t("pva.target", { range: kind === "pace" ? `${fmt.pace(x[0]).split("/")[0]}–${fmt.pace(x[1]).split("/")[0]}` : `${x[0]}–${x[1]}` });
+    return t("pva.target", { range: kind === "pace" ? `${fmt.pace(x[0]).split("/")[0]}–${fmt.pace(x[1]).split("/")[0]}` : r.target.hrCeiling ? `≤ ${x[1]}` : `${x[0]}–${x[1]}` });
   };
   const lapsText = (r: StepResult) => (r.laps.length > 1 ? t("pva.laps", { from: r.laps[0], to: r.laps.at(-1)! }) : r.laps.length ? t("pva.lap", { n: r.laps[0] }) : "");
   const done = (r: StepResult) => (r.durationS == null ? "–" : `${fmtDuration(r.durationS)} · ${fmt.dist((r.distanceM ?? 0) / 1000, 2)}`);

@@ -35,6 +35,22 @@ describe("matching laps to steps", () => {
     expect(m).toMatchObject({ workTotal: 3, workJudged: 3, workIn: 2, hrDrift: 6, lapCount: 9, autoMerged: 2, extraLaps: 0 });
   });
 
+  it("counts easy HR below the band as in target, only above it as off", () => {
+    const slow: [number, number, number, LapTrigger][] = [[353, 1000, 118, "distance"], [353, 1000, 122, "manual"], ...session.slice(2)];
+    const m = matchSteps(steps, laps(slow), null, refs) as StepMatch;
+    expect(status(m)[0]).toBe("warmup:in");
+    expect(status(m).at(-1)).toBe("cooldown:near+3");
+  });
+
+  it("leaves strides out of the rep count and the HR drift", () => {
+    const easyStrides = parseSteps("6 km lugnt, 3x20 s strides / 1 min jogg", "metric").steps!;
+    const m = matchSteps(easyStrides, laps([
+      [1765, 4340, 151, "manual"], [20, 90, 164, "manual"], [60, 140, 166, "manual"],
+      [20, 70, 160, "manual"], [60, 150, 171, "manual"], [20, 90, 170, "manual"], [301, 650, 163, "end"],
+    ]), null, refs) as StepMatch;
+    expect(m).toMatchObject({ workTotal: 0, workJudged: 0, workIn: 0, hrDrift: null });
+  });
+
   it("folds a few-second closing lap into the step before it", () => {
     const withTail: [number, number, number, LapTrigger][] = [...session.slice(0, 6), [478, 1720, 172, "manual"], [365, 1000, 150, "manual"], [2, 5, 150, "end"]];
     const m = matchSteps(steps, laps(withTail), null, refs) as StepMatch;

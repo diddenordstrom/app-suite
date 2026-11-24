@@ -8,7 +8,7 @@ updated: 2026-11-24
 
 # Fartlek gets a race-specific phase for the marathon and half, built from blueprints that scale per runner
 
-Settled with the user on 2026-11-24. Built in six steps (2026-11-24 to 2026-11-25); the [build plan](#build-plan) below says how, and what was settled while building. It amends "no branches per distance" in [goal to plan](fartlek-goal-to-plan.md): the method stays one engine, but the last weeks before a long race now get race-pace sessions, because those sessions are what every marathon method has in common ([research](../research/marathon-specific-phase.md)). It answers the open pre-race phase in [block progression](fartlek-block-progression.md) and the distance-specific blocks left open in [race blocks](fartlek-race-blocks.md).
+Settled with the user on 2026-11-24. Built in six steps on 2026-11-24; the [build plan](#build-plan) below says how, and what was settled while building. It amends "no branches per distance" in [goal to plan](fartlek-goal-to-plan.md): the method stays one engine, but the last weeks before a long race now get race-pace sessions, because those sessions are what every marathon method has in common ([research](../research/marathon-specific-phase.md)). It answers the open pre-race phase in [block progression](fartlek-block-progression.md) and the distance-specific blocks left open in [race blocks](fartlek-race-blocks.md).
 
 ## Decided
 
