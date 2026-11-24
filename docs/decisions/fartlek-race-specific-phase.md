@@ -168,7 +168,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
 
 ### PRs
 
-1. **Catalogue and compiler.**
+1. **Catalogue and compiler.** *Built.* `compileBlueprint` also takes an optional `runDays`, and `meetsRequires` / `entryStep` are exported for PR 2 and 4.
    - Add `shared/blueprints.ts`, `PHASE_SCHEDULE`, and in `shared/racephase.ts`:
      ```ts
      RACE_PHASE = { weeks: 8, highKm: 60, warn: { weekKm: 40, longKm: 25 }, mpCapOfCs: 0.94, askPct: 0.03,
