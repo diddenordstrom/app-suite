@@ -39,6 +39,15 @@ Settled with the user on 2026-11-24. Not built yet; the [build plan](#build-plan
 - The blueprint format (shares, steps, requirements) and its exact progressions are first guesses to tune on real histories (`npm run scenarios -w apps/fartlek`).
 - The block and week planners do not read pain today; the injury stop (build plan step 5) adds it.
 
+## Still missing around the phase (todo)
+
+Noted on 2026-11-24 and not decided. The engine's year-round base (easy running, one threshold session, the long run, strides, 3:1 blocks) is sound for a runner at 40–70 km a week, but these gaps remain, most important first:
+
+1. **Recovery after the race.** This is the biggest gap. After a marathon the engine only refuses block suggestions for 14 days (`afterRaceDays`). The rule of thumb is 2–4 easy weeks after a marathon and 1–2 after a half, then a gentle return. Without it the engine can build again too soon. It is already open in [race blocks](fartlek-race-blocks.md).
+2. **The general build 16–8 weeks out.** Pfitzinger and Hansons run faster sessions there (VO2max, hills, 800–1000 m repeats) before marathon pace takes over. `intervals` exists as a workout type but is never generated. The effect for the marathon is moderate, but it gives variety and speed in reserve. It can use the same blueprints.
+3. **The threshold ladder runs out.** It ends at 4×10 min, so after a few blocks the threshold session stops progressing. Longer continuous tempo runs (20–30 min, or 6–10 km) would keep it progressing over a longer time.
+4. **A midweek medium-long run** (18–24 km). This is Pfitzinger's signature session, but it only matters from about 70 km a week. Lowest priority.
+
 ## Build plan
 
 Drafted 2026-11-24 from the code at that date, to be built by a later session. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. Each PR runs `npm run check`, has a gitmoji commit message, and puts every UI string through `t()` in both `en` and `sv`. When a step is built, mark it here, and when all are built, mark the page built.
