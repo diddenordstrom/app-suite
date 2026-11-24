@@ -1,6 +1,7 @@
 import { riegel } from "./bestefforts";
 import { daysBetween, type ISODate } from "./dates";
 import type { BlueprintId } from "./blueprints";
+import type { InjuryStop } from "./recovery";
 
 /*
  * The race-specific phase before an A-race marathon or half (docs/decisions/fartlek-race-specific-phase.md).
@@ -106,6 +107,8 @@ export interface PaceQuestion {
 export interface RacePaceView {
   raceId: number; name: string; date: ISODate; kind: "marathon" | "half"; wip: number;
   paces: PaceView; locked: boolean; lockedOn: ISODate | null; question: PaceQuestion | null;
+  /** Real injury now: the phase holds every step and offers a re-plan. */
+  injury: InjuryStop | null;
 }
 
 /* ---------- The phase in the planner ---------- */

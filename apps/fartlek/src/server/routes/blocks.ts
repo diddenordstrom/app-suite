@@ -2,6 +2,7 @@ import { and, eq, gt, gte, lte, sql } from "drizzle-orm";
 import type { Db } from "../db";
 import * as t from "../db/schema";
 import * as repo from "../repo";
+import { injuryNow, phaseRace } from "../racephase";
 import { ctxFor, loadSeries, loadsWithToday, openToday, stepRefs, weekSummariesWithHistory, type Ctx } from "../analysis";
 import { addDays, daysBetween, weekStartOf, type ISODate } from "../../shared/dates";
 import { COACH, project, suggest, type CoachInput } from "../../shared/coach";
@@ -271,13 +272,15 @@ export function blockRoutes(db: Db) {
     const ctx = ctxFor(db, uid(c));
     const blocks = repo.listBlocks(db, ctx.userId);
     const races = repo.listRaces(db, ctx.userId);
-    if (!blocks.length) return c.json({ today: ctx.today, blocks: [], races });
+    // Real injury while an A race's phase is on: the client offers a lighter re-plan (the runner chooses).
+    const injury = phaseRace(ctx, weekStartOf(ctx.today, ctx.settings.weekStart)) ? injuryNow(ctx) : null;
+    if (!blocks.length) return c.json({ today: ctx.today, blocks: [], races, injury });
     const from = blocks[0].startWeek, to = blocks.map(blockEnd).sort().at(-1)!;
     const s = weekSummariesWithHistory(ctx, from, to);
     const formOf = blockForm(ctx, from);
     return c.json({
       today: ctx.today,
-      races,
+      races, injury,
       blocks: blocks.map((b) => ({ ...b, summary: summarizeBlock(b, s.weeks, ctx.today, { zonesOf: s.zonesOf, history: s.history }), form: formOf(b) })),
     });
   });

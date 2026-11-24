@@ -7,6 +7,7 @@ import { addDays, daysBetween, type ISODate } from "../shared/dates";
 import { AUTO_WINDOW_DAYS, autoCriticalSpeed, bestCurve, chooseCs, predictRace, trainingContext } from "../shared/bestefforts";
 import { HALF_M, MARATHON_M } from "../shared/racemodels";
 import { RACE_PHASE, racePace, type PaceChoice, type PaceSource, type PaceView, type RacePaceResult, type RacePaceView } from "../shared/racephase";
+import { injuryStop, type InjuryStop } from "../shared/recovery";
 import { thresholdOn } from "../shared/threshold";
 import type { Race } from "../shared/types";
 
@@ -51,12 +52,15 @@ function inputs(ctx: Ctx, race: Race, choice: PaceChoice | null) {
   };
 }
 
+/** Real injury now (pain of level 8 or more, or level 5 or more on 3 days, in the last week); null when there is none. */
+export const injuryNow = (ctx: Ctx): InjuryStop | null => injuryStop(repo.listPain(ctx.db, ctx.userId, addDays(ctx.today, -RACE_PHASE.injury.windowDays)), ctx.today);
+
 const view = (r: RacePaceResult): PaceView => ({ mp: r.mp, hmp: r.hmp, source: r.source, overCap: r.overCap });
 
 /** The paces the phase uses for a race, and the question the runner must answer first, if any. */
 export function racePaceView(ctx: Ctx, ph: PhaseRace): RacePaceView {
   const { race } = ph;
-  const base = { raceId: race.id, name: race.name, date: race.date, kind: ph.kind, wip: ph.wip };
+  const base = { raceId: race.id, name: race.name, date: race.date, kind: ph.kind, wip: ph.wip, injury: injuryNow(ctx) };
   const prediction = racePace(inputs(ctx, race, null));
   const goalPaces = race.goalSeconds ? racePace(inputs(ctx, race, "goal")) : null;
   if (race.paceLockedOn == null) {

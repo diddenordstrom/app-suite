@@ -70,4 +70,31 @@ describe("race paces of the race phase", () => {
     expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "keep" }))).status).toBe(400);
     expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "prediction" }))).status).toBe(200);
   });
+
+  it("real injury, not a bad day, holds the phase: pain 8, or 5 on three days, and only while a phase is on", async () => {
+    at("2026-11-18");
+    const a = createApp(createDb(":memory:"), loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv));
+    await a.request("/api/settings");
+    const pain = (date: string, level: number) => a.request("/api/pain", json({ date, area: "knee", level }));
+    const injury = async () => ((await (await a.request("/api/blocks")).json()) as { injury: { reason: string; level: number } | null }).injury;
+    // Pain with no race ahead is not the phase's business.
+    await pain("2026-11-18", 9);
+    expect(await injury()).toBeNull();
+    await a.request("/api/races", json({ name: "Marathon", date: "2026-12-27", distanceKm: 42.195, priority: "A" }));
+    expect(await injury()).toMatchObject({ reason: "severe", level: 9 });
+    const next = (await (await a.request("/api/plan/next-week?weekStart=2026-11-23")).json()) as { racePace: { injury: { reason: string } | null }; seed: { phase: { injury: boolean } } };
+    expect(next.racePace.injury).toMatchObject({ reason: "severe" });
+    expect(next.seed.phase.injury).toBe(true);
+    // A week later the pain has gone out of the window; a 7 and two 5s on three days is not enough, three days of 5 is.
+    at("2026-11-26");
+    expect(await injury()).toBeNull();
+    await pain("2026-11-26", 7);
+    await pain("2026-11-25", 5);
+    expect(await injury()).toBeNull();
+    await pain("2026-11-24", 5);
+    await pain("2026-11-23", 5);
+    expect(await injury()).toMatchObject({ reason: "repeated" });
+    // Nothing is re-planned by itself.
+    expect(((await (await a.request("/api/plan?from=2026-11-23&to=2026-12-27")).json()) as { weeks: { sessions: unknown[] }[] }).weeks.flatMap((w) => w.sessions)).toEqual([]);
+  });
 });

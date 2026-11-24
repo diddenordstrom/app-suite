@@ -5,6 +5,7 @@ import { useFmt } from "./prefs";
 import { Button, ErrorText } from "./ui";
 import { weekNumber } from "@/shared/dates";
 import type { PaceView, PhaseWarnings, RacePaceView } from "@/shared/racephase";
+import type { InjuryStop } from "@/shared/recovery";
 
 /*
  * The paces of the race phase (docs/decisions/fartlek-race-specific-phase.md): a card that asks which pace to train
@@ -23,6 +24,7 @@ export function RacePaceNote({ view }: { view: RacePaceView }) {
     <div className="mb-3 space-y-1 text-sm text-muted-foreground">
       <p>{pace == null ? t("racepace.noPace") : t("racepace.note", { pace: fmt.pace(pace), source: sourceText(p) })}</p>
       {p.overCap && <p className="text-amber-600 dark:text-amber-400">{t("racepace.overCap")}</p>}
+      {view.injury && <p className="text-amber-600 dark:text-amber-400">{injuryText(view.injury)}</p>}
     </div>
   );
 }
@@ -62,6 +64,21 @@ export function PhaseWarningsNote({ warnings }: { warnings: PhaseWarnings | null
     <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
       {warnings.lowWeek && <p>{t("racepace.warn.lowWeek", { week: weekNumber(warnings.lowWeek.weekStart), dist: fmt.dist(warnings.lowWeek.km, 0) })}</p>}
       {warnings.shortLong && <p>{t("racepace.warn.shortLong", { dist: fmt.dist(warnings.shortLong.km, 0) })}</p>}
+    </div>
+  );
+}
+
+const injuryText = (i: InjuryStop) => (i.reason === "severe" ? t("racepace.injury.severe", { level: i.level }) : t("racepace.injury.repeated", { days: i.dates.length }));
+
+/** Real injury while the race phase is on: the progression is held, and a lighter re-plan is on offer (the runner chooses). */
+export function InjuryOffer({ injury, onReplan }: { injury: InjuryStop; onReplan: (() => void) | null }) {
+  return (
+    <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3">
+      <div className="min-w-0 flex-1 basis-80 space-y-0.5">
+        <p className="text-sm">{injuryText(injury)}</p>
+        <p className="text-xs text-muted-foreground">{t("racepace.injury.choice")}</p>
+      </div>
+      {onReplan && <Button variant="outline" onClick={onReplan}>{t("racepace.injury.replan")}</Button>}
     </div>
   );
 }

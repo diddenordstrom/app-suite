@@ -1,5 +1,6 @@
 import { addDays, daysBetween, range, type ISODate } from "./dates";
 import { FORM } from "./load";
+import { RACE_PHASE } from "./racephase";
 import type { Checkin, Msg, PainEntry, Wellness } from "./types";
 
 /* ---------- Pain (old 3.12) ---------- */
@@ -99,6 +100,22 @@ const round1 = (x: number) => Math.round(x * 10) / 10;
 /** Is `d` within the last `days` days, today included? */
 const within = (d: ISODate, today: ISODate, days: number) => d <= today && daysBetween(d, today) < days;
 const missing = (key: SignalKey, detail: Msg = { key: "detail.noData" }): Signal => ({ key, points: 0, value: null, partial: false, detail });
+
+/**
+ * Real injury, not daily form (docs/decisions/fartlek-race-specific-phase.md): pain at `RACE_PHASE.injury.level` or more
+ * in the last `windowDays` days (today included), or at `repeatLevel` or more on `repeatDays` different days of them. It
+ * holds the race phase's progression and offers a re-plan; a bad day on its own never does.
+ */
+export interface InjuryStop { reason: "severe" | "repeated"; /** The highest level that counted. */ level: number; dates: ISODate[] }
+export function injuryStop(pain: PainEntry[], today: ISODate): InjuryStop | null {
+  const L = RACE_PHASE.injury;
+  const recent = pain.filter((p) => within(p.date, today, L.windowDays));
+  const severe = recent.filter((p) => p.level >= L.level);
+  if (severe.length) return { reason: "severe", level: Math.max(...severe.map((p) => p.level)), dates: [...new Set(severe.map((p) => p.date))].sort() };
+  const some = recent.filter((p) => p.level >= L.repeatLevel);
+  const dates = [...new Set(some.map((p) => p.date))].sort();
+  return dates.length >= L.repeatDays ? { reason: "repeated", level: Math.max(...some.map((p) => p.level)), dates } : null;
+}
 
 /** Advice only, never edits the plan (D15), and doesn't look at the plan at all: is the body up for today's session? */
 export function readiness(i: ReadinessInput): Readiness {
