@@ -3,7 +3,7 @@ title: Fartlek plans in goal-driven blocks, re-simulated week by week
 summary: "Föreslå block" plans a 2–4 week block as a whole with a km goal, capped by proven tolerance instead of a flat +10 %; "Räkna om resten" re-plans the weeks not started toward the goal; no build block near a race or just after one
 type: decision
 status: accepted
-updated: 2026-11-13
+updated: 2026-11-24
 ---
 
 # Fartlek plans in goal-driven blocks, re-simulated week by week
@@ -39,6 +39,6 @@ Agreed with the user on 2026-11-13 after the week-47 review, mocked, then built 
 ## Open
 
 - Loose planned weeks outside blocks are not wrapped into blocks yet; "Föreslå veckan" stays for them.
-- A recovery block after a race is not generated. (Race blocks inside the 16 weeks are, since 2026-11-16: [race blocks](fartlek-race-blocks.md).)
+- A recovery block after a race is not generated. (Race blocks inside the 16 weeks are, since 2026-11-16: [race blocks](fartlek-race-blocks.md).) Decided 2026-11-24: the next block starts with recovery weeks, see [post-race recovery](fartlek-post-race-recovery.md).
 - Whether the block coach and the block engine merge into one (they judge the same deepest week but are separate code).
 - Whether the race window should depend on distance (a marathon build is longer than a 10 km one).

@@ -33,7 +33,7 @@ So the runner gets a base engine up to 16 weeks before an A race and then plans 
 - **A taper is not a lighter week.** A lighter week cuts to 70 % of volume and long run. A taper cuts further (first week about 70 % of the peak, race week about 50 %, the defaults already in `COACH.taper`), keeps frequency, and keeps a few short fast reps. The taper replaces the lighter week at the end of the plan; the two are never stacked.
 - **Taper depth is checked by the simulation, not fixed.** `evaluateBlock` already simulates the whole plan as a chain of weeks. The engine picks the taper depth inside the Bosquet range (total −40–60 %) so that form on race day lands in `COACH.race` (`FORM.fresh` to +20). A fixed 70 / 50 / 60 is the fallback, not the rule.
 - **Taper length stays two weeks for every distance for now.** `TAPER_WEEKS` is the single value; a distance-dependent taper comes with the distance work.
-- **After the race:** keep the existing 14-day refusal (`raceJustRun`), then base blocks again. A recovery block is not generated yet.
+- **After the race:** keep the existing 14-day refusal (`raceJustRun`), then base blocks again. A recovery block is not generated yet. *Superseded on 2026-11-24 by [post-race recovery](fartlek-post-race-recovery.md): the refusal goes and the next block starts with recovery weeks.*
 
 ## Settled after the spec (2026-11-16)
 
@@ -44,7 +44,7 @@ So the runner gets a base engine up to 16 weeks before an A race and then plans 
 - **The race day, not the weekday, places the race week's sessions**: the last short sharpening session 3–4 days before, rest or a short easy run the day before, only easy after it. The same rule fits a Saturday, a Sunday or a weekday race.
 - **A B race gets a mini-taper, no taper week before it**: the race week at about 70 %, Monday–Wednesday shorter than usual with one short sharpening session, easy until the race. An A race gets the full two-week taper.
 - **"Ändra block"'s race limit goes**: today it edits a race's weeks by hand and hides "Räkna om resten"; with race planning in place, re-planning those weeks is allowed.
-- **Recovery after the race** waits; when built, its length follows the distance (rule of thumb: about a week easy after 5–10 km, 1–2 after a half, 2–4 after a marathon).
+- **Recovery after the race** waits; when built, its length follows the distance (rule of thumb: about a week easy after 5–10 km, 1–2 after a half, 2–4 after a marathon). Decided on 2026-11-24 in [post-race recovery](fartlek-post-race-recovery.md): recovery weeks at the start of the next block after an A or B race of 10 km+, gated by days since the race.
 
 ## Built (2026-11-16)
 
@@ -80,4 +80,4 @@ So the runner gets a base engine up to 16 weeks before an A race and then plans 
 ## Open
 
 - How the base blocks more than 16 weeks out should end so the race plan starts on a block boundary (the in-phase block above handles it from 16 weeks in).
-- The recovery block after a race. Distance-specific race blocks are decided in [race-specific phase](fartlek-race-specific-phase.md).
+- Distance-specific race blocks are decided in [race-specific phase](fartlek-race-specific-phase.md); recovery after the race in [post-race recovery](fartlek-post-race-recovery.md) (decided, not built).
