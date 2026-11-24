@@ -3,6 +3,7 @@ import type { Db } from "../db";
 import * as t from "../db/schema";
 import * as repo from "../repo";
 import { afterResult, raceChecks, resultSuggestions } from "../races";
+import { lockRacePace, phaseRace, racePaceView } from "../racephase";
 import { ctxFor, stepMatchFor, stepRefs, weekSummaries, type Ctx } from "../analysis";
 import { stepSummary } from "../../shared/stepmatch";
 import { parseSteps, plannedFromSteps, readSteps, type WorkoutSteps } from "../../shared/steps";
@@ -200,6 +201,22 @@ export function planRoutes(db: Db) {
     db.update(t.races).set(raceFields(await body(c))).where(own(t.races, uid(c), id)).run();
     afterResult(ctxFor(db, uid(c)), id);
     return c.json(repo.listRaces(db, uid(c)));
+  });
+  /**
+   * The runner's answer to a pace question of the race phase: train for the "prediction" or the "goal", or "keep" the
+   * paces already locked (a B race was run). Returns the phase's view after the answer.
+   */
+  r.post("/races/:id/race-pace", async (c) => {
+    const ctx = ctxFor(db, uid(c));
+    const race = repo.listRaces(db, ctx.userId).find((x) => x.id === idParam(c.req.param("id")));
+    if (!race) return c.json({ error: "not found" }, 404);
+    const choice = oneOf((await body(c)).choice, ["prediction", "goal", "keep"] as const, "choice");
+    const ph = phaseRace(ctx, weekStartOf(ctx.today, ctx.settings.weekStart));
+    if (!ph || ph.race.id !== race.id) throw new BadRequest("the race is not in its race-specific phase");
+    if (choice === "goal" && !race.goalSeconds) throw new BadRequest("the race has no goal time");
+    if (choice === "keep" && race.paceLockedOn == null) throw new BadRequest("no paces are locked");
+    lockRacePace(ctx, race, choice === "keep" ? "keep" : choice);
+    return c.json(racePaceView(ctx, { ...ph, race: repo.listRaces(db, ctx.userId).find((x) => x.id === race.id)! }));
   });
   r.delete("/races/:id", (c) => {
     const id = idParam(c.req.param("id"));

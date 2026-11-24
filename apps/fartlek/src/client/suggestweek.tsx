@@ -11,6 +11,8 @@ import { FORM, formPct } from "@/shared/load";
 import { evaluate, growthBase, NEXT, type DaysAdvice, spikeMax, stepsKm, thresholdSteps, type SuggestItem, type SuggestType, type Suggestion, type Try, type WeekEval, type WeekSeed, type Why } from "@/shared/nextweek";
 import { stepsText, stridesOf, withStrides, type WorkoutSteps } from "@/shared/steps";
 import { StepsPanel } from "./sessionbuilder";
+import { RacePaceCard, RacePaceNote } from "./racepace";
+import type { RacePaceView } from "@/shared/racephase";
 import type { Settings, Workout } from "@/shared/types";
 
 /*
@@ -19,7 +21,7 @@ import type { Settings, Workout } from "@/shared/types";
  * change; nothing blocks "Use", the warnings only say what is off.
  */
 
-type Res = { weekStart: ISODate; ok: false; reason: "race" } | { weekStart: ISODate; ok: true; seed: WeekSeed; suggestion: Suggestion; replaces: Workout[]; advice: DaysAdvice | null };
+type Res = { weekStart: ISODate; ok: false; reason: "race" } | { weekStart: ISODate; ok: true; seed: WeekSeed; suggestion: Suggestion; replaces: Workout[]; advice: DaysAdvice | null; racePace: RacePaceView | null };
 /** What "Använd" wrote and what it replaced, for undo. */
 export interface Applied { ids: number[]; removed: Workout[] }
 
@@ -46,11 +48,13 @@ export function SuggestWeekDialog({ weekStart, light, onClose, onApplied }: { we
       <ErrorText>{error}</ErrorText>
       {(!ready) && !error && <Spinner className="text-muted-foreground" />}
       {ready && !data.ok && <p className="text-sm text-muted-foreground">{t("next.race")}</p>}
-      {ready && data.ok && phase === "sim" && <Simulation s={data.suggestion} onDone={() => setPhase(data.advice ? "days" : "edit")} />}
-      {ready && data.ok && phase === "days" && data.advice && (
+      {ready && data.ok && data.racePace?.question && <RacePaceCard view={data.racePace} onAnswered={() => setRev(rev + 1)} />}
+      {ready && data.ok && !data.racePace?.question && data.racePace && phase !== "sim" && <RacePaceNote view={data.racePace} />}
+      {ready && data.ok && !data.racePace?.question && phase === "sim" && <Simulation s={data.suggestion} onDone={() => setPhase(data.advice ? "days" : "edit")} />}
+      {ready && data.ok && !data.racePace?.question && phase === "days" && data.advice && (
         <MoreDays advice={data.advice} onAdded={() => { setRev(rev + 1); setPhase("sim"); }} onSkip={() => setPhase("edit")} />
       )}
-      {ready && data.ok && phase === "edit" && <Editor seed={data.seed} s={data.suggestion} replaces={data.replaces} onClose={onClose} onApplied={onApplied} />}
+      {ready && data.ok && !data.racePace?.question && phase === "edit" && <Editor seed={data.seed} s={data.suggestion} replaces={data.replaces} onClose={onClose} onApplied={onApplied} />}
     </Dialog>
   );
 }

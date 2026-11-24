@@ -12,6 +12,7 @@ import { plannedLoad, pmc } from "../../shared/load";
 import { asWeekSuggestion, suggestWeek, weekAsBlock } from "../../shared/blockplan";
 import { planRange } from "../../shared/planrange";
 import { daysAdvice, formHeavy, NEXT, rungBefore, type BackoffWhy, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
+import { phaseView, racePaceGate } from "../racephase";
 import { parseBlueprintTag } from "../../shared/blueprints";
 import { parseSteps, plannedFromSteps, stepsText, type WorkoutSteps } from "../../shared/steps";
 import { goalPace } from "../../shared/recovery";
@@ -211,7 +212,7 @@ export function nextWeekRoutes(db: Db) {
         (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; });
       return { suggestion, advice };
     });
-    return c.json({ weekStart, ok: true, seed, suggestion, replaces, advice });
+    return c.json({ weekStart, ok: true, seed, suggestion, replaces, advice, racePace: phaseView(ctx, weekStart, 1) });
   });
 
   r.post("/plan/next-week", async (c) => {
@@ -228,11 +229,15 @@ export function nextWeekRoutes(db: Db) {
     if (current.length !== shown.size || current.some((w) => !shown.has(w.id))) {
       return c.json({ error: "the week changed since the suggestion", conflict: "changed" }, 409);
     }
+    // A pace question of the race phase is answered first; with none locked, the proposal is locked by this write.
+    const gate = racePaceGate(ctx, weekStart, 1);
+    if (gate.blocked) return c.json({ error: "choose the race paces first", conflict: "racePace" }, 409);
     let ids: number[] = [];
     db.transaction((tx) => {
       for (const w of current) tx.delete(t.workouts).where(and(eq(t.workouts.userId, ctx.userId), eq(t.workouts.id, w.id))).run();
       ids = insertItems(tx, ctx, items);
     });
+    gate.done();
     return c.json({ ids, removed: current });
   });
 
