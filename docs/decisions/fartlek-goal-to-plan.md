@@ -3,7 +3,7 @@ title: Fartlek "Mål till plan": from a goal to a plan in two minutes, on Garmin
 summary: Plan for the first screen a new runner meets (race or time goal, date, run days), built on Garmin history: phases with the first block concrete, beside "Skapa block"
 type: decision
 status: accepted
-updated: 2026-11-20
+updated: 2026-11-24
 ---
 
 # Mål till plan
@@ -48,7 +48,7 @@ The point of Fartlek is placing the runner exactly in the build from real traini
 
 ## Deliberately later
 
-- **Not planned: distance-specific training** (5 km intervals vs marathon long runs). Every distance gets the same method (see above); this was out of scope in [race blocks](fartlek-race-blocks.md) and now stays out by choice, not for lack of time.
+- **Not planned: distance-specific training** (5 km intervals vs marathon long runs). Every distance gets the same method (see above); this was out of scope in [race blocks](fartlek-race-blocks.md) and now stays out by choice, not for lack of time. *Amended 2026-11-24:* the last 8 weeks before an A-race marathon or half get race-pace sessions from blueprints ([race-specific phase](fartlek-race-specific-phase.md)).
 - Strength content (an exercise library), audio cues, a native app.
 
 ## Open questions

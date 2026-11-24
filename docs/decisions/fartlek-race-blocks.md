@@ -3,7 +3,7 @@ title: Fartlek plans the weeks up to an A or B race backwards (peak builds, then
 summary: Spec for race-mode block planning: from the race date, two taper weeks, up to three build weeks before them, a lighter week ahead of those, and the base engine's guards kept; replaces the "race within 16 weeks refuses" rule
 type: decision
 status: accepted
-updated: 2026-11-16
+updated: 2026-11-24
 ---
 
 # Fartlek plans the weeks up to an A or B race backwards
@@ -80,4 +80,4 @@ So the runner gets a base engine up to 16 weeks before an A race and then plans 
 ## Open
 
 - How the base blocks more than 16 weeks out should end so the race plan starts on a block boundary (the in-phase block above handles it from 16 weeks in).
-- Distance-specific race blocks (session mix, long-run share by distance), and the recovery block after a race.
+- The recovery block after a race. Distance-specific race blocks are decided in [race-specific phase](fartlek-race-specific-phase.md).

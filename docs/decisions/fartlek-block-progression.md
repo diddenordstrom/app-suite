@@ -3,7 +3,7 @@ title: Fartlek blocks rise through the block and are scaled by bisection, and ex
 summary: Build weeks follow a ramp of the proven load (100 % → 105 % → 110 %) before a lighter week; a too-hard block is scaled down by bisection so it keeps rising; the long run is a share of the week that falls with volume; easy runs are at most half the long run; the tweakable values live in one table and the injury guards stay outside it; "add a run day" is asked only when a trial plan shows a free day helps
 type: decision
 status: accepted
-updated: 2026-11-14
+updated: 2026-11-24
 ---
 
 # Fartlek blocks rise through the block and are scaled by bisection, and extra run days are offered only when they change the plan
@@ -46,6 +46,6 @@ Built on 2026-11-14. An admin can override every number in `TUNE` per user, in "
 
 ## Open
 
-- A pre-race phase by distance (marathon 8 weeks, half 6, a bigger long-run share of about 50 %). The taper and the race blocks themselves are built ([race blocks](fartlek-race-blocks.md)); the distance-specific part waits.
+- ~~A pre-race phase by distance.~~ Decided 2026-11-24 in [race-specific phase](fartlek-race-specific-phase.md): 8 weeks for both marathon and half, long-run ceiling unchanged.
 - A setting for days the runner can't run (gym, swimming), so free days offered are real ones.
 - The share curve (floor 30 %, extra 20 %, scale 40 km) and the 8 % step are first guesses from rules of thumb (Daniels: 25 % or 150 min), not studies; tune them on real histories (`npm run scenarios -w apps/fartlek`).
