@@ -20,6 +20,7 @@ function entriesOf(sets: SetRowDb[]): GymEntry[] {
   for (const x of [...sets].sort((a, b) => a.position - b.position || a.setIndex - b.setIndex)) {
     let e = byPos.get(x.position);
     if (!e) { e = { exercise: x.exercise, slot: (x.slot as Pattern | null) ?? null, sets: [] }; byPos.set(x.position, e); }
+    if (x.note) e.note = x.note;
     e.sets.push({ kind: x.kind as SetKind, kg: x.kg, reps: x.reps, seconds: x.seconds });
   }
   return [...byPos.values()];
@@ -38,7 +39,7 @@ function setsFor(db: Db, userId: number, sessionIds: number[]): SetRowDb[] {
 /** Latest work sets per exercise, from every session (optionally leaving one out). */
 export function lastTimes(db: Db, userId: number, exceptSessionId?: number): Record<string, LastTime> {
   const rows = db.select({
-    sessionId: t.gymSets.sessionId, exercise: t.gymSets.exercise, kind: t.gymSets.kind, kg: t.gymSets.kg, reps: t.gymSets.reps, seconds: t.gymSets.seconds,
+    sessionId: t.gymSets.sessionId, exercise: t.gymSets.exercise, kind: t.gymSets.kind, kg: t.gymSets.kg, reps: t.gymSets.reps, seconds: t.gymSets.seconds, note: t.gymSets.note,
     date: t.gymSessions.date, startedAt: t.gymSessions.startedAt, position: t.gymSets.position, setIndex: t.gymSets.setIndex,
   }).from(t.gymSets).innerJoin(t.gymSessions, eq(t.gymSets.sessionId, t.gymSessions.id))
     .where(eq(t.gymSets.userId, userId)).all()
@@ -82,6 +83,7 @@ export function saveSession(db: Db, userId: number, s: GymSessionInput | (Import
     const values = s.entries.flatMap((e, position) => e.sets.map((x, setIndex) => ({
       userId, sessionId: row.id, position, setIndex, exercise: e.exercise.trim(), slot: e.slot, kind: x.kind,
       kg: x.kg, reps: x.reps == null ? null : Math.round(x.reps), seconds: x.seconds == null ? null : Math.round(x.seconds),
+      note: setIndex === 0 ? e.note?.trim() || null : null,
     })));
     for (let i = 0; i < values.length; i += 200) tx.insert(t.gymSets).values(values.slice(i, i + 200)).run();
     return { id: row.id, created: true };

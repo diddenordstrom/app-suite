@@ -73,6 +73,9 @@ export function parseBoltCsv(text: string): ParsedImport {
     let entry = s.entries.find((e) => e.exercise === id);
     if (!entry) { entry = { exercise: id, slot: null, sets: [] }; s.entries.push(entry); }
     entry.sets.push(set);
+    // Bolt repeats an exercise's note on its rows; the first one becomes the exercise's comment.
+    const note = c.notes >= 0 ? (r[c.notes] ?? "").trim().slice(0, 300) : "";
+    if (note && !entry.note) entry.note = note;
   });
   return { sessions: [...sessions.values()].sort((a, b) => a.date.localeCompare(b.date)), unknown: [...unknown].sort(), errors };
 }

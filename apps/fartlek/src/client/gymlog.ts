@@ -15,7 +15,7 @@ import type { ISODate } from "@/shared/dates";
 
 export interface DraftSet extends GymSet { done: boolean }
 /** `uid` keeps a row the same element while the list is reordered (drafts saved before it existed have none). */
-export interface DraftEntry { uid?: string; exercise: string; slot: Pattern | null; scheme: Scheme; sets: DraftSet[] }
+export interface DraftEntry { uid?: string; exercise: string; slot: Pattern | null; scheme: Scheme; note?: string; sets: DraftSet[] }
 export interface Draft {
   clientId: string;
   date: ISODate;
@@ -51,14 +51,27 @@ export const newClientId = () => `g${Date.now().toString(36)}${Math.random().toS
 /** A new entry for an exercise, its sets filled in from last time. */
 export function entryFor(id: string, slot: Pattern | null, scheme: Scheme | null, last: LastTime | undefined): DraftEntry {
   const sch = scheme ?? schemeFor(id);
-  return { uid: Math.random().toString(36).slice(2, 10), exercise: id, slot, scheme: sch, sets: suggestSets(id, sch, last).sets.map((s) => ({ ...s, done: false })) };
+  return { uid: Math.random().toString(36).slice(2, 10), exercise: id, slot, scheme: sch, note: last?.note ?? "", sets: suggestSets(id, sch, last).sets.map((s) => ({ ...s, done: false })) };
 }
 
 export function toInput(d: Draft): GymSessionInput {
   return {
     clientId: d.clientId, date: d.date, startedAt: d.startedAt, finishedAt: Date.now(), template: d.template, feel: d.feel, workoutId: d.workoutId,
-    entries: d.entries.map((e) => ({ exercise: e.exercise, slot: e.slot, sets: e.sets.filter((s) => s.done).map((s) => ({ kind: s.kind, kg: s.kg, reps: s.reps, seconds: s.seconds })) })).filter((e) => e.sets.length),
+    entries: d.entries.map((e) => ({ exercise: e.exercise, slot: e.slot, note: e.note?.trim() || null, sets: e.sets.filter((s) => s.done).map((s) => ({ kind: s.kind, kg: s.kg, reps: s.reps, seconds: s.seconds })) })).filter((e) => e.sets.length),
   };
+}
+
+/**
+ * Changes set `j` of an exercise. A new weight also goes to the sets below that are not done and still had
+ * the old weight, so 10 kg typed on the first set is suggested on the rest (one a runner set by hand stays).
+ */
+export function patchSet(sets: DraftSet[], j: number, patch: Partial<DraftSet>): DraftSet[] {
+  const old = sets[j]?.kg ?? null;
+  return sets.map((s, m) => {
+    if (m === j) return { ...s, ...patch };
+    if ("kg" in patch && m > j && !s.done && (s.kg ?? null) === old) return { ...s, kg: patch.kg ?? null };
+    return s;
+  });
 }
 
 /** The list with the item at `from` moved to `to`. */
