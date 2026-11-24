@@ -343,6 +343,8 @@ export const gymSessions = sqliteTable("gym_sessions", {
   /** The planned gym session it was started from. */
   workoutId: integer("workout_id"),
   source: text("source").notNull().default("fartlek"),
+  /** JSON `LayoutEntry[]`: the session as it stood when finished, skipped exercises included (shared/gymplan.ts). */
+  layout: text("layout"),
 }, (t) => [uniqueIndex("gym_sessions_client").on(t.userId, t.clientId), index("gym_sessions_user_date").on(t.userId, t.date)]);
 
 /** One set of a gym session. `exercise` is a catalogue id (shared/gym.ts) or `x:<name>`. */

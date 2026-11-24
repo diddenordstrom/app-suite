@@ -29,7 +29,19 @@ export interface GymSessionInput {
   feel: JointFeel | null;
   workoutId: number | null;
   entries: GymEntry[];
+  /** The session as it stood when finished, skipped exercises included; the next session on the template starts from it. */
+  layout?: LayoutEntry[] | null;
 }
+
+/**
+ * One exercise of a session's layout: what it was, in which slot, and how many sets of which range were
+ * planned. An exercise in the layout but with nothing ticked was skipped and comes back next time; one
+ * removed (or with every set removed) is not in it and stays gone.
+ */
+export interface LayoutEntry { exercise: string; slot: Pattern | null; scheme: Scheme }
+
+/** The latest finished layout of a template, for the session page. */
+export interface TemplateLayout { date: ISODate; entries: LayoutEntry[] }
 
 /** The work sets of the latest session with an exercise. */
 export interface LastTime { date: ISODate; sets: GymSet[]; note?: string }
@@ -114,6 +126,15 @@ export function templateEntries(id: TemplateId): { exercise: string; slot: Patte
   return TEMPLATES[id].slots.map((s) => ({ exercise: s.choices[0], slot: s.pattern, scheme: s.scheme }));
 }
 
+/**
+ * Where a session on a template starts: the runner's own version (the layout of the last finished session on
+ * it) when there is one, else the template as suggested. `own` says which, for "Your A" and the reset button.
+ */
+export function startEntries(id: TemplateId, layouts: Partial<Record<TemplateId, TemplateLayout>> | undefined, fresh = false): { own: TemplateLayout | null; entries: LayoutEntry[] } {
+  const own = fresh ? null : layouts?.[id] ?? null;
+  return own?.entries.length ? { own, entries: own.entries } : { own: null, entries: templateEntries(id) };
+}
+
 /** A set's weight times reps, the usual measure of volume; held and body-weight sets count nothing. */
 const volumeOf = (x: GymSet) => (x.kg ?? 0) * (x.reps ?? 0);
 export function volume(entries: GymEntry[]): number {
@@ -158,6 +179,15 @@ export function checkSession(s: unknown): string[] {
   if (x.feel != null && !JOINT_FEELS.includes(x.feel as JointFeel)) errs.push("feel must be none, some or pain");
   for (const k of ["startedAt", "finishedAt", "workoutId"] as const) if (x[k] != null && (typeof x[k] !== "number" || !Number.isFinite(x[k]))) errs.push(`${k} must be a number`);
   if (!Array.isArray(x.entries) || x.entries.length > 40) return [...errs, "entries must be a list of at most 40"];
+  if (x.layout != null) {
+    const okInt = (v: unknown, max: number) => Number.isInteger(v) && (v as number) >= 0 && (v as number) <= max;
+    if (!Array.isArray(x.layout) || x.layout.length > 40) errs.push("layout must be a list of at most 40");
+    else x.layout.forEach((e, i) => {
+      const en = e as Record<string, unknown>, sc = en?.scheme as Record<string, unknown> | undefined;
+      if (typeof en?.exercise !== "string" || !en.exercise.trim() || en.exercise.length > 80 || (en.slot != null && typeof en.slot !== "string")
+        || !sc || !okInt(sc.sets, 30) || !okInt(sc.low, 36000) || !okInt(sc.high, 36000)) errs.push(`layout ${i + 1} is invalid`);
+    });
+  }
   const okNum = (v: unknown, max: number) => v == null || (typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= max);
   x.entries.forEach((e, i) => {
     const en = e as Record<string, unknown>;
@@ -178,6 +208,8 @@ export interface GymDay {
   planned: Workout | null;
   suggested: TemplateChoice;
   last: Record<string, LastTime>;
+  /** The runner's own version of each template: the layout of the last finished session on it. */
+  layouts: Partial<Record<TemplateId, TemplateLayout>>;
   /** Sessions already logged that day. */
   logged: GymSummary[];
   /** Gym sessions done and planned in the last four weeks, for "7 of 8". */

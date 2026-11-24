@@ -619,6 +619,15 @@ describe("api", () => {
     const better = await (await a.request("/api/gym/sessions", json({ ...session, clientId: "test-session-2", date: "2026-11-30", entries: [{ exercise: "stiff_leg_deadlift", slot: "hinge", sets: [{ kind: "work", kg: 62.5, reps: 8, seconds: null }] }] }))).json() as { improvements: { exercise: string; kg: number }[] };
     expect(better.improvements).toEqual([expect.objectContaining({ exercise: "stiff_leg_deadlift", kg: 2.5 })]);
 
+    // The runner's own version of a template: the layout of the last finished session on it, skipped exercises included.
+    type Layouts = { layouts: Record<string, { date: string; entries: { exercise: string; slot: string | null; scheme: { sets: number } }[] }> };
+    expect((await (await a.request(`/api/gym?date=${day}`)).json() as Layouts).layouts).toEqual({});
+    const layout = [{ exercise: "single_leg_rdl", slot: "hinge", scheme: { sets: 4, low: 8, high: 10 } }, { exercise: "seated_calf_raise", slot: "calf", scheme: { sets: 3, low: 12, high: 15 } }];
+    expect((await a.request("/api/gym/sessions", json({ ...session, clientId: "test-session-3", date: "2026-12-02", layout }))).status).toBe(201);
+    expect((await a.request("/api/gym/sessions", json({ ...session, clientId: "test-session-4", layout: [{ exercise: "x", scheme: { sets: -1 } }] }))).status).toBe(400);
+    const own = (await (await a.request("/api/gym?date=2026-12-07")).json() as Layouts).layouts;
+    expect(own).toEqual({ A: { date: "2026-12-02", entries: layout } });
+
     const csv = 'Date,Workout Name,Exercise Name,Set,Weight,Reps,Distance,Duration,Level,Notes\n"2026-01-05 12:00:00","Upper","Bench Press (Barbell)","1","62,5","6","0","0","0",""\n"2026-01-05 12:00:00","Upper","Odd Machine","1","20","12","0","0","0",""';
     const imp = await (await a.request("/api/gym/import", json({ csv }))).json();
     expect(imp).toEqual({ added: 1, skipped: 0, sets: 2, unknown: ["Odd Machine"], rowErrors: 0 });
@@ -626,12 +635,12 @@ describe("api", () => {
     expect((await a.request("/api/gym/import", json({ csv: "a,b\n1,2" }))).status).toBe(400);
 
     const list = await (await a.request("/api/gym/sessions")).json() as { id: number; date: string; source: string; volume: number }[];
-    expect(list.map((s) => [s.date, s.source])).toEqual([["2026-11-30", "fartlek"], [day, "fartlek"], ["2026-01-05", "bolt"]]);
-    expect(list[1].volume).toBe(1200);
-    const full = await (await a.request(`/api/gym/sessions/${list[2].id}`)).json() as { entries: { exercise: string }[] };
+    expect(list.map((s) => [s.date, s.source])).toEqual([["2026-12-02", "fartlek"], ["2026-11-30", "fartlek"], [day, "fartlek"], ["2026-01-05", "bolt"]]);
+    expect(list[2].volume).toBe(1200);
+    const full = await (await a.request(`/api/gym/sessions/${list[3].id}`)).json() as { entries: { exercise: string }[] };
     expect(full.entries.map((e) => e.exercise)).toEqual(["bench_press", "x:Odd Machine"]);
-    await a.request(`/api/gym/sessions/${list[2].id}`, { method: "DELETE", headers: { origin: ORIGIN } });
-    expect((await a.request(`/api/gym/sessions/${list[2].id}`)).status).toBe(404);
+    await a.request(`/api/gym/sessions/${list[3].id}`, { method: "DELETE", headers: { origin: ORIGIN } });
+    expect((await a.request(`/api/gym/sessions/${list[3].id}`)).status).toBe(404);
   });
 
   it("deleting training data reaches every per-user table except the account's own", () => {

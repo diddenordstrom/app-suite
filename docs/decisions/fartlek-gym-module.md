@@ -3,7 +3,7 @@ title: Fartlek gym module: log sets in the gym, suggest sessions that suit the r
 summary: A gym logger inside Fartlek (sets with last time's weight, swap or add an exercise in one tap, offline, Bolt import) and a rule-based choice of template from the run week; why it lives in Fartlek, how it compares with the gym apps that exist, what is built and what is left
 type: note
 status: open
-updated: 2026-11-23
+updated: 2026-11-24
 ---
 
 # Fartlek gym module
@@ -75,6 +75,16 @@ Hardly any, and no model to train:
 - **Offline**: the session in progress is kept in the browser's `localStorage`, not IndexedDB as first planned (one small JSON object is all it needs). A finished session that can't be sent waits in an outbox and is sent when the gym pages open or the phone comes online.
 - **News and landing page**: its own "what's new" note (December 2026, not part of the November one) and a gym section with a FAQ entry on the [Fartlek landing page](fartlek-landing-page.md).
 - **Demo**: gym planned on Mondays and logged A/B sessions with weights that creep up.
+
+## Your own version of a template (settled 2026-11-24)
+
+Asked for by the user: a swap made in one session was gone the next time, because every session started from the template's first choices.
+
+- **The last finished session on a template is the new template.** Everything done to it sticks: swaps (before or during the session), order, exercises added, exercises removed, the number of sets. A session that is discarded doesn't count, and a free session leaves the templates alone.
+- **Skipped is not removed.** An exercise with no set ticked (time ran out) stays in the template; one removed with the cross, or whose sets were all removed, is gone. So the session stores its layout (`gym_sessions.layout`, JSON: exercise, slot, sets and rep range), not only the sets logged. Sessions from before this have no layout and start from the suggestion.
+- **No setup step first.** A blank routine builder is heavy before the runner has stood in the gym, and the suggested templates are the part that knows the run week. With this rule the templates become the runner's own after a few sessions anyway. Runna, for comparison, has fixed strength sessions that can't be edited.
+- **On the session page:** while the runner has no version of any template, one line says the session is a suggestion and that what they finish becomes their session next time. With their own version it says "Your version from 17 Nov · Reset to the suggestion"; after a reset, "Use your version" brings it back. The reset only changes that session; finishing it makes the suggestion the new version.
+- **Later, if missed:** editing the templates at rest under Plan, and routines of their own next to A/B/C/F ("Save as routine"). Own routines would need a tag (legs, upper, full body) to take part in the suggestion from the run week.
 
 ## Left to build
 

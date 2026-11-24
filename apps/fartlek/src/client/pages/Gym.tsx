@@ -7,7 +7,7 @@ import { fmtDay } from "../bits";
 import { locale, t, tm, type MsgKey } from "../i18n";
 import { clock, entryFor, matchesSearch, moveItem, exName, fmtKg, loadDraft, newClientId, patchSet, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
 import { alternatives, customId, exercise, EXERCISES, known, TEMPLATE_IDS, TEMPLATES, type TemplateId } from "@/shared/gym";
-import { suggestSets, templateEntries, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type LastTime } from "@/shared/gymplan";
+import { startEntries, suggestSets, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type LastTime } from "@/shared/gymplan";
 import { todayIn } from "@/shared/dates";
 
 /*
@@ -18,10 +18,13 @@ import { todayIn } from "@/shared/dates";
 
 interface Finished { input: GymSessionInput; improvements: Improvement[]; offline: boolean; last: Record<string, LastTime> }
 
-function build(day: GymDay, tpl: TemplateId): Draft {
+/** A new session on a template: the runner's own version of it when there is one (unless `fresh`), else the suggestion. */
+function build(day: GymDay, tpl: TemplateId, fresh = false): Draft {
+  const { own, entries } = startEntries(tpl, day.layouts, fresh);
   return {
     clientId: newClientId(), date: day.date, template: tpl, feel: null, workoutId: day.planned?.id ?? null, startedAt: null, lastSetAt: null,
-    entries: templateEntries(tpl).map((e) => entryFor(e.exercise, e.slot, e.scheme, day.last[e.exercise])),
+    ownFrom: own?.date ?? null,
+    entries: entries.map((e) => entryFor(e.exercise, e.slot, e.scheme, day.last[e.exercise])),
   };
 }
 
@@ -51,11 +54,12 @@ export function Gym() {
   if (!data || !draft) return <div className="grid place-items-center py-16"><Spinner /></div>;
   return draft.startedAt
     ? <Active day={data} draft={draft} setDraft={setDraft} onFinished={(f) => { setDraft(null); setFinished(f); window.scrollTo(0, 0); }} />
-    : <Setup day={data} draft={draft} setDraft={setDraft} rebuild={(tpl) => setDraft(build(data, tpl))} />;
+    : <Setup day={data} draft={draft} setDraft={setDraft} rebuild={(tpl, fresh) => setDraft(build(data, tpl, fresh))} />;
 }
 
-function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; setDraft: (d: Draft | null) => void; rebuild: (tpl: TemplateId) => void }) {
+function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; setDraft: (d: Draft | null) => void; rebuild: (tpl: TemplateId, fresh?: boolean) => void }) {
   const tpl = draft.template ?? "A";
+  const own = day.layouts?.[tpl];
   const [swapAt, setSwapAt] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const minutes = TEMPLATES[tpl].minutes;
@@ -94,6 +98,11 @@ function Setup({ day, draft, setDraft, rebuild }: { day: GymDay; draft: Draft; s
         options={TEMPLATE_IDS.map((v) => ({ value: v, label: t(`gym.templateShort.${v}`) }))}
         onChange={(v) => rebuild(v)} />
       {tpl === day.suggested.id && <p className="rounded-md bg-accent px-3 py-2.5 text-sm text-accent-foreground">{whyText(day.suggested.why)}</p>}
+      {draft.ownFrom
+        ? <p className="text-sm text-muted-foreground">{t("gym.own", { date: fmtDay(draft.ownFrom, { day: "numeric", month: "short" }) })} · <button type="button" className="underline" onClick={() => rebuild(tpl, true)}>{t("gym.reset")}</button></p>
+        : own
+          ? <p className="text-sm"><button type="button" className="text-muted-foreground underline" onClick={() => rebuild(tpl)}>{t("gym.useOwn")}</button></p>
+          : !Object.keys(day.layouts ?? {}).length && <p className="text-sm text-muted-foreground">{t("gym.ownHint")}</p>}
       {day.logged.length > 0 && <p className="text-sm text-muted-foreground">{t("gym.loggedToday")} <Link to="/gym/history" className="underline">{t("gym.history")}</Link></p>}
 
       <Card className="p-0">

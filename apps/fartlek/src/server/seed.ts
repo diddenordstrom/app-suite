@@ -100,7 +100,7 @@ export function seedDemoGym(db: Db, userId: number, today: ISODate) {
       const step = w + 4;
       saveSession(db, userId, {
         clientId: `demo-${date}-${tpl}`, date, startedAt: Date.parse(`${date}T16:00:00Z`), finishedAt: Date.parse(`${date}T16:45:00Z`),
-        template: tpl, feel: "none", workoutId: null,
+        template: tpl, feel: "none", workoutId: null, layout: templateEntries(tpl),
         entries: templateEntries(tpl).map((e) => {
           const ex = exercise(e.exercise);
           const kg = start[e.exercise] ? start[e.exercise] + Math.floor(step / 2) * ex.step : null;
