@@ -2,6 +2,9 @@ import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { createDb } from "./db";
+import { backOffNow } from "./racephase";
+import { ctxFor, weekSummaries } from "./analysis";
+import { parseSteps } from "../shared/steps";
 
 const ORIGIN = "http://localhost:5173";
 const json = (body: unknown, method = "POST") => ({ method, body: JSON.stringify(body), headers: { "content-type": "application/json", origin: ORIGIN } });
@@ -96,5 +99,41 @@ describe("race paces of the race phase", () => {
     expect(await injury()).toMatchObject({ reason: "repeated" });
     // Nothing is re-planned by itself.
     expect(((await (await a.request("/api/plan?from=2026-11-23&to=2026-12-27")).json()) as { weeks: { sessions: unknown[] }[] }).weeks.flatMap((w) => w.sessions)).toEqual([]);
+  });
+
+  it("backs the deep aim off for pain of level 5 in the last week, or when the paces of a key session were missed", async () => {
+    at("2026-11-25");
+    const db = createDb(":memory:");
+    const a = createApp(db, loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv));
+    await a.request("/api/settings");
+    const ctx = () => ctxFor(db, 1);
+    const sessions = () => weekSummaries(ctx(), "2026-11-16", "2026-11-24").flatMap((w) => w.sessions);
+    expect(backOffNow(ctx(), sessions())).toBe(false);
+    await a.request("/api/pain", json({ date: "2026-11-24", area: "knee", level: 4 }));
+    expect(backOffNow(ctx(), sessions())).toBe(false);
+    await a.request("/api/pain", json({ date: "2026-11-24", area: "knee", level: 5 }));
+    expect(backOffNow(ctx(), sessions())).toBe(true);
+    db.$client.prepare("delete from pain_entries").run();
+    expect(backOffNow(ctx(), sessions())).toBe(false);
+
+    // A tagged tempo session run at 330 s/km against a 300 s/km target: no rep in target. Run at 300: all in.
+    const steps = parseSteps("2 km easy, 3x1 km @5:00 / 1 min jog, 1 km easy", "metric").steps!;
+    const lap = (id: string, i: number, m: number, s: number, hr: number) =>
+      db.$client.prepare("insert into laps (user_id, activity_id, idx, distance_m, duration_s, avg_hr, start_s, trigger) values (1, ?, ?, ?, ?, ?, ?, 'manual')").run(id, i, m, s, hr, i * 100);
+    const run = (day: string, id: string, workSec: number) => {
+      db.$client.prepare("insert into workouts (user_id, date, type, distance_km, steps, blueprint) values (1, ?, 'threshold', 6, ?, 'mp-tempo#0')").run(day, JSON.stringify(steps));
+      db.$client.prepare(`insert into activities (user_id, id, name, type_key, start_time_local, date, distance_m, duration_s, avg_hr, is_run, detail_status)
+        values (1, ?, 'tempo', 'running', ?, ?, 6000, 2000, 150, 1, 'done')`).run(id, `${day} 07:00:00`, day);
+      const laps: [number, number][] = [[2000, 700], [1000, workSec], [200, 60], [1000, workSec], [200, 60], [1000, workSec], [1000, 350]];
+      laps.forEach(([m, s], i) => lap(id, i, m, s, 150));
+    };
+    run("2026-11-18", "x:slow", 330);
+    expect(backOffNow(ctx(), sessions())).toBe(true);
+    // The two latest tagged sessions count: a good one after it still leaves the slow one among the last two.
+    run("2026-11-21", "x:good", 300);
+    expect(backOffNow(ctx(), sessions())).toBe(true);
+    // A third, good one pushes the slow one out of the last two.
+    run("2026-11-23", "x:good2", 300);
+    expect(backOffNow(ctx(), sessions())).toBe(false);
   });
 });

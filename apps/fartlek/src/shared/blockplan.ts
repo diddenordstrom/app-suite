@@ -140,7 +140,7 @@ export interface BlockEval {
   race: { date: ISODate; form: number; formPct: number } | null;
 }
 
-export type BlockTryId = "read" | "start" | "volume" | "goal" | "lighter" | "tempo" | "second" | "cross" | "taper";
+export type BlockTryId = "read" | "start" | "volume" | "goal" | "lighter" | "tempo" | "second" | "cross" | "taper" | "deep";
 export interface BlockTry { id: BlockTryId; form: number | null; state: WeekState | "skip" | "info"; params: Record<string, number | string> }
 export interface BlockSuggestion {
   weeks: PlannedWeek[];
@@ -492,8 +492,43 @@ export function suggestBlock(seed: BlockSeed): BlockSuggestion {
     return { weeks, e, shape };
   };
   const finish = (id: BlockTryId, chosen: { weeks: PlannedWeek[]; e: BlockEval; shape: Shape }): BlockSuggestion => {
-    const r = taperFit(chosen);
-    return finished(id, r);
+    // The last two build weeks may aim deep inside the form band; if race-day form then leaves its window, the plain weeks stay.
+    const deep = deepen(chosen);
+    if (deep) {
+      tries.push({ id: "deep", form: deep.e.deepest?.form ?? null, state: deep.e.state, params: { km: deep.e.km, weeks: deep.e.weeks.map((w) => w.km).join(" → ") } });
+      const fit = taperFit(deep);
+      const f = fit.e.race?.form;
+      if (f != null && f >= COACH.race.low && f <= COACH.race.high) return finished(id, fit);
+    }
+    return finished(id, taperFit(chosen));
+  };
+  /**
+   * The race phase's deep aim (docs/decisions/fartlek-race-specific-phase.md): the two build weeks right before the first taper
+   * week get the largest km, between the planned km and the week's cap, whose deepest form is `RACE_PHASE.deepAim` or higher and is
+   * not too hard, so the taper has more to bring back. No guard changes: the cap, the floor and the ramp stay what they were. A
+   * week already deeper than the aim at its planned km is left alone. Null when nothing is deeper, or with back-off or injury.
+   */
+  const deepen = (r: { weeks: PlannedWeek[]; e: BlockEval; shape: Shape }) => {
+    const ph = seed.phase;
+    if (!ph || ph.backOff || ph.injury || seed.race?.priority !== "A") return null;
+    const taper = r.weeks.findIndex((w) => w.role === "taper");
+    const idx = [taper - 2, taper - 1].filter((i) => i >= 0 && r.weeks[i].role === "build");
+    if (taper < 0 || !idx.length) return null;
+    const kms = r.weeks.map((w) => (w.role === "build" || w.role === "lighter" ? w.targetKm : undefined)) as number[];
+    let changed = false;
+    for (const i of idx) {
+      const week = (km: number) => evalOf(seed, weeksFor(seed, r.shape, kms.map((k, j) => (j === i ? km : k)))).weeks[i];
+      const fits = (km: number) => { const w = week(km); return w.lowPct >= RACE_PHASE.deepAim && !tooHard(seed, w); };
+      let lo = kms[i], hi = r.weeks[i].cap;
+      if (hi <= lo || !fits(lo)) continue;
+      if (fits(hi)) lo = hi;
+      else for (let k = 0; k < BLOCK.fit.steps; k++) { const mid = (lo + hi) / 2; if (fits(mid)) lo = mid; else hi = mid; }
+      const km = floorHalf(lo);
+      if (km > kms[i]) { kms[i] = km; changed = true; }
+    }
+    if (!changed) return null;
+    const weeks = weeksFor(seed, r.shape, kms);
+    return { weeks, e: evalOf(seed, weeks), shape: r.shape };
   };
   /**
    * Before an A race: the taper's depth that lands race-day form in `COACH.race`, tried from shallow to deep on the

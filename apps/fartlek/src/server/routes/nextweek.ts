@@ -12,7 +12,7 @@ import { plannedLoad, pmc } from "../../shared/load";
 import { asWeekSuggestion, suggestWeek, weekAsBlock } from "../../shared/blockplan";
 import { planRange } from "../../shared/planrange";
 import { daysAdvice, formHeavy, NEXT, rungBefore, type BackoffWhy, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
-import { injuryNow, phaseRaceIn, phaseView, racePaceGate, racePaceView } from "../racephase";
+import { backOffNow, injuryNow, phaseRaceIn, phaseView, racePaceGate, racePaceView } from "../racephase";
 import { BLUEPRINTS, entryStep, parseBlueprintTag, stepFor } from "../../shared/blueprints";
 import type { PhaseSeed } from "../../shared/racephase";
 import { parseSteps, plannedFromSteps, stepsText, type WorkoutSteps } from "../../shared/steps";
@@ -119,7 +119,7 @@ export function keySessionSeed(ctx: Ctx, weekStart: ISODate, o: { weeks?: number
     const paces = racePaceView(ctx, ph).paces;
     const steps = Object.fromEntries(BLUEPRINTS.filter((b) => b.race === ph.kind)
       .map((b) => [b.id, stepFor(sessions, b.id, weekStart, entryStep(b, o.toleranceKm ?? 0))])) as PhaseSeed["steps"];
-    phase = { race: { date: ph.race.date, kind: ph.kind }, paces: { mp: paces.mp, hmp: paces.hmp }, paceSource: paces.source, steps, backOff: false, injury: injuryNow(ctx) != null };
+    phase = { race: { date: ph.race.date, kind: ph.kind }, paces: { mp: paces.mp, hmp: paces.hmp }, paceSource: paces.source, steps, backOff: backOffNow(ctx, sessions), injury: injuryNow(ctx) != null };
   }
   return { longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore), rung: rungBefore(weekStart, sessions, thr?.paceSecPerKm ?? null), tempoPace, ...(phase ? { phase } : {}) };
 }
