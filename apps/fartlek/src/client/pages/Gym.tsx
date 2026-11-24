@@ -5,7 +5,7 @@ import { useSettings } from "../prefs";
 import { Button, Card, CardTitle, Dialog, ErrorText, IconButton, Input, SegmentedControl, Spinner } from "../ui";
 import { fmtDay } from "../bits";
 import { locale, t, tm, type MsgKey } from "../i18n";
-import { clock, entryFor, matchesSearch, moveItem, exName, fmtKg, loadDraft, newClientId, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
+import { clock, entryFor, matchesSearch, moveItem, exName, fmtKg, loadDraft, newClientId, patchSet, patternName, planText, queue, saveDraft, setsText, toInput, useOutbox, type Draft, type DraftEntry } from "../gymlog";
 import { alternatives, customId, exercise, EXERCISES, known, TEMPLATE_IDS, TEMPLATES, type TemplateId } from "@/shared/gym";
 import { suggestSets, templateEntries, volume, workSetCount, type GymDay, type GymSessionInput, type Improvement, type LastTime } from "@/shared/gymplan";
 import { todayIn } from "@/shared/dates";
@@ -149,17 +149,18 @@ function useWakeLock() {
   }, []);
 }
 
+function firstOpenIn(entries: DraftEntry[]) {
+  for (let i = 0; i < entries.length; i++) { const j = entries[i].sets.findIndex((s) => !s.done); if (j >= 0) return { e: i, s: j }; }
+  return null;
+}
+
 function Active({ day, draft, setDraft, onFinished }: { day: GymDay; draft: Draft; setDraft: (d: Draft | null) => void; onFinished: (f: Finished) => void }) {
   const now = useNow();
   useWakeLock();
   const [swapAt, setSwapAt] = useState<number | null>(null);
   const [adding, setAdding] = useState(false);
   const [saving, setSaving] = useState(false);
-  const firstOpen = () => {
-    for (let i = 0; i < draft.entries.length; i++) { const j = draft.entries[i].sets.findIndex((s) => !s.done); if (j >= 0) return { e: i, s: j }; }
-    return null;
-  };
-  const [focus, setFocus] = useState<{ e: number; s: number } | null>(firstOpen);
+  const [focus, setFocus] = useState<{ e: number; s: number } | null>(() => firstOpenIn(draft.entries));
   const update = (i: number, f: (e: DraftEntry) => DraftEntry, extra: Partial<Draft> = {}) => setDraft({ ...draft, ...extra, entries: draft.entries.map((x, j) => (j === i ? f(x) : x)) });
   const doneCount = draft.entries.filter((e) => e.sets.length && e.sets.every((s) => s.done)).length;
   const current = Math.min(draft.entries.length, doneCount + 1);
@@ -207,7 +208,13 @@ function Active({ day, draft, setDraft, onFinished }: { day: GymDay; draft: Draf
       {draft.entries.map((e, i) => (
         <ExerciseCard key={e.uid ?? `${e.exercise}-${i}`} entry={e} last={day.last[e.exercise]} focus={focus?.e === i ? focus.s : null}
           onFocus={(s) => setFocus({ e: i, s })} onTick={(s) => tick(i, s)} onSwap={() => setSwapAt(i)}
-          onChange={(s, patch) => update(i, (x) => ({ ...x, sets: x.sets.map((v, m) => (m === s ? { ...v, ...patch } : v)) }))}
+          onChange={(s, patch) => update(i, (x) => ({ ...x, sets: patchSet(x.sets, s, patch) }))}
+          onNote={(note) => update(i, (x) => ({ ...x, note }))}
+          onRemoveSet={(s) => {
+            const entries = draft.entries.map((x, k) => (k === i ? { ...x, sets: x.sets.filter((_, m) => m !== s) } : x));
+            setDraft({ ...draft, entries });
+            setFocus(firstOpenIn(entries));
+          }}
           onAddSet={() => { update(i, (x) => ({ ...x, sets: [...x.sets, { ...(x.sets[x.sets.length - 1] ?? { kind: "work", kg: null, reps: x.scheme.low, seconds: null }), done: false }] })); setFocus({ e: i, s: e.sets.length }); }} />
       ))}
 
@@ -221,9 +228,9 @@ function Active({ day, draft, setDraft, onFinished }: { day: GymDay; draft: Draf
   );
 }
 
-export function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, onSwap, onAddSet }: {
+export function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, onSwap, onAddSet, onRemoveSet, onNote }: {
   entry: DraftEntry; last: LastTime | undefined; focus: number | null;
-  onFocus: (s: number) => void; onTick: (s: number) => void; onChange: (s: number, patch: Partial<DraftEntry["sets"][number]>) => void; onSwap: () => void; onAddSet: () => void;
+  onFocus: (s: number) => void; onTick: (s: number) => void; onChange: (s: number, patch: Partial<DraftEntry["sets"][number]>) => void; onSwap: () => void; onAddSet: () => void; onRemoveSet?: (s: number) => void; onNote?: (note: string) => void;
 }) {
   const ex = exercise(entry.exercise);
   const sug = useMemo(() => suggestSets(entry.exercise, entry.scheme, last), [entry.exercise, entry.scheme, last]);
@@ -249,10 +256,15 @@ export function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, on
       <p className="rounded-md bg-signature-soft px-3 py-1.5 text-sm text-signature-foreground">
         {last ? <>{t("gym.lastTime", { date: fmtDay(last.date, { day: "numeric", month: "short" }), sets: setsText(last.sets) })}{upText && <> · {upText}</>}</> : t("gym.never")}
       </p>
+      {onNote && <input aria-label={t("gym.note")} placeholder={t("gym.notePlaceholder")} value={entry.note ?? ""} maxLength={300} onChange={(e) => onNote(e.target.value)}
+        className="h-9 w-full rounded-md border border-border bg-transparent px-3 text-sm outline-none placeholder:text-muted-foreground focus:border-primary" />}
       <ol className="space-y-1.5">
         {entry.sets.map((s, j) => focus === j && !s.done ? (
           <li key={j} className="space-y-2 rounded-md bg-accent p-2.5 text-accent-foreground">
-            <div className="flex items-center justify-between text-sm"><span className="font-semibold">{t("gym.set")} {j + 1}</span><span>{t("gym.last")} {lastOf(j)}</span></div>
+            <div className="flex items-center justify-between text-sm"><span className="font-semibold">{t("gym.set")} {j + 1}</span>
+              <span className="flex items-center gap-1">{t("gym.last")} {lastOf(j)}
+                {onRemoveSet && <button type="button" aria-label={t("gym.removeSet", { n: j + 1 })} onClick={() => onRemoveSet(j)} className="-my-2 -mr-1.5 grid size-9 place-items-center rounded-md"><XIcon /></button>}
+              </span></div>
             <div className="flex items-center gap-2">
               {ex.load === "time" ? (
                 <Stepper what={t("gym.sec")} value={s.seconds} step={5} onChange={(v) => onChange(j, { seconds: v })} className="flex-1" />
@@ -272,6 +284,7 @@ export function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, on
               <span className="w-16 shrink-0 text-xs text-muted-foreground tabular-nums">{lastOf(j)}</span>
               <span className={`whitespace-nowrap tabular-nums ${s.done ? "font-semibold" : "text-muted-foreground"}`}>{amountOf(s)}</span>
             </button>
+            {onRemoveSet && <button type="button" aria-label={t("gym.removeSet", { n: j + 1 })} onClick={() => onRemoveSet(j)} className="grid size-8 place-items-center rounded-md text-muted-foreground"><XIcon /></button>}
             {s.done
               ? <button type="button" aria-label={t("gym.undoSet")} onClick={() => onTick(j)} className="grid size-10 place-items-center rounded-md bg-success text-background"><CheckIcon /></button>
               : <button type="button" aria-label={t("gym.doneSet")} onClick={() => onTick(j)} className="size-10 rounded-md border border-dashed border-border" />}

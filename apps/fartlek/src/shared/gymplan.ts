@@ -12,7 +12,8 @@ export const SET_KINDS = ["work", "warmup", "drop"] as const;
 export type SetKind = (typeof SET_KINDS)[number];
 
 export interface GymSet { kind: SetKind; kg: number | null; reps: number | null; seconds: number | null }
-export interface GymEntry { exercise: string; slot: Pattern | null; sets: GymSet[] }
+/** `note` is the runner's comment on the exercise ("left leg first"); it comes back next time. */
+export interface GymEntry { exercise: string; slot: Pattern | null; note?: string | null; sets: GymSet[] }
 
 /** A joint check-in before a session; not asked in the first version, kept so stored sessions can carry it. */
 export const JOINT_FEELS = ["none", "some", "pain"] as const;
@@ -31,12 +32,12 @@ export interface GymSessionInput {
 }
 
 /** The work sets of the latest session with an exercise. */
-export interface LastTime { date: ISODate; sets: GymSet[] }
+export interface LastTime { date: ISODate; sets: GymSet[]; note?: string }
 
 export const workSets = (sets: GymSet[]) => sets.filter((x) => x.kind === "work");
 
 /** One stored set, as the server reads it, for `latestByExercise`. */
-export interface SetRow { sessionId: number; date: ISODate; startedAt: number | null; exercise: string; kind: string; kg: number | null; reps: number | null; seconds: number | null }
+export interface SetRow { sessionId: number; date: ISODate; startedAt: number | null; exercise: string; kind: string; kg: number | null; reps: number | null; seconds: number | null; note?: string | null }
 
 /** For each exercise, the work sets of the latest session that had any. Rows in set order. */
 export function latestByExercise(rows: SetRow[]): Record<string, LastTime> {
@@ -50,8 +51,11 @@ export function latestByExercise(rows: SetRow[]): Record<string, LastTime> {
   const out: Record<string, LastTime> = {};
   for (const r of rows) {
     const b = best.get(r.exercise);
-    if (!b || r.sessionId !== b.sessionId || r.kind !== "work") continue;
-    (out[r.exercise] ??= { date: b.date, sets: [] }).sets.push({ kind: "work", kg: r.kg, reps: r.reps, seconds: r.seconds });
+    if (!b || r.sessionId !== b.sessionId) continue;
+    const l = (out[r.exercise] ??= { date: b.date, sets: [] });
+    // The note sits on the entry's first set, which may be a warm-up.
+    if (r.note) l.note = r.note;
+    if (r.kind === "work") l.sets.push({ kind: "work", kg: r.kg, reps: r.reps, seconds: r.seconds });
   }
   return out;
 }
@@ -158,6 +162,7 @@ export function checkSession(s: unknown): string[] {
   x.entries.forEach((e, i) => {
     const en = e as Record<string, unknown>;
     if (typeof en?.exercise !== "string" || !en.exercise.trim() || en.exercise.length > 80) errs.push(`entry ${i + 1}: exercise is required`);
+    if (en?.note != null && (typeof en.note !== "string" || en.note.length > 300)) errs.push(`entry ${i + 1}: note must be text of at most 300 characters`);
     if (!Array.isArray(en?.sets) || en.sets.length > 30) { errs.push(`entry ${i + 1}: sets must be a list of at most 30`); return; }
     (en.sets as Record<string, unknown>[]).forEach((st, j) => {
       if (!SET_KINDS.includes(st?.kind as SetKind) || !okNum(st.kg, 1000) || !okNum(st.reps, 1000) || !okNum(st.seconds, 36000)) errs.push(`entry ${i + 1}, set ${j + 1} is invalid`);
