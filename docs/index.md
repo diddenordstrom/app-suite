@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · decision · Fartlek race plan honours every race the runner entered ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race plan: a skeleton to an A marathon or half, with a build plan ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek post-race recovery weeks, with a build plan ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek gym: the last finished session is the new template ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · decision · Strides are not counted as judged reps ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Easy HR is a ceiling in plan vs actual ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · CI and CD stay in one workflow, renamed ci-cd ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · note · Fartlek: gaps in marathon training outside the race phase ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

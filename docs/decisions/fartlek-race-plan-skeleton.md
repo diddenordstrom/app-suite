@@ -144,11 +144,18 @@ export function phaseLengths(n: number, kind: RaceKind): PhaseLengths {
 ```ts
 export interface OtherRace { date: ISODate; distanceKm: number; name: string }
 /**
- * Which other races the plan honours: those before the plan race's peak block (wip >= 5 of the plan race) and at most one
- * per chunk (the first by date). The rest are `ignored` (shown, not planned as races).
+ * Every other race the runner entered between the plan start and the plan race is honoured; the engine never drops one.
+ * `close` lists those inside the plan race's peak block or taper (wip <= 4 of the plan race): still planned as races,
+ * but the UI warns (`rp.otherClose`). Several in one chunk are all honoured.
  */
-export function otherRacesIn(others: OtherRace[], raceDate: ISODate, chunkStarts: ISODate[]): { honoured: OtherRace[]; ignored: OtherRace[] };
+export function otherRacesIn(others: OtherRace[], raceDate: ISODate, chunkStarts: ISODate[]): { honoured: OtherRace[]; close: OtherRace[] };
 ```
+
+The runner decides which races to run, not the engine. Rules when other races collide with the plan:
+
+- A week holding an other race gets role `race` (B race-week km), unless it is a plan-race `taper` or `race` week: then the week keeps its taper role and km, and only the race day itself becomes the race session.
+- Recovery weeks after an other race never replace the plan race's `taper` or `race` weeks; where they overlap, the taper role wins. Elsewhere, two recovery spans that overlap merge into the longer one (per week the lower km share).
+- Two other races in one week: one `race` week; recovery from the longer race.
 
 **The projection:**
 
@@ -185,8 +192,8 @@ Algorithm, in order:
 
 1. `n0 = wipOf(planStart, race.date)`; `phases = phaseOfWeeks(phaseLengths(n0, kind))` (index 0 = planStart). `n = wipOf(firstWeek, race.date)`; `chunks = raceChunks(n)` (anchored at the race, so their edges agree with `raceChunks(n0)`). If `n < 1` the race is over: return only the recovery weeks (6.).
 2. Walk the chunks from `firstWeek`. For each chunk with start `cs`, length `c.weeks` and roles `c.roles`:
-   - Other race in it (`others.find((o) => o.date >= cs && o.date <= addDays(cs, c.weeks * 7 - 1))`): its week's role becomes `"race"`; the plan race keeps priority A only in its own week (step 2).
-   - Recovery after an honoured other race (in this chunk, else the latest one before `cs`): `roles = withRecovery(roles, recoveryRoles({ date: o.date, distanceKm: o.distanceKm, priority: "B", peakKm: null }, cs, c.weeks))`, and the same race as the seed's `recovery`. A race under 10 km gives no recovery weeks (`recoveryRow` is null).
+   - Other races in it (`others.filter((o) => o.date >= cs && o.date <= addDays(cs, c.weeks * 7 - 1))`, all of them): each one's week becomes `"race"` unless it is a plan-race `taper`/`race` week (then the role stays; see the collision rules above); the plan race keeps priority A only in its own week (step 2).
+   - Recovery after each honoured other race (in this chunk, or before `cs` with recovery reaching into it; overlaps merged per the collision rules, never over `taper`/`race` weeks): `roles = withRecovery(roles, recoveryRoles({ date: o.date, distanceKm: o.distanceKm, priority: "B", peakKm: null }, cs, c.weeks))`, and the same race as the seed's `recovery`. A race under 10 km gives no recovery weeks (`recoveryRow` is null).
    - Build a seed with only the fields `volumes()` reads: `{ startWeek: cs, weeks: c.weeks, kmBefore: win.slice(-3), tolerance, roles, anchorKm: anchor, firstWeekMax: null, race: holdsPlanRace ? { date: race.date, priority: "A" } : otherInChunk ? { date: o.date, priority: "B" } : null, recovery: thatOtherRace ? { date, distanceKm, priority: "B", peakKm: null } : null, backKm: first chunk && backDays > absorbDays ? floorHalf(RACE_PLAN.back.share * (storedKm ?? anchor)) : null }` plus zero/default values for the rest (`ctl: 0, atl: 0, past: [], runDays: [], longRunDay: 0, threshold: null, refs: {} as StepRefs, crossMin: 0, lighterLast: false, goalKm: null, buildWeeksDone: 0, hardBefore: false, longestKm, rung: 0, tempoPace: null`). Taper depth: none set, so `TUNE.taper` shares (the search runs only when the peak block is generated).
    - `vols = projectVolumes(seed)`; for each week `i` push `{ weekStart, wip, phase: phases[index of weekStart from planStart], role: vols[i].role, km: vols[i].km, longKm, chunk }`; `win.push(km)`.
    - After the chunk: `anchor = Math.max(anchor, ...build kms of the chunk)`; `peak = Math.max(peak, ...build kms)`.
@@ -352,7 +359,8 @@ export interface RaceRoad {
   /** Under RACE_PLAN.phases[kind].minWeeks at the plan's start; `suggestedSeconds` = today's prediction, rounded up to the minute, when slower than the goal (or no goal). */
   short: { minWeeks: number; goalSeconds: number | null; suggestedSeconds: number | null } | null;
   warnings: ("longShort")[];
-  others: { name: string; date: ISODate; honoured: boolean }[];
+  /** Every other race in the plan (all are honoured); `close` = inside the plan race's peak block or taper, shown with `rp.otherClose`. */
+  others: { name: string; date: ISODate; close: boolean }[];
   stored: boolean; computedOn: ISODate | null;
 }
 ```
@@ -374,7 +382,7 @@ export interface RaceRoad {
   - Title `rp.title`. One row of phase bands (`flex-grow` = weeks): name (`block.kind.base` / `.build` / `.specific` / `.taper` / `.recovery`, `rp.phase.race`), weeks (`tn("be.weeksN", n)`) and km (`fmt.dist`).
   - Under it one bar per week, height ∝ km (the biggest week = 100 %), the colours of `RacePlanView` per role (recovery `bg-signature opacity-30`). `done` grey, `block` and `now` solid with `now` ringed (`ring-1 ring-primary`), `skeleton` dashed outline with 60 % opacity. Each bar has a `title` and an `aria-label` (`rp.weekLabel`); a visually hidden table lists week, phase and km for screen readers.
   - Marks: the race flag on the race week, `rp.racePace` over `racePaceFrom`, `rp.longPeak` under `longPeak`'s week.
-  - Lines under the bars: `rp.now` (what is planned now), `rp.recovery`, each `others` entry (`rp.other` or `rp.otherIgnored`), `rp.longShort` when warned.
+  - Lines under the bars: `rp.now` (what is planned now), `rp.recovery`, each `others` entry (`rp.other`, plus `rp.otherClose` for one in `close`), `rp.longShort` when warned.
   - `short`: an amber note at the top, `rp.short`, then `rp.goal.lower` with a button `rp.goal.use` that `PUT`s the race with `goalSeconds: suggestedSeconds` (the other fields as they are) and refetches. Never applied without the tap.
   - Phone first: the week bars scroll sideways inside their box (`overflow-x-auto`, like `RacePlanView`) at most; the page never does. `compact` hides the lines and the hidden table and shows only bands and bars (for above the editor).
 - **`client/suggestblock.tsx`**:
@@ -399,7 +407,7 @@ export interface RaceRoad {
   | `rp.longShort` | The longest run reaches about {km}. Under 25 km goes with a slower finish. | Längsta passet når ungefär {km}. Under 25 km brukar ge en långsammare avslutning. |
   | `rp.recovery` | Then {weeks} of recovery, and ordinary blocks again. | Sen {weeks} återhämtning, och vanliga block igen. |
   | `rp.other` | {name} ({date}) is planned as a race: a lighter week and recovery after it. | {name} ({date}) planeras som lopp: en lättare vecka och återhämtning efter. |
-  | `rp.otherIgnored` | {name} ({date}) is too close to {race} to plan as a race. | {name} ({date}) ligger för nära {race} för att planeras som lopp. |
+  | `rp.otherClose` | {name} ({date}) is close to {race}; racing it hard can cost some of the peak form. | {name} ({date}) ligger nära {race}; springer du det hårt kan det kosta lite av formtoppen. |
   | `rp.short` | {weeks} to {race} is short for a {dist}; {min} is the usual minimum. Base and build are shortened, race pace and taper kept. | {weeks} till {race} är kort för en {dist}; {min} brukar vara minimum. Bas och uppbyggnad kortas, loppfart och nedtrappning blir kvar. |
   | `rp.goal.lower` | Aim for about {time} (today's prediction) rather than {goal}. | Sikta på ungefär {time} (dagens prognos) i stället för {goal}. |
   | `rp.goal.use` | Use {time} as the goal | Använd {time} som mål |
@@ -425,7 +433,7 @@ export interface RaceRoad {
 8. **Caps come from the actual tolerance:** `window [20, 20, 20]`, tolerance 45: the first week is ≤ `blockWeekCap([20, 20, 20], 45).cap`; with tolerance 30 instead it is ≤ `blockWeekCap([20, 20, 20], 30).cap` (smaller), whatever `anchorKm` is.
 9. **Anchor moves, caps don't:** with `anchorKm` 80 and tolerance 45 (golden window), the first build week is ≤ `blockWeekCap([40, 44, 38], 45).cap`, and every week is ≤ the cap its own window gives.
 10. **Back after a break:** `backDays: 10` and the first chunk's first build week is ≤ `floorHalf(0.7 × 45)` = 31.5; `backDays: 7` changes nothing.
-11. **Other races:** a B half on Sunday 2027-01-17 (wip 10) → that week's role `race` with km `floorHalf(prev × TUNE.taper.bRace)`, the next week `recovery` (B half row: 1 week, 85 % of the peak so far); a B race at wip 3 → `ignored`.
+11. **Other races:** a B half on Sunday 2027-01-17 (wip 10) → that week's role `race` with km `floorHalf(prev × TUNE.taper.bRace)`, the next week `recovery` (B half row: 1 week, 85 % of the peak so far); a B race at wip 3 → honoured and in `close`: the week keeps its `taper` role and km, the race day is the race session, no recovery weeks replace the taper; `rp.otherClose` is shown.
 12. **Half golden:** half, race 12 weeks out, `window [30, 34, 28]`, tolerance 35, `longestKm 14`: lengths 3/4/3/2; 2 recovery weeks at the end (`RECOVERY.A.half`); `longPeak.wip >= 4`; wip 3 `longKm <= longPeak.km`.
 13. **Over:** `firstWeek` after the race week → only recovery weeks.
 14. **Performance guard:** 200 projections of a 30-week marathon in under 1 s (loose on purpose; the point is that it builds no sessions).
@@ -467,7 +475,7 @@ Mark this page built and note what changed while building; mark the closed items
 - **Exactly at the window** (30 / 20 weeks): planned. 31 / 21: `farRace`.
 - **Two A races** (a half in spring, a marathon in autumn): the first one inside its window gets the plan; the second is beyond or is an `other` race of the first plan only if it is before it. When the first race's recovery ends, the next "Skapa block" starts the second plan, replacing future rows.
 - **The race moves later:** rows deleted; the next block starts a plan with a new `planStart` (a longer base). **Earlier:** the same, and a plan that is now short warns.
-- **A B race in the peak block or the taper:** not planned as a race (`otherIgnored`); it stays on the race list.
+- **A B race in the peak block or the taper:** still planned (the runner decides, not the engine): taper weeks keep their role and km, the race day becomes the race session, and the plan shows `rp.otherClose`.
 - **A missed week inside a block:** the adaptive engine's re-plan and Monday check-in handle it ([adaptive engine](fartlek-adaptive-engine.md)); the re-plan POST recomputes the skeleton after the block.
 - **A break across the block edge:** `breakBefore` counts actual days off up to yesterday; 8 days or more caps the next block's first build week at 70 % of what the plan had for it.
 - **Taper weeks of the skeleton** use `TUNE.taper`; the real taper depth is searched when the peak block is generated, so the road's taper km may change then.
