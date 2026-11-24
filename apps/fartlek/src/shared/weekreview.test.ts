@@ -9,7 +9,7 @@ const WEEK = "2026-11-09";
 
 let id = 0;
 function s(date: string, type: Workout["type"], km: number, outcome: SessionView["outcome"], over: Partial<Workout> = {}): SessionView {
-  const workout: Workout = { id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, ...over };
+  const workout: Workout = { id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null, ...over };
   return { workout, outcome, match: null, activity: null };
 }
 const week = (sessions: SessionView[], actualKm = 0) => ({ weekStart: WEEK, sessions, actualKm });

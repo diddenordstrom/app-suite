@@ -12,6 +12,7 @@ import { plannedLoad, pmc } from "../../shared/load";
 import { asWeekSuggestion, suggestWeek, weekAsBlock } from "../../shared/blockplan";
 import { planRange } from "../../shared/planrange";
 import { daysAdvice, formHeavy, NEXT, rungBefore, type BackoffWhy, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
+import { parseBlueprintTag } from "../../shared/blueprints";
 import { parseSteps, plannedFromSteps, stepsText, type WorkoutSteps } from "../../shared/steps";
 import { goalPace } from "../../shared/recovery";
 import { thresholdOn } from "../../shared/threshold";
@@ -127,6 +128,13 @@ function stepsParam(v: unknown, ctx: Ctx): WorkoutSteps {
   return parsed.steps;
 }
 
+/** A blueprint tag from the client: absent or null is none; anything but a known tag is refused. */
+function blueprintOf(v: unknown, label: string): { blueprint?: string } {
+  if (v == null) return {};
+  if (typeof v !== "string" || !parseBlueprintTag(v)) throw new BadRequest(`${label} must be a blueprint tag`);
+  return { blueprint: v };
+}
+
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /** A week's suggested sessions from the client: 1–14, each inside the week, threshold steps read back by the parser. */
@@ -140,7 +148,7 @@ export function parseItems(ctx: Ctx, raw: unknown, weekStart: ISODate, label = "
     const type = oneOf(x.type, TYPES, `${label}[${i}].type`);
     if (type === "cross") return { date: d, type, km: 0, durationMin: num(x.durationMin, `${label}[${i}].durationMin`, 5, 600), steps: null };
     const steps = x.steps != null ? stepsParam(x.steps, ctx) : null;
-    return { date: d, type, km: num(x.km, `${label}[${i}].km`, 0.5, 200), durationMin: null, steps };
+    return { date: d, type, km: num(x.km, `${label}[${i}].km`, 0.5, 200), durationMin: null, steps, ...blueprintOf(x.blueprint, `${label}[${i}].blueprint`) };
   });
 }
 
@@ -149,7 +157,7 @@ export function insertItems(tx: Tx, ctx: Ctx, items: SuggestItem[]): number[] {
   return items.map((it) => {
     const amount = it.steps ? plannedFromSteps(it.steps, stepRefs(ctx, it.date)) : { distanceKm: it.type === "cross" ? null : it.km, durationMin: it.durationMin };
     return tx.insert(t.workouts).values({
-      userId: ctx.userId, date: it.date, type: it.type, ...amount, zone2: false, steps: it.steps ? JSON.stringify(it.steps) : null,
+      userId: ctx.userId, date: it.date, type: it.type, ...amount, zone2: false, steps: it.steps ? JSON.stringify(it.steps) : null, blueprint: it.blueprint ?? null,
     }).returning().get().id;
   });
 }
@@ -168,7 +176,7 @@ export function restoreRows(ctx: Ctx, raw: unknown, from: ISODate, to: ISODate) 
       distanceKm: optNum(w.distanceKm, `restore[${i}].distanceKm`, 0, 500), durationMin: optNum(w.durationMin, `restore[${i}].durationMin`, 0, 1440),
       zone2: w.zone2 === true, notes: optStr(w.notes, `restore[${i}].notes`, 2000),
       status: oneOf(w.status ?? "planned", WORKOUT_STATUSES, `restore[${i}].status`), skipReason: optStr(w.skipReason, `restore[${i}].skipReason`, 60),
-      steps: w.steps ? JSON.stringify(stepsParam(w.steps, ctx)) : null,
+      steps: w.steps ? JSON.stringify(stepsParam(w.steps, ctx)) : null, blueprint: blueprintOf(w.blueprint, `restore[${i}].blueprint`).blueprint ?? null,
     };
   });
 }

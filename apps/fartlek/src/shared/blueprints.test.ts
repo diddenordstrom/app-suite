@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { BLUEPRINTS, PHASE_SCHEDULE, blueprintById, compileBlueprint, entryStep, type CompileCtx } from "./blueprints";
+import type { SessionView } from "./compliance";
+import { BLUEPRINTS, PHASE_SCHEDULE, blueprintById, blueprintTag, compileBlueprint, entryStep, parseBlueprintTag, stepFor, type CompileCtx } from "./blueprints";
+import { rungBefore, thresholdSteps } from "./nextweek";
 import { parseSteps, stepsText, type StepTarget } from "./steps";
 
 const paces = { mp: 300, hmp: 285 };
@@ -119,5 +121,52 @@ describe("compileBlueprint", () => {
     expect(targets(mp)[1]).toEqual({ kind: "zone", zone: 3 });
     const hmp = compileBlueprint(blueprintById("hmp-repeats"), 0, ctx({ paces: none, longKm: undefined }))!;
     expect(targets(hmp)[1]).toEqual({ kind: "zone", zone: 4 });
+  });
+});
+
+const sess = (date: string, blueprint: string | null, outcome: SessionView["outcome"], type: "long" | "threshold" = "long"): SessionView => ({
+  workout: { id: 1, date, type, distanceKm: 20, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null,
+    manualUnlinked: false, steps: type === "threshold" ? thresholdSteps(3, 8) : null, blueprint },
+  outcome, match: null, activity: null,
+});
+
+describe("blueprint tags", () => {
+  it("round-trips and refuses unknown ids and steps outside the progression", () => {
+    expect(parseBlueprintTag(blueprintTag("mp-long", 2))).toEqual({ id: "mp-long", step: 2, held: false });
+    expect(parseBlueprintTag(blueprintTag("mp-tempo", 3, true))).toEqual({ id: "mp-tempo", step: 3, held: true });
+    expect(parseBlueprintTag("nope#1")).toBeNull();
+    expect(parseBlueprintTag("mp-long#9")).toBeNull();
+    expect(parseBlueprintTag("mp-long")).toBeNull();
+  });
+});
+
+describe("stepFor", () => {
+  const before = "2026-11-23";
+  it("starts at the entry step with nothing before", () => {
+    expect(stepFor([], "mp-long", before, 1)).toBe(1);
+    expect(stepFor([sess("2026-11-10", "fast-finish-long#2", "done")], "mp-long", before, 1)).toBe(1);
+  });
+  it("done, short, to do and upcoming step on, up to the last step", () => {
+    for (const o of ["done", "short", "to_do", "upcoming"] as const) expect(stepFor([sess("2026-11-10", "mp-long#1", o)], "mp-long", before, 0)).toBe(2);
+    expect(stepFor([sess("2026-11-10", "mp-long#4", "done")], "mp-long", before, 0)).toBe(4);
+  });
+  it("missed, skipped and dropped take the same step again, never stacked", () => {
+    for (const o of ["missed", "skipped", "dropped"] as const) expect(stepFor([sess("2026-11-10", "mp-long#2", o)], "mp-long", before, 0)).toBe(2);
+    expect(stepFor([sess("2026-11-03", "mp-long#1", "done"), sess("2026-11-10", "mp-long#2", "missed")], "mp-long", before, 0)).toBe(2);
+  });
+  it("a held session never advances", () => {
+    expect(stepFor([sess("2026-11-10", "mp-tempo#3h", "done", "threshold")], "mp-tempo", before, 0)).toBe(3);
+  });
+  it("ignores sessions on or after the week", () => {
+    expect(stepFor([sess("2026-11-23", "mp-long#3", "done")], "mp-long", before, 0)).toBe(0);
+  });
+});
+
+describe("rungBefore and tagged sessions", () => {
+  it("a race-phase session planned as threshold does not reset the ladder", () => {
+    const ladder = sess("2026-11-03", null, "done", "threshold");
+    const mp = sess("2026-11-10", "mp-tempo#1", "done", "threshold");
+    expect(rungBefore("2026-11-23", [ladder, mp], 255)).toBe(rungBefore("2026-11-23", [ladder], 255));
+    expect(rungBefore("2026-11-23", [ladder, mp], 255)).toBeGreaterThan(0);
   });
 });

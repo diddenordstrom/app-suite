@@ -5,7 +5,7 @@ import { parseBoltCsv, parseCsv } from "./boltcsv";
 import type { Workout } from "./types";
 
 const w = (reps: number, kg: number | null = null): GymSet => ({ kind: "work", kg, reps, seconds: null });
-const plan = (date: string, type: Workout["type"]): Workout => ({ id: 1, date, type, distanceKm: 8, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null });
+const plan = (date: string, type: Workout["type"]): Workout => ({ id: 1, date, type, distanceKm: 8, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null });
 
 describe("gym catalogue", () => {
   it("has unique ids and aliases, valid patterns, and templates built from it", () => {

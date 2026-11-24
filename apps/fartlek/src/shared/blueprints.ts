@@ -1,3 +1,5 @@
+import type { SessionView } from "./compliance";
+import type { ISODate } from "./dates";
 import { RACE_PHASE, type RacePaces } from "./racephase";
 import type { StepDef, StepItem, StepTarget, WorkoutSteps } from "./steps";
 
@@ -246,4 +248,38 @@ export function compileBlueprint(bp: Blueprint, step: number, c: CompileCtx): { 
     if (!used) return null;
   }
   return { steps: wrap([easyStep(warm), ...workItems(used, c.paces), easyStep(cool)]), step: at };
+}
+
+/* ---------- Tags and progression ---------- */
+
+/**
+ * The tag a planned session carries (`workouts.blueprint`): `mp-long#2` is blueprint `mp-long` at step 2; a trailing
+ * `h` marks a held session in a lighter or taper week, which never advances the progression.
+ */
+export const blueprintTag = (id: BlueprintId, step: number, held = false): string => `${id}#${step}${held ? "h" : ""}`;
+
+export function parseBlueprintTag(tag: string): { id: BlueprintId; step: number; held: boolean } | null {
+  const m = /^([a-z-]+)#(\d{1,2})(h?)$/.exec(tag);
+  const bp = m && BLUEPRINTS.find((b) => b.id === m[1]);
+  if (!m || !bp || Number(m[2]) >= bp.steps.length) return null;
+  return { id: bp.id, step: Number(m[2]), held: m[3] === "h" };
+}
+
+/** Outcomes of a session that count as run, or still to run: a missed, skipped or dropped one doesn't. */
+const RAN = new Set<SessionView["outcome"]>(["done", "short", "to_do", "upcoming"]);
+
+/**
+ * The step of blueprint `id` for a session in the week starting `before`: derived from the last session with that
+ * tag before the week, the way `rungBefore` derives the threshold rung. A session that was run (or is still to run)
+ * steps on, up to the last step; a missed, skipped or dropped one, or a held one, leaves the step where it was.
+ * With no earlier session, `entry`.
+ */
+export function stepFor(sessions: SessionView[], id: BlueprintId, before: ISODate, entry: number): number {
+  const last = sessions
+    .map((s) => ({ s, tag: s.workout.blueprint ? parseBlueprintTag(s.workout.blueprint) : null }))
+    .filter((x) => x.tag?.id === id && x.s.workout.date < before)
+    .sort((a, b) => b.s.workout.date.localeCompare(a.s.workout.date))[0];
+  if (!last?.tag) return entry;
+  const advance = RAN.has(last.s.outcome) && !last.tag.held;
+  return Math.min(last.tag.step + (advance ? 1 : 0), blueprintById(id).steps.length - 1);
 }

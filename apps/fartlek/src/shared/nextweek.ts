@@ -112,11 +112,11 @@ const RAN = new Set<SessionView["outcome"]>(["done", "short", "to_do", "upcoming
 /**
  * The threshold rung for a session on `date`: the one after the last threshold session before it that was
  * run (matched to an activity) or is still to run. A missed one leaves the rung where it was, like a missed
- * long run leaves the long run's step.
+ * long run leaves the long run's step. Race-phase sessions (tagged, planned as threshold) are not the ladder.
  */
 export function rungBefore(date: ISODate, sessions: SessionView[], pace: number | null): number {
   const last = sessions
-    .filter((s) => s.workout.type === "threshold" && s.workout.steps && s.workout.date < date && RAN.has(s.outcome))
+    .filter((s) => s.workout.type === "threshold" && !s.workout.blueprint && s.workout.steps && s.workout.date < date && RAN.has(s.outcome))
     .sort((a, b) => b.workout.date.localeCompare(a.workout.date))[0];
   return last ? nextRung(last.workout.steps, pace) : 0;
 }
@@ -155,7 +155,11 @@ export function longRun(longestKm: number, lighter: boolean, easyPace: number | 
 }
 
 export type SuggestType = "easy" | "long" | "threshold" | "cross";
-export interface SuggestItem { date: ISODate; type: SuggestType; km: number; durationMin: number | null; steps: WorkoutSteps | null }
+export interface SuggestItem {
+  date: ISODate; type: SuggestType; km: number; durationMin: number | null; steps: WorkoutSteps | null;
+  /** Race-phase blueprint tag (shared/blueprints.ts), kept through writing, undo and copying. */
+  blueprint?: string | null;
+}
 
 export interface PastWeek { weekStart: ISODate; km: number; ctl: number; atl: number }
 export interface WeekSeed {
