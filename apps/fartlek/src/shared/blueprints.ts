@@ -321,11 +321,11 @@ export function phaseWeekFor(phase: PhaseSeed, weekStart: ISODate, runDays: numb
 /** A phase session compiled: the blueprint planned (the fallback when `requires` failed), its step and steps. */
 export interface PhaseSession { id: BlueprintId; step: number; steps: WorkoutSteps; held: boolean }
 
-/** A slot as steps: the blueprint, or its fallback when `requires` fail; null when nothing fits (a plain session then). */
-export function compileSlot(slot: PhaseSlot, stepOf: (id: BlueprintId) => number, c: CompileCtx): PhaseSession | null {
+/** A slot as steps: the blueprint, or its fallback when `requires` fail; null when nothing fits (a plain session then). `forceHeld` tags it held without making it smaller (an injury holds the step). */
+export function compileSlot(slot: PhaseSlot, stepOf: (id: BlueprintId) => number, c: CompileCtx, forceHeld = false): PhaseSession | null {
   for (let id: BlueprintId | null = slot.id; id; id = blueprintById(id).fallback) {
     const r = compileBlueprint(blueprintById(id), stepOf(id), { ...c, ...(slot.held != null ? { hold: slot.held } : {}) });
-    if (r) return { id, step: r.step, steps: r.steps, held: slot.held != null };
+    if (r) return { id, step: r.step, steps: r.steps, held: forceHeld || slot.held != null };
   }
   return null;
 }

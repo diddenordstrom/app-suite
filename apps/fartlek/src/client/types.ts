@@ -1,4 +1,5 @@
 import type { Feel, KeyFix, LowFormPlan, MovePlan, TooHard } from "@/shared/today";
+import type { InjuryStop } from "@/shared/recovery";
 import type { CatchUp, WeekReview } from "@/shared/weekreview";
 import type { MonthStatus, SessionView, WeekStatus, WeekSummary } from "@/shared/compliance";
 import type { ActivityLoad, PmcPoint } from "@/shared/load";
@@ -59,7 +60,7 @@ export interface PlanData { today: string; weeks: WeekSummary[]; races: Race[]; 
 /** Form (fitness − fatigue) into the block and out of it, or today while it runs; null before it starts. */
 export interface FormPoint { value: number; pct: number }
 export type BlockWithSummary = Block & { summary: BlockSummary; form: { start: FormPoint | null; end: FormPoint | null; running: boolean } | null };
-export interface BlocksData { today: string; blocks: BlockWithSummary[]; races: Race[] }
+export interface BlocksData { today: string; blocks: BlockWithSummary[]; races: Race[]; /** Real injury while an A race's phase is on (shared/recovery.ts `injuryStop`); null otherwise. */ injury: InjuryStop | null }
 export interface BlockPreview {
   weeks: WeekPreview[];
   errors: Msg[];

@@ -11,13 +11,13 @@ import type { StepRefs } from "./steps";
 const REFS: StepRefs = { thresholdPace: 255, thresholdHr: 169, easyLow: 135, easyHigh: 150, zones: null, easyPace: 330 };
 const MONDAY = "2026-11-16";
 
-const phase = (race: string, kind: "marathon" | "half" = "marathon"): PhaseSeed => ({
+const phase = (race: string, kind: "marathon" | "half" = "marathon", over: Partial<PhaseSeed> = {}, step = 0): PhaseSeed => ({
   race: { date: race, kind }, paces: { mp: 300, hmp: 285 }, paceSource: "prediction", backOff: false, injury: false,
-  steps: Object.fromEntries(BLUEPRINTS.map((b) => [b.id, 0])) as PhaseSeed["steps"],
+  steps: Object.fromEntries(BLUEPRINTS.map((b) => [b.id, step])) as PhaseSeed["steps"], ...over,
 });
 
 /** A runner at `km` a week, an A race `weeks` weeks out (the race on the given weekday of the last week, Monday = 0). */
-function plan(km: number, o: { weeks?: number; raceDay?: number; kind?: "marathon" | "half"; runDays?: number[] } = {}) {
+function plan(km: number, o: { weeks?: number; raceDay?: number; kind?: "marathon" | "half"; runDays?: number[]; injury?: boolean; step?: number } = {}) {
   const weeks = o.weeks ?? 8;
   const race = addDays(MONDAY, (weeks - 1) * 7 + (o.raceDay ?? 5));
   const seed: BlockSeed = {
@@ -27,7 +27,7 @@ function plan(km: number, o: { weeks?: number; raceDay?: number; kind?: "maratho
     threshold: { id: 1, effectiveDate: "2026-01-01", paceSecPerKm: 255, hr: 169 }, refs: REFS,
     crossMin: 0, lighterLast: false, goalKm: null, buildWeeksDone: 0, hardBefore: false,
     longestKm: Math.round(km * 0.34), rung: 0, tempoPace: 275,
-    roles: raceRoles(weeks, "A"), race: { date: race, priority: "A" }, phase: phase(race, o.kind),
+    roles: raceRoles(weeks, "A"), race: { date: race, priority: "A" }, phase: phase(race, o.kind, { injury: !!o.injury }, o.step ?? 0),
   };
   return { seed, race, s: suggestBlock(seed) };
 }
@@ -128,5 +128,21 @@ describe("the race phase in the plan", () => {
     const off = suggestBlock({ ...seed, phase: undefined });
     expect(off.weeks.flatMap((w) => w.items).some((it) => it.blueprint)).toBe(false);
     expect(off.phaseWarnings).toBeNull();
+  });
+
+  it("holds every step in an injury and changes nothing but those steps", () => {
+    const calm = plan(45, { step: 1 }), hurt = plan(45, { step: 1, injury: true });
+    const sessions = (x: typeof calm) => x.s.weeks.flatMap((w) => w.items);
+    // Same weeks, same days and types, same km a week.
+    expect(hurt.s.weeks.map((w) => w.targetKm)).toEqual(calm.s.weeks.map((w) => w.targetKm));
+    expect(sessions(hurt).map((it) => [it.date, it.type])).toEqual(sessions(calm).map((it) => [it.date, it.type]));
+    expect(sessions(hurt).map((it) => it.blueprint?.split("#")[0] ?? null)).toEqual(sessions(calm).map((it) => it.blueprint?.split("#")[0] ?? null));
+    // Every blueprint stays at the step it was at, tagged held; without injury they step on.
+    const tags = (x: typeof calm) => sessions(x).map((it) => it.blueprint).filter((b): b is string => !!b).map((b) => parseBlueprintTag(b)!);
+    expect(tags(hurt).length).toBeGreaterThan(0);
+    for (const t of tags(hurt)) { expect(t.held).toBe(true); expect(t.step).toBeLessThanOrEqual(1); }
+    expect(Math.max(...tags(calm).map((t) => t.step))).toBeGreaterThan(1);
+    // The deep aim is the next step's job; the form on race day still lands in the window.
+    expect(hurt.s.eval.race?.form).toBeGreaterThanOrEqual(COACH.race.low);
   });
 });

@@ -366,8 +366,9 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
       };
       const slot = (x: PhaseSlot | null) => (x && v.role === "build" && x.held != null ? { ...x, held: undefined } : x);
       const lSlot = slot(phase.long), qSlot = slot(phase.quality);
-      const l = lSlot && longKm != null ? compileSlot(lSlot, stepOf, { ...ctx, longKm }) : null;
-      const q = qSlot ? compileSlot(qSlot, stepOf, ctx) : null;
+      const hold = seed.phase.injury;
+      const l = lSlot && longKm != null ? compileSlot(lSlot, stepOf, { ...ctx, longKm }, hold) : null;
+      const q = qSlot ? compileSlot(qSlot, stepOf, ctx, hold) : null;
       phased = { long: l ? item(l) : null, quality: q ? [{ ...item(q), ...(qSlot?.day ? { date: qSlot.day } : {}) }] : [] };
       // A quality session of the phase takes the threshold session's place, the ladder stays as a third from `highKm` a week.
       const third = v.role === "build" && v.km >= RACE_PHASE.highKm && daysOf(ws).slots.length >= NEXT.secondMinDays;

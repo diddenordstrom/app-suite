@@ -37,7 +37,7 @@ Settled with the user on 2026-11-24. Not built yet; the [build plan](#build-plan
 ## Open
 
 - The blueprint format (shares, steps, requirements) and its exact progressions are first guesses to tune on real histories (`npm run scenarios -w apps/fartlek`).
-- The block and week planners do not read pain today; the injury stop (build plan step 5) adds it.
+- The block and week planners read pain only through the injury stop (build plan step 5): readiness alone never changes a plan.
 
 ## Still missing around the phase (todo)
 
@@ -202,7 +202,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
      - the warnings show at 35 km;
      - race-day form lands in `COACH.race`;
      - the scenarios output has been reviewed.
-5. **Injury stop.**
+5. **Injury stop.** *Built.* Held means the blueprint stays at the step it is at and is tagged `h`, at full size (a lighter week's scaling is separate). The offer is a card on the Blocks page, shown only while a phase is on; its button opens the existing lighter re-plan of the running block. `PhaseSeed.injury` is set from the same check.
    - Add `injuryStop(pain, today)` in `shared/recovery.ts`. It fires on pain of level 8 or more in the last 7 days, or of level 5 or more on 3 different days within 7.
    - `server/racephase.ts` reads `repo.listPain`. When it fires, every step is held and the deep aim is off.
    - GETs return `injury`, and the client offers the existing re-plan (`/blocks/:id/replan?light=1`). The runner chooses; readiness alone never re-plans.
