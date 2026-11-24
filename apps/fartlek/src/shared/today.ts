@@ -133,7 +133,8 @@ const ahead = (s: SessionView, today: ISODate) =>
  */
 export function keyFixes(sessions: SessionView[], history: RunPoint[], today: ISODate, o: { easyPace: number | null; thresholdPace: number | null; units: Units }): KeyFix[] {
   const out: KeyFix[] = [];
-  const next = (type: Workout["type"]) => sessions.filter((s) => s.workout.type === type && ahead(s, today)).sort((a, b) => a.workout.date.localeCompare(b.workout.date))[0];
+  // Race-phase sessions (tagged) are typed threshold but are not on the ladder.
+  const next = (type: Workout["type"]) => sessions.filter((s) => s.workout.type === type && !s.workout.blueprint && ahead(s, today)).sort((a, b) => a.workout.date.localeCompare(b.workout.date))[0];
 
   const long = next("long");
   if (long && !long.workout.steps && long.workout.distanceKm) {
@@ -150,7 +151,7 @@ export function keyFixes(sessions: SessionView[], history: RunPoint[], today: IS
     const want = rungBefore(thr.workout.date, sessions, o.thresholdPace);
     if (want < at) {
       const to = rung(want);
-      const prev = sessions.filter((s) => s.workout.type === "threshold" && s.workout.date < thr.workout.date && (s.outcome === "done" || s.outcome === "short"))
+      const prev = sessions.filter((s) => s.workout.type === "threshold" && !s.workout.blueprint && s.workout.date < thr.workout.date && (s.outcome === "done" || s.outcome === "short"))
         .sort((a, b) => b.workout.date.localeCompare(a.workout.date))[0];
       const steps: WorkoutSteps = thresholdSteps(to.reps, to.min, to.rest);
       const lastRun = prev ? thresholdReps(prev.workout.steps, o.thresholdPace) : null;
@@ -238,7 +239,7 @@ export function tooHardPlan(hard: LoadedSession, sessions: SessionView[], today:
   }
 
   // 2. A threshold session on the ladder within two days: a rung down.
-  const thr = open.find((s) => s.workout.type === "threshold" && s.workout.date <= addDays(day, 2));
+  const thr = open.find((s) => s.workout.type === "threshold" && !s.workout.blueprint && s.workout.date <= addDays(day, 2));
   const reps = thr ? thresholdReps(thr.workout.steps) : null;
   const at = reps ? NEXT.ladder.findIndex((x) => x.reps === reps.reps && x.min === reps.min) : -1;
   if (thr && at > 0) {

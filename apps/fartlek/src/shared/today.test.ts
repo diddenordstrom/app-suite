@@ -11,7 +11,7 @@ const RUN_DAYS = [2, 4, 6, 0];
 
 let id = 0;
 function s(date: string, type: Workout["type"], km: number | null, outcome: SessionView["outcome"] = date < TODAY ? "to_do" : "to_do", over: Partial<Workout> = {}): SessionView {
-  const workout: Workout = { id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, ...over };
+  const workout: Workout = { id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null, ...over };
   return { workout, outcome, match: null, activity: null };
 }
 
@@ -105,6 +105,9 @@ describe("keyFixes", () => {
     expect(keyFixes([run, thr("2026-11-10", 3, 10, "done"), next], history, TODAY, O)).toEqual([]);
     // A session of the runner's own (5x5) is never rewritten.
     expect(keyFixes([run, missed, thr("2026-11-17", 5, 5, "upcoming")], history, TODAY, O)).toEqual([]);
+    // A race-phase session (tagged, typed threshold) before it is not the ladder: the ladder session is still fixed.
+    const mp = s("2026-11-14", "threshold", 12, "upcoming", { blueprint: "mp-tempo#0" });
+    expect(keyFixes([run, missed, mp, next], history, TODAY, O)).toMatchObject([{ kind: "threshold", workout: next.workout, lastRun: { reps: 3, min: 8 } }]);
   });
 
   it("only looks a week ahead", () => {

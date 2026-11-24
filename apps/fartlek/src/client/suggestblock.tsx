@@ -1,4 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { PhaseWarningsNote, RacePaceCard, RacePaceNote } from "./racepace";
+import { phaseWarnings, type RacePaceView } from "@/shared/racephase";
 import { api, useApi } from "./http";
 import { lang, t, tn, WEEKDAY_LONG } from "./i18n";
 import { useFmt } from "./prefs";
@@ -8,7 +10,7 @@ import { MoreDays, PILL, signed, signedInt, SimLines, skipVerdict, type Line, ty
 import { BlockWarnings, useBlockWeeks, WeekEditor } from "./blockeditor";
 import { addDays, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { sessionText } from "@/shared/blocktext";
-import { BLOCK, evaluateBlock, type BlockEval, type BlockSeed, type BlockSuggestion, type BlockTry, type RaceChunk, type WeekRole } from "@/shared/blockplan";
+import { BLOCK, evaluateBlock, weekKm, type BlockEval, type BlockSeed, type BlockSuggestion, type BlockTry, type RaceChunk, type WeekRole } from "@/shared/blockplan";
 import { diffPlans, workoutWeeks, type DayChange, type PlanDiff } from "@/shared/planrange";
 import { COACH } from "@/shared/coach";
 import { FORM, formPct, formState } from "@/shared/load";
@@ -29,7 +31,7 @@ type SugBase = { startWeek: ISODate; defaultStart: ISODate; earliest: ISODate; t
 type RacePlan = { race: Race & { priority: "A" | "B" }; weeksToRace: number; chunks: RaceChunk[]; now: number };
 type SugOk = SugBase & { ok: true; seed: BlockSeed; suggestion: BlockSuggestion; replaces: Workout[]; race: Race | null; advice: DaysAdvice | null; racePlan: RacePlan | null;
   /** Days before `today` in a block that starts in the running week are over: locked, with the km run. */
-  doneDays: Record<ISODate, number> };
+  doneDays: Record<ISODate, number>; racePace: RacePaceView | null };
 type SugRes = SugBase & (
   | { ok: false; reason: "block"; block: Block }
   | { ok: false; reason: "race" | "afterRace"; race: Race }
@@ -78,11 +80,13 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
           onNext={() => setStep(mode === "suggest" ? "sim" : "edit")} />
       )}
       {step !== "start" && (!data || loading) && <Spinner className="text-muted-foreground" />}
-      {ok && !loading && step === "sim" && <BlockSim seed={ok.seed} s={ok.suggestion} onDone={() => setStep(ok.advice ? "days" : "edit")} />}
-      {ok && !loading && step === "days" && ok.advice && (
+      {ok && !loading && step !== "start" && ok.racePace?.question && <RacePaceCard view={ok.racePace} onAnswered={() => setRev(rev + 1)} />}
+      {ok && !loading && step !== "start" && !ok.racePace?.question && ok.racePace && step !== "sim" && <RacePaceNote view={ok.racePace} />}
+      {ok && !loading && !ok.racePace?.question && step === "sim" && <BlockSim seed={ok.seed} s={ok.suggestion} onDone={() => setStep(ok.advice ? "days" : "edit")} />}
+      {ok && !loading && !ok.racePace?.question && step === "days" && ok.advice && (
         <MoreDays advice={ok.advice} onAdded={() => { setRev(rev + 1); setStep("sim"); }} onSkip={() => setStep("edit")} />
       )}
-      {ok && !loading && step === "edit" && (
+      {ok && !loading && !ok.racePace?.question && step === "edit" && (
         <BlockEditor key={`${ok.startWeek}-${ok.weeks}-${mode}-${rev}`} res={ok} own={mode === "own"} rhythm={rhythm} extended={extra > 0}
           onExtend={() => setExtra(extra + 1)} onUnextend={() => setExtra(0)} onBack={() => setStep("start")} onClose={onClose}
           names={nowChunks.length > 1 ? nowChunks.map((c, i) => (i === 0 ? name.trim() : chunkName(c, rp!))) : null}
@@ -369,6 +373,11 @@ function BlockEditor({ res, own, rhythm, extended, names, onExtend, onUnextend, 
     return out;
   }, [names, rp]);
   const ev = useMemo(() => evaluateBlock(b.seed, b.weeks), [b.seed, b.weeks]);
+  // The race phase's warnings follow the weeks as they are edited.
+  const phaseWarn = useMemo(() => (b.seed.phase ? phaseWarnings(b.weeks.map((items, i) => ({
+    weekStart: addDays(b.seed.startWeek, i * 7), build: b.roles[i] === "build", km: weekKm(items),
+    longKm: items.filter((it) => it.type === "long").reduce<number | null>((m, it) => (m == null || it.km > m ? it.km : m), null),
+  })), b.seed.phase) : null), [b.seed, b.weeks, b.roles]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
@@ -409,6 +418,7 @@ function BlockEditor({ res, own, rhythm, extended, names, onExtend, onUnextend, 
           {ev.race && rp && <RaceForm ev={ev} name={rp.race.name} />}
           <BlockStats seed={b.seed} ev={ev} race={race} panel towardRace={!!rp} />
           <BlockWarnings ev={ev} />
+          <PhaseWarningsNote warnings={phaseWarn} />
           <BlockCharts seed={b.seed} ev={ev} stacked />
         </>} />
       <Footer seed={b.seed} s={s} weeks={b.weeks} edited={b.changed} busy={busy} replaces={replaces.length} onBack={onBack}
@@ -547,7 +557,7 @@ type RpRes =
   | { ok: false; reason: "nothingLeft" }
   | { ok: false; reason: "race"; race: Race }
   | { ok: false; reason: "extendBlocked"; block: Block }
-  | { ok: true; block: Block; seed: BlockSeed; suggestion: BlockSuggestion; replaces: Workout[]; diff: PlanDiff; extend: number; compressed: { by: "block" | "race"; name: string } | null; done: { km: number; weeks: number; sick: boolean; days: Record<ISODate, number> }; goal: number | null; before: { weekStart: ISODate; km: number }[]; today: ISODate; race: Race | null; raceDays: ISODate[] };
+  | { ok: true; block: Block; seed: BlockSeed; suggestion: BlockSuggestion; replaces: Workout[]; diff: PlanDiff; extend: number; compressed: { by: "block" | "race"; name: string } | null; done: { km: number; weeks: number; sick: boolean; days: Record<ISODate, number> }; goal: number | null; before: { weekStart: ISODate; km: number }[]; today: ISODate; race: Race | null; raceDays: ISODate[]; racePace: RacePaceView | null };
 
 /** The input the engine is called with: which weeks, how many to add, lighter or not. "Räkna om resten" is the plain call. */
 export interface ReplanOptions { extend?: number; thisWeek?: boolean; light?: boolean; edit?: boolean }
@@ -560,7 +570,8 @@ export interface ReplanOptions { extend?: number; thisWeek?: boolean; light?: bo
 export function ReplanDialog({ block, options = {}, startWith = "engine", onClose, onSaved }: { block: Block; options?: ReplanOptions; startWith?: "plan" | "engine"; onClose: () => void; onSaved: () => void }) {
   const edit = startWith === "plan";
   const q = [options.extend ? `extend=${options.extend}` : "", options.thisWeek ? "thisWeek=1" : "", options.light ? "light=1" : "", edit ? "edit=1" : ""].filter(Boolean).join("&");
-  const { data, error } = useApi<RpRes>(`/blocks/${block.id}/replan${q ? `?${q}` : ""}`);
+  const [rev, setRev] = useState(0);
+  const { data, error } = useApi<RpRes>(`/blocks/${block.id}/replan?${q}${q ? "&" : ""}r=${rev}`);
   const [phase, setPhase] = useState<"sim" | "edit">(startWith === "plan" ? "edit" : "sim");
   return (
     <Dialog open onClose={onClose} title={t(startWith === "plan" ? "be.editTitle" : "rp.title", { name: blockName(block) })} className="sm:max-w-[min(100rem,96vw)]">
@@ -573,8 +584,10 @@ export function ReplanDialog({ block, options = {}, startWith = "engine", onClos
             : t("rp.race", { name: data.race.name, date: fmtDay(data.race.date, { day: "numeric", month: "short" }) })}
         </p>
       )}
-      {data?.ok && phase === "sim" && <BlockSim seed={data.seed} s={data.suggestion} onDone={() => setPhase("edit")} />}
-      {data?.ok && phase === "edit" && <ReplanEditor res={data} options={options} startWith={startWith} onClose={onClose} onSaved={onSaved} />}
+      {data?.ok && data.racePace?.question && <RacePaceCard view={data.racePace} onAnswered={() => setRev(rev + 1)} />}
+      {data?.ok && !data.racePace?.question && data.racePace && phase !== "sim" && <RacePaceNote view={data.racePace} />}
+      {data?.ok && !data.racePace?.question && phase === "sim" && <BlockSim seed={data.seed} s={data.suggestion} onDone={() => setPhase("edit")} />}
+      {data?.ok && !data.racePace?.question && phase === "edit" && <ReplanEditor res={data} options={options} startWith={startWith} onClose={onClose} onSaved={onSaved} />}
     </Dialog>
   );
 }

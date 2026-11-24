@@ -13,7 +13,7 @@ const act = (p: Partial<Activity> & { id: string; date: string; km?: number }): 
 let nextId = 1;
 const wo = (p: Partial<Workout> & { date: string }): Workout => ({
   id: nextId++, type: "easy", distanceKm: null, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null,
-  manualActivityId: null, manualUnlinked: false, steps: null, ...p,
+  manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null, ...p,
 });
 const block = (p: Partial<Block> & { id: number; startWeek: string; weeks: number }): Block => ({ kind: "base", name: null, note: null, crossMin: null, goalKm: null, ...p });
 const state = (weekStart: string, workouts: Workout[], today: string, acts: Activity[] = [], target: WeekState["target"] = null): WeekState => {

@@ -3,6 +3,7 @@ import type { Db } from "../db";
 import * as t from "../db/schema";
 import * as repo from "../repo";
 import { afterResult, raceChecks, resultSuggestions } from "../races";
+import { lockRacePace, phaseRace, racePaceView } from "../racephase";
 import { ctxFor, stepMatchFor, stepRefs, weekSummaries, type Ctx } from "../analysis";
 import { stepSummary } from "../../shared/stepmatch";
 import { parseSteps, plannedFromSteps, readSteps, type WorkoutSteps } from "../../shared/steps";
@@ -131,7 +132,7 @@ export function planRoutes(db: Db) {
     const to = date((await body(c)).date);
     const src = db.select().from(t.workouts).where(own(t.workouts, uid(c), idParam(c.req.param("id")))).get();
     if (!src) return c.json({ error: "not found" }, 404);
-    const row = db.insert(t.workouts).values({ userId: src.userId, date: to, type: src.type, distanceKm: src.distanceKm, durationMin: src.durationMin, zone2: src.zone2, notes: src.notes, steps: src.steps }).returning().get();
+    const row = db.insert(t.workouts).values({ userId: src.userId, date: to, type: src.type, distanceKm: src.distanceKm, durationMin: src.durationMin, zone2: src.zone2, notes: src.notes, steps: src.steps, blueprint: src.blueprint }).returning().get();
     return c.json(repo.toWorkout(row));
   });
 
@@ -150,7 +151,7 @@ export function planRoutes(db: Db) {
       for (const w of src) {
         tx.insert(t.workouts).values({
           userId: ctx.userId, date: addDays(w.date, shift), type: w.type, distanceKm: w.distanceKm, durationMin: w.durationMin, zone2: w.zone2, notes: w.notes,
-          steps: w.steps ? JSON.stringify(w.steps) : null,
+          steps: w.steps ? JSON.stringify(w.steps) : null, blueprint: w.blueprint,
         }).run();
       }
       for (const [ws, tg] of targets) {
@@ -200,6 +201,22 @@ export function planRoutes(db: Db) {
     db.update(t.races).set(raceFields(await body(c))).where(own(t.races, uid(c), id)).run();
     afterResult(ctxFor(db, uid(c)), id);
     return c.json(repo.listRaces(db, uid(c)));
+  });
+  /**
+   * The runner's answer to a pace question of the race phase: train for the "prediction" or the "goal", or "keep" the
+   * paces already locked (a B race was run). Returns the phase's view after the answer.
+   */
+  r.post("/races/:id/race-pace", async (c) => {
+    const ctx = ctxFor(db, uid(c));
+    const race = repo.listRaces(db, ctx.userId).find((x) => x.id === idParam(c.req.param("id")));
+    if (!race) return c.json({ error: "not found" }, 404);
+    const choice = oneOf((await body(c)).choice, ["prediction", "goal", "keep"] as const, "choice");
+    const ph = phaseRace(ctx, weekStartOf(ctx.today, ctx.settings.weekStart));
+    if (!ph || ph.race.id !== race.id) throw new BadRequest("the race is not in its race-specific phase");
+    if (choice === "goal" && !race.goalSeconds) throw new BadRequest("the race has no goal time");
+    if (choice === "keep" && race.paceLockedOn == null) throw new BadRequest("no paces are locked");
+    lockRacePace(ctx, race, choice === "keep" ? "keep" : choice);
+    return c.json(racePaceView(ctx, { ...ph, race: repo.listRaces(db, ctx.userId).find((x) => x.id === race.id)! }));
   });
   r.delete("/races/:id", (c) => {
     const id = idParam(c.req.param("id"));

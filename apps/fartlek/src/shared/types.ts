@@ -125,6 +125,8 @@ export interface Workout {
   manualUnlinked: boolean;
   /** Structured steps; when set, distanceKm/durationMin are derived from them. */
   steps: WorkoutSteps | null;
+  /** Race-phase blueprint tag such as `mp-long#2` (`h` after the step = held); null for any other session. */
+  blueprint: string | null;
 }
 
 export interface Race {
@@ -137,6 +139,11 @@ export interface Race {
   /** Finish time once run, and the run it was (docs/decisions/fartlek-race-results.md). */
   resultSeconds: number | null;
   activityId: string | null;
+  /** Race pace (sec/km) the race phase trains at, its source and the date it was locked; null until locked. */
+  mpSec: number | null;
+  hmpSec: number | null;
+  paceSource: string | null;
+  paceLockedOn: ISODate | null;
 }
 
 export const BLOCK_KINDS = ["base", "build", "specific", "taper", "recovery"] as const;

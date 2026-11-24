@@ -85,4 +85,28 @@ group("planning scenarios", () => {
     expect(x.roles, describe(r("race after a break"))).toBe("bbblbbtr");
     expect(x.raceForm).toBeGreaterThan(0);
   });
+
+  it("plans the race phase through the real app: tagged sessions, the ladder as a third only at 70 km, race-day form in the window", () => {
+    const tagged = (x: ScenarioResult) => x.race!.weeks.map((w) => w.items.filter((it) => it.blueprint));
+    for (const name of ["marathon in 8 at 45", "marathon in 8 at 70", "half in 6"]) {
+      const x = r(name);
+      expect(x.race!.raceForm, describe(x)).toBeGreaterThanOrEqual(5);
+      expect(x.race!.raceForm, describe(x)).toBeLessThanOrEqual(20);
+      for (const w of x.race!.weeks) {
+        expect(w.items.filter((it) => it.type === "long"), describe(x)).toHaveLength(w.role === "race" ? 0 : 1);
+        for (const it of w.items) if (it.type === "long") expect(it.km, describe(x)).toBeLessThanOrEqual(32);
+      }
+      expect(tagged(x).flat().length, describe(x)).toBeGreaterThan(6);
+    }
+    const ladder = (x: ScenarioResult) => x.race!.weeks.filter((w) => w.role === "build").map((w) => w.items.filter((it) => it.type === "threshold" && !it.blueprint).length);
+    expect(ladder(r("marathon in 8 at 45")).every((n) => n === 0), describe(r("marathon in 8 at 45"))).toBe(true);
+    expect(ladder(r("marathon in 8 at 70")).some((n) => n === 1), describe(r("marathon in 8 at 70"))).toBe(true);
+    // A marathon's dress rehearsal sits 9–13 days before the race (the race is on a Saturday here).
+    const x = r("marathon in 8 at 45").race!;
+    const race = x.weeks.at(-1)!.weekStart;
+    const dress = x.weeks.flatMap((w) => w.items).find((it) => it.blueprint?.startsWith("dress-rehearsal"))!;
+    const out = Math.round((Date.parse(race) - Date.parse(dress.date)) / 864e5) + 5;
+    expect(out).toBeGreaterThanOrEqual(9);
+    expect(out).toBeLessThanOrEqual(13);
+  });
 });

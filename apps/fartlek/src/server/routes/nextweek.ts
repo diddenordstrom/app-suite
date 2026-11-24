@@ -12,6 +12,9 @@ import { plannedLoad, pmc } from "../../shared/load";
 import { asWeekSuggestion, suggestWeek, weekAsBlock } from "../../shared/blockplan";
 import { planRange } from "../../shared/planrange";
 import { daysAdvice, formHeavy, NEXT, rungBefore, type BackoffWhy, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
+import { backOffNow, injuryNow, phaseRaceIn, phaseView, racePaceGate, racePaceView } from "../racephase";
+import { BLUEPRINTS, entryStep, parseBlueprintTag, stepFor } from "../../shared/blueprints";
+import type { PhaseSeed } from "../../shared/racephase";
 import { parseSteps, plannedFromSteps, stepsText, type WorkoutSteps } from "../../shared/steps";
 import { goalPace } from "../../shared/recovery";
 import { thresholdOn } from "../../shared/threshold";
@@ -51,7 +54,7 @@ function weekParam(ctx: Ctx, v: unknown): ISODate {
  * The seed for a week. `formOverTarget`: heavy form makes the week lighter even when the week has a target (Skapa block
  * does: a target a block or a copy left behind isn't the runner deciding the week); only a target noted "backoff" counts as asked.
  */
-export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: boolean } = {}): WeekSeed {
+export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: boolean; /** Weeks planned from `weekStart` (a block); the race phase may start in any of them. */ weeks?: number } = {}): WeekSeed {
   const thr = thresholdOn(ctx.thresholds, ctx.today);
   const block = blockOn(weekStart, repo.listBlocks(ctx.db, ctx.userId));
   const habit = crossHabit(ctx);
@@ -91,7 +94,7 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
     runDays: ctx.settings.runDays, longRunDay: ctx.settings.longRunDay,
     threshold: thr, refs: stepRefs(ctx, ctx.today), crossMin,
     targetKm: target?.km ?? null, backoff: backoffWhy != null, backoffWhy, hardBefore, toleranceKm,
-    ...keySessionSeed(ctx, weekStart),
+    ...keySessionSeed(ctx, weekStart, { weeks: o.weeks, toleranceKm }),
   };
 }
 
@@ -100,7 +103,7 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
  * after the last threshold session before it that was run or is still to run (`rungBefore`), and the
  * faster finish's pace.
  */
-export function keySessionSeed(ctx: Ctx, weekStart: ISODate): Pick<WeekSeed, "longestKm" | "rung" | "tempoPace"> {
+export function keySessionSeed(ctx: Ctx, weekStart: ISODate, o: { weeks?: number; toleranceKm?: number } = {}): Pick<WeekSeed, "longestKm" | "rung" | "tempoPace" | "phase"> {
   const dayBefore = addDays(weekStart, -1);
   const sessions = weekSummaries(ctx, addDays(weekStart, -7 * PAST_WEEKS), dayBefore).flatMap((w) => w.sessions);
   const T = NEXT.tempo;
@@ -109,7 +112,16 @@ export function keySessionSeed(ctx: Ctx, weekStart: ISODate): Pick<WeekSeed, "lo
     .sort((a, b) => a.date.localeCompare(b.date))[0];
   const thr = thresholdOn(ctx.thresholds, ctx.today);
   const tempoPace = race ? goalPace(race.goalSeconds!, race.distanceKm) + T.racePlus : thr?.paceSecPerKm != null ? thr.paceSecPerKm + T.thrPlus : null;
-  return { longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore), rung: rungBefore(weekStart, sessions, thr?.paceSecPerKm ?? null), tempoPace };
+  // The race-specific phase: the paces and where each blueprint stands, from what was done before the week.
+  const ph = phaseRaceIn(ctx, weekStart, o.weeks ?? 1);
+  let phase: PhaseSeed | undefined;
+  if (ph) {
+    const paces = racePaceView(ctx, ph).paces;
+    const steps = Object.fromEntries(BLUEPRINTS.filter((b) => b.race === ph.kind)
+      .map((b) => [b.id, stepFor(sessions, b.id, weekStart, entryStep(b, o.toleranceKm ?? 0))])) as PhaseSeed["steps"];
+    phase = { race: { date: ph.race.date, kind: ph.kind }, paces: { mp: paces.mp, hmp: paces.hmp }, paceSource: paces.source, steps, backOff: backOffNow(ctx, sessions), injury: injuryNow(ctx) != null };
+  }
+  return { longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore), rung: rungBefore(weekStart, sessions, thr?.paceSecPerKm ?? null), tempoPace, ...(phase ? { phase } : {}) };
 }
 
 const HARD = new Set(["threshold", "intervals", "long", "race"]);
@@ -127,6 +139,13 @@ function stepsParam(v: unknown, ctx: Ctx): WorkoutSteps {
   return parsed.steps;
 }
 
+/** A blueprint tag from the client: absent or null is none; anything but a known tag is refused. */
+function blueprintOf(v: unknown, label: string): { blueprint?: string } {
+  if (v == null) return {};
+  if (typeof v !== "string" || !parseBlueprintTag(v)) throw new BadRequest(`${label} must be a blueprint tag`);
+  return { blueprint: v };
+}
+
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 
 /** A week's suggested sessions from the client: 1–14, each inside the week, threshold steps read back by the parser. */
@@ -140,7 +159,7 @@ export function parseItems(ctx: Ctx, raw: unknown, weekStart: ISODate, label = "
     const type = oneOf(x.type, TYPES, `${label}[${i}].type`);
     if (type === "cross") return { date: d, type, km: 0, durationMin: num(x.durationMin, `${label}[${i}].durationMin`, 5, 600), steps: null };
     const steps = x.steps != null ? stepsParam(x.steps, ctx) : null;
-    return { date: d, type, km: num(x.km, `${label}[${i}].km`, 0.5, 200), durationMin: null, steps };
+    return { date: d, type, km: num(x.km, `${label}[${i}].km`, 0.5, 200), durationMin: null, steps, ...blueprintOf(x.blueprint, `${label}[${i}].blueprint`) };
   });
 }
 
@@ -149,7 +168,7 @@ export function insertItems(tx: Tx, ctx: Ctx, items: SuggestItem[]): number[] {
   return items.map((it) => {
     const amount = it.steps ? plannedFromSteps(it.steps, stepRefs(ctx, it.date)) : { distanceKm: it.type === "cross" ? null : it.km, durationMin: it.durationMin };
     return tx.insert(t.workouts).values({
-      userId: ctx.userId, date: it.date, type: it.type, ...amount, zone2: false, steps: it.steps ? JSON.stringify(it.steps) : null,
+      userId: ctx.userId, date: it.date, type: it.type, ...amount, zone2: false, steps: it.steps ? JSON.stringify(it.steps) : null, blueprint: it.blueprint ?? null,
     }).returning().get().id;
   });
 }
@@ -168,7 +187,7 @@ export function restoreRows(ctx: Ctx, raw: unknown, from: ISODate, to: ISODate) 
       distanceKm: optNum(w.distanceKm, `restore[${i}].distanceKm`, 0, 500), durationMin: optNum(w.durationMin, `restore[${i}].durationMin`, 0, 1440),
       zone2: w.zone2 === true, notes: optStr(w.notes, `restore[${i}].notes`, 2000),
       status: oneOf(w.status ?? "planned", WORKOUT_STATUSES, `restore[${i}].status`), skipReason: optStr(w.skipReason, `restore[${i}].skipReason`, 60),
-      steps: w.steps ? JSON.stringify(stepsParam(w.steps, ctx)) : null,
+      steps: w.steps ? JSON.stringify(stepsParam(w.steps, ctx)) : null, blueprint: blueprintOf(w.blueprint, `restore[${i}].blueprint`).blueprint ?? null,
     };
   });
 }
@@ -203,7 +222,7 @@ export function nextWeekRoutes(db: Db) {
         (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; });
       return { suggestion, advice };
     });
-    return c.json({ weekStart, ok: true, seed, suggestion, replaces, advice });
+    return c.json({ weekStart, ok: true, seed, suggestion, replaces, advice, racePace: phaseView(ctx, weekStart, 1) });
   });
 
   r.post("/plan/next-week", async (c) => {
@@ -220,11 +239,15 @@ export function nextWeekRoutes(db: Db) {
     if (current.length !== shown.size || current.some((w) => !shown.has(w.id))) {
       return c.json({ error: "the week changed since the suggestion", conflict: "changed" }, 409);
     }
+    // A pace question of the race phase is answered first; with none locked, the proposal is locked by this write.
+    const gate = racePaceGate(ctx, weekStart, 1);
+    if (gate.blocked) return c.json({ error: "choose the race paces first", conflict: "racePace" }, 409);
     let ids: number[] = [];
     db.transaction((tx) => {
       for (const w of current) tx.delete(t.workouts).where(and(eq(t.workouts.userId, ctx.userId), eq(t.workouts.id, w.id))).run();
       ids = insertItems(tx, ctx, items);
     });
+    gate.done();
     return c.json({ ids, removed: current });
   });
 

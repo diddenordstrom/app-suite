@@ -5,6 +5,7 @@ import * as repo from "../repo";
 import { ctxFor, type Ctx } from "../analysis";
 import { kmByDay, weeksBefore } from "./blocks";
 import { hardOn, insertItems, parseItems, restoreRows, runUndo, seedFor } from "./nextweek";
+import { phaseView, racePaceGate } from "../racephase";
 import { addDays, daysBetween, weekStartOf, type ISODate } from "../../shared/dates";
 import { blockEnd, checkEdges } from "../../shared/blocks";
 import { diffPlans, planRange, rangeWeeks, workoutWeeks } from "../../shared/planrange";
@@ -95,7 +96,7 @@ function raceInOpenWeeks(ctx: Ctx, from: ISODate, end: ISODate) {
 
 /** The block engine's seed for `weeks` weeks from `startWeek` (a week that hasn't started). */
 function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: number | null; buildWeeksDone: number; lighterLast: boolean; light?: boolean; lighterWeeks?: boolean[]; roles?: WeekRole[] | null; race?: BlockSeed["race"] }): BlockSeed {
-  const w = seedFor(ctx, startWeek, { formOverTarget: true });
+  const w = seedFor(ctx, startWeek, { formOverTarget: true, weeks });
   const seed: BlockSeed = {
     startWeek, weeks, ctl: w.ctl, atl: w.atl, kmBefore: w.kmBefore, past: w.past,
     tolerance: tolerance(weeksBefore(ctx, startWeek, BLOCK.tolerance.lookbackWeeks)),
@@ -105,6 +106,7 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
     lighterFirst: !!o.light || (o.buildWeeksDone === 0 && w.backoff),
     lighterFirstWhy: o.light ? "light" : o.buildWeeksDone === 0 && w.backoff ? w.backoffWhy ?? "form" : null,
     longestKm: w.longestKm, rung: w.rung, tempoPace: w.tempoPace,
+    ...(w.phase ? { phase: w.phase } : {}),
     ...(o.lighterWeeks ? { lighterWeeks: o.lighterWeeks } : {}),
     ...(o.race ? { race: o.race } : {}),
   };
@@ -243,7 +245,7 @@ export function blockPlanRoutes(db: Db) {
     });
     const next = repo.listRaces(db, ctx.userId).find((x) => (x.priority === "A" || x.priority === "B") && x.date >= startWeek) ?? null;
     const doneDays = from > startWeek ? Object.fromEntries(kmByDay(ctx, startWeek, addDays(from, -1))) : {};
-    return c.json({ startWeek, defaultStart: firstStart, earliest, weeks, ok: true, seed, suggestion, replaces, advice, race: next && { name: next.name, date: next.date }, racePlan: rp?.plan ?? null, today: ctx.today, doneDays });
+    return c.json({ startWeek, defaultStart: firstStart, earliest, weeks, ok: true, seed, suggestion, replaces, advice, race: next && { name: next.name, date: next.date }, racePlan: rp?.plan ?? null, today: ctx.today, doneDays, racePace: phaseView(ctx, startWeek, weeks) });
   });
 
   r.post("/plan/block-suggest", async (c) => {
@@ -266,6 +268,8 @@ export function blockPlanRoutes(db: Db) {
     const current = replacedBy(ctx, startWeek, end);
     if (raceJustRun(ctx, startWeek)) return c.json({ error: "a race was just run", conflict: "afterRace" }, 409);
     if (!sameShown(current, b.replace)) return c.json({ error: "the weeks changed since the suggestion", conflict: "changed" }, 409);
+    const gate = racePaceGate(ctx, startWeek, n);
+    if (gate.blocked) return c.json({ error: "choose the race paces first", conflict: "racePace" }, 409);
     const targetsBefore = [...repo.getTargets(db, ctx.userId, startWeek, end).values()];
     let ids: number[] = [];
     const blockIds: number[] = [];
@@ -280,6 +284,7 @@ export function blockPlanRoutes(db: Db) {
       ids = weeks.flatMap((items) => insertItems(tx, ctx, items));
       writeTargets(tx, ctx.userId, startWeek, weeks, roles);
     });
+    gate.done();
     return c.json({ id: blockIds[0], blockIds, ids, removed: current, targetsBefore });
   });
 
@@ -399,6 +404,7 @@ export function blockPlanRoutes(db: Db) {
       done: { km: st.doneKm, weeks: st.doneWeeks, sick: st.sick, days: Object.fromEntries([...st.doneDays].filter(([d]) => d >= seed.startWeek && d < ctx.today)) },
       goal: st.goal, before: st.before, today: ctx.today,
       race: race ? { name: race.name, date: race.date } : null,
+      racePace: phaseView(ctx, st.first, st.weeksLeft),
       raceDays: repo.listWorkouts(db, ctx.userId, st.first, st.newEnd).filter((w) => w.type === "race").map((w) => w.date),
     });
   });
@@ -419,6 +425,8 @@ export function blockPlanRoutes(db: Db) {
     const current = editable(plannedIn(ctx, s.first, s.newEnd), true);
     if (!sameShown(current, b.replace)) return c.json({ error: "the weeks changed since the suggestion", conflict: "changed" }, 409);
     const goalKm = r1(s.doneKm + weeks.reduce((sum, w) => sum + weekKm(w), 0));
+    const gate = racePaceGate(ctx, s.first, weeks.length);
+    if (gate.blocked) return c.json({ error: "choose the race paces first", conflict: "racePace" }, 409);
     let ids: number[] = [];
     db.transaction((tx) => {
       for (const w of current) tx.delete(t.workouts).where(and(eq(t.workouts.userId, ctx.userId), eq(t.workouts.id, w.id))).run();
@@ -426,6 +434,7 @@ export function blockPlanRoutes(db: Db) {
       writeTargets(tx, ctx.userId, s.first, weeks, roles);
       tx.update(t.blocks).set({ goalKm, weeks: block.weeks + extend }).where(and(eq(t.blocks.userId, ctx.userId), eq(t.blocks.id, block.id))).run();
     });
+    gate.done();
     return c.json({ ids, goalKm });
   });
 

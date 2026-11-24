@@ -164,6 +164,8 @@ export const workouts = sqliteTable("workouts", {
   manualUnlinked: integer("manual_unlinked", { mode: "boolean" }).notNull().default(false),
   /** Structured steps as JSON (shared/steps.ts `WorkoutSteps`); null = a plain workout. The planned amount is derived from them. */
   steps: text("steps"),
+  /** The race-phase blueprint this session came from, e.g. `mp-long#2` (a trailing `h` = held); see shared/blueprints.ts. */
+  blueprint: text("blueprint"),
 }, (t) => [index("workouts_user_date").on(t.userId, t.date)]);
 
 export const weekTargets = sqliteTable("week_targets", {
@@ -185,6 +187,11 @@ export const races = sqliteTable("races", {
   /** The finish time of a race that has been run, and the activity it was. */
   resultSeconds: integer("result_seconds"),
   activityId: text("activity_id"),
+  /** Race pace (sec/km) the race phase trains at, where it came from and when it was locked (docs/decisions/fartlek-race-specific-phase.md). */
+  mpSec: real("mp_sec"),
+  hmpSec: real("hmp_sec"),
+  paceSource: text("pace_source"),
+  paceLockedOn: text("pace_locked_on"),
 });
 
 /**

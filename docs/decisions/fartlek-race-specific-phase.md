@@ -8,7 +8,7 @@ updated: 2026-11-24
 
 # Fartlek gets a race-specific phase for the marathon and half, built from blueprints that scale per runner
 
-Settled with the user on 2026-11-24. Not built yet; the [build plan](#build-plan) below says how. It amends "no branches per distance" in [goal to plan](fartlek-goal-to-plan.md): the method stays one engine, but the last weeks before a long race now get race-pace sessions, because those sessions are what every marathon method has in common ([research](../research/marathon-specific-phase.md)). It answers the open pre-race phase in [block progression](fartlek-block-progression.md) and the distance-specific blocks left open in [race blocks](fartlek-race-blocks.md).
+Settled with the user on 2026-11-24. Built in six steps on 2026-11-24; the [build plan](#build-plan) below says how, and what was settled while building. It amends "no branches per distance" in [goal to plan](fartlek-goal-to-plan.md): the method stays one engine, but the last weeks before a long race now get race-pace sessions, because those sessions are what every marathon method has in common ([research](../research/marathon-specific-phase.md)). It answers the open pre-race phase in [block progression](fartlek-block-progression.md) and the distance-specific blocks left open in [race blocks](fartlek-race-blocks.md).
 
 ## Decided
 
@@ -37,7 +37,7 @@ Settled with the user on 2026-11-24. Not built yet; the [build plan](#build-plan
 ## Open
 
 - The blueprint format (shares, steps, requirements) and its exact progressions are first guesses to tune on real histories (`npm run scenarios -w apps/fartlek`).
-- The block and week planners do not read pain today; the injury stop (build plan step 5) adds it.
+- The block and week planners read pain only through the injury stop (build plan step 5): readiness alone never changes a plan.
 
 ## Still missing around the phase (todo)
 
@@ -50,7 +50,7 @@ Noted on 2026-11-24 and not decided. The engine's year-round base (easy running,
 
 ## Build plan
 
-Drafted 2026-11-24 from the code at that date, to be built by a later session. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. Each PR runs `npm run check`, has a gitmoji commit message, and puts every UI string through `t()` in both `en` and `sv`. When a step is built, mark it here, and when all are built, mark the page built.
+Drafted 2026-11-24 from the code at that date and built step by step. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. Each PR runs `npm run check`, has a gitmoji commit message, and puts every UI string through `t()` in both `en` and `sv`. When a step is built, mark it here, and when all are built, mark the page built.
 
 ### Blueprint format
 
@@ -168,7 +168,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
 
 ### PRs
 
-1. **Catalogue and compiler.**
+1. **Catalogue and compiler.** *Built.* `compileBlueprint` also takes an optional `runDays`, and `meetsRequires` / `entryStep` are exported for PR 2 and 4.
    - Add `shared/blueprints.ts`, `PHASE_SCHEDULE`, and in `shared/racephase.ts`:
      ```ts
      RACE_PHASE = { weeks: 8, highKm: 60, warn: { weekKm: 40, longKm: 25 }, mpCapOfCs: 0.94, askPct: 0.03,
@@ -181,16 +181,16 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
      - mp-alternations at 40 km a week steps down to a session of 12 km or less;
      - every compiled session round-trips through `stepsText` / `parseSteps`;
      - no pace source gives zone targets.
-2. **Data and tag plumbing.**
+2. **Data and tag plumbing.** *Built.* The tag helpers `blueprintTag` / `parseBlueprintTag` live in `shared/blueprints.ts` next to `stepFor`; migration `0024_race_phase`.
    - Files: schema and migration; `Workout.blueprint` and the `Race` pace fields in `shared/types.ts`; `toWorkout` in `server/repo.ts`; `SuggestItem.blueprint`; `parseItems`, `insertItems` and `restoreRows` in `server/routes/nextweek.ts` (validate against known ids); `workoutWeeks` in `shared/planrange.ts`; the copy path in `server/routes/plan.ts`.
    - `rungBefore` must ignore tagged workouts, or MP sessions reset the threshold ladder.
    - Add `stepFor(sessions, id, before, entry)`.
    - Done when tests cover done → +1, missed → same, held → same and the ignored rung, and an `app.test.ts` round-trip keeps the tag.
-3. **Marathon pace and lock.**
+3. **Marathon pace and lock.** *Built.* `racePace` also takes the runner's `choice` (`prediction` or `goal`), since the cap and the 3 % question depend on it. The next A race is the one that counts: when it is not a marathon or half there is no phase. A pace with source `none` is never locked.
    - Add `racePace`, `server/racephase.ts` with `phaseRace(ctx, weekStart)` and `racePaceProposal`, the route, and the client choice card.
    - `phaseRace` finds the next A race within 1 km of 42.195 or 21.0975 with wip ≤ 8.
    - Done when there are tests for the cap, the runner's own choice over the cap, the 3 % question, each fallback and the recalculation after a B race.
-4. **Planner wiring.**
+4. **Planner wiring.** *Built.* Settled with the user while building: the dress rehearsal sits in the week that holds its day (race − 13 to − 9), which is W3 for a race on Monday–Wednesday (it then replaces W3's quality session and W2 has none). A held session is only held in a lighter or taper week (the schedule's `held` is dropped in a build week, so a phase shorter than 8 weeks gets a full session there). When the day or week can't hold a blueprint or its fallback, the week keeps the plain threshold session. `PhaseSeed.backOff` and `injury` are in place but always false until steps 5 and 6. The block editor shows `phaseWarnings`.
    - Add `PhaseSeed { race, paces, paceSource, steps, backOff, injury }` on `WeekSeed` (via `seedFor` / `keySessionSeed`), on `BlockSeed` and in `weekAsBlock`.
    - In `weeksFor` (`shared/blockplan.ts`), phase weeks use the schedule: the ladder goes (or stays as a third session per the rule above) and tempo turns off.
    - `build` (`shared/nextweek.ts`) gains `Shape.phase` with the long run and the quality sessions, placed before the threshold, typed `threshold` and tagged.
@@ -202,12 +202,12 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
      - the warnings show at 35 km;
      - race-day form lands in `COACH.race`;
      - the scenarios output has been reviewed.
-5. **Injury stop.**
+5. **Injury stop.** *Built.* Held means the blueprint stays at the step it is at and is tagged `h`, at full size (a lighter week's scaling is separate). The offer is a card on the Blocks page, shown only while a phase is on; its button opens the existing lighter re-plan of the running block. `PhaseSeed.injury` is set from the same check.
    - Add `injuryStop(pain, today)` in `shared/recovery.ts`. It fires on pain of level 8 or more in the last 7 days, or of level 5 or more on 3 different days within 7.
    - `server/racephase.ts` reads `repo.listPain`. When it fires, every step is held and the deep aim is off.
    - GETs return `injury`, and the client offers the existing re-plan (`/blocks/:id/replan?light=1`). The runner chooses; readiness alone never re-plans.
    - Done when there are tests at both limits, and a test that nothing but the held steps changes.
-6. **Deep aim in the last two build weeks.**
+6. **Deep aim in the last two build weeks.** *Built.* The deep aim only runs with a phase (an A marathon or half). `PhaseSeed.backOff` is set from pain of level 5 or more in the last 7 days, or from under half of the judged work reps in target in either of the last two run tagged sessions (`backOffNow`). When the taper can't land race-day form in `COACH.race` on the deeper weeks, the plain weeks stay. The page is built.
    - In `suggestBlock`, before `taperFit`: for the two build weeks right before the first taper week, when there is no back-off or injury, bisect km between the planned km and the week's cap for the largest km whose deepest form is −25 % or higher and is not too hard. Add the try id `"deep"`.
    - Revert if race-day form then leaves `COACH.race`.
    - Leave `COACH.floor`, `rampRisk`, `weekGrowth`, `floorFor`, `fitWeeks` and the spike rule untouched.

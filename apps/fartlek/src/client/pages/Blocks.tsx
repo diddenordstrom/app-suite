@@ -8,6 +8,7 @@ import { t, tm, tn } from "../i18n";
 import type { BlockPreview, BlocksData, BlockWithSummary, CoachTip } from "../types";
 import { CoachPanel, CrossHabit, ListEditor, QuickAdd, WeekCalendar, wk } from "../blockcoach";
 import { ReplanDialog } from "../suggestblock";
+import { InjuryOffer } from "../racepace";
 import { MoreMenu } from "../moremenu";
 import { labelRight, raceLabels } from "../seasonlabels";
 import { lang } from "../i18n";
@@ -31,7 +32,7 @@ const short = (d: string) => fmtDay(d, { day: "numeric", month: "short" });
 export function BlockView({ onOpenWeek, creating, onCreatingDone, initialSelected = null }: { onOpenWeek: (weekStart: string) => void; creating: boolean; onCreatingDone: () => void; initialSelected?: number | null }) {
   const { data, error, reload, loading } = useApi<BlocksData>("/blocks");
   const [selected, setSelected] = useState<number | null>(initialSelected);
-  const [replanning, setReplanning] = useState<{ block: BlockWithSummary; startWith: "plan" | "engine" } | null>(null);
+  const [replanning, setReplanning] = useState<{ block: BlockWithSummary; startWith: "plan" | "engine"; light?: boolean } | null>(null);
   const [editing, setEditing] = useState<BlockWithSummary | null>(null);
   const [changing, setChanging] = useState<BlockWithSummary | null>(null);
 
@@ -51,6 +52,10 @@ export function BlockView({ onOpenWeek, creating, onCreatingDone, initialSelecte
   return (
     <div className="space-y-4">
       {loading && <Spinner className="text-muted-foreground" />}
+      {data.injury && (
+        <InjuryOffer injury={data.injury}
+          onReplan={(() => { const run = data.blocks.find((b) => b.summary.start <= data.today && b.summary.end >= data.today); return run ? () => setReplanning({ block: run, startWith: "engine", light: true }) : null; })()} />
+      )}
       {data.blocks.length > 0 && <SeasonStrip data={data} selected={current?.id ?? null} onSelect={(id) => { setSelected(id); setEditing(null); }} />}
 
       {creating || editing ? (
@@ -65,7 +70,7 @@ export function BlockView({ onOpenWeek, creating, onCreatingDone, initialSelecte
         <Card><p className="text-sm text-muted-foreground">{t("block.none")}</p></Card>
       )}
 
-      {replanning && <ReplanDialog block={replanning.block} startWith={replanning.startWith} options={{ thisWeek: true }} onClose={() => setReplanning(null)} onSaved={() => { setReplanning(null); void reload(); }} />}
+      {replanning && <ReplanDialog block={replanning.block} startWith={replanning.startWith} options={{ thisWeek: true, light: replanning.light }} onClose={() => setReplanning(null)} onSaved={() => { setReplanning(null); void reload(); }} />}
       {changing && <ChangeDialog block={changing} onClose={() => setChanging(null)} onSaved={() => { setChanging(null); void reload(); }} />}
     </div>
   );

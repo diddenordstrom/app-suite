@@ -148,7 +148,7 @@ describe("the threshold ladder", () => {
 describe("rungBefore", () => {
   const thr = (date: string, reps: number, min: number, outcome: "done" | "missed" | "skipped" | "upcoming" | "to_do") => ({
     workout: { id: 1, date, type: "threshold" as const, distanceKm: null, durationMin: null, zone2: false, notes: null, status: "planned" as const,
-      skipReason: null, manualActivityId: null, manualUnlinked: false, steps: thresholdSteps(reps, min) },
+      skipReason: null, manualActivityId: null, manualUnlinked: false, steps: thresholdSteps(reps, min), blueprint: null },
     outcome, match: null, activity: null,
   });
   it("steps on from the last session run or still to run, and repeats after a missed one", () => {

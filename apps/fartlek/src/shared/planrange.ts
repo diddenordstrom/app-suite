@@ -64,7 +64,7 @@ export function workoutWeeks(workouts: Workout[], startWeek: ISODate, weeks: num
     const i = Math.floor(daysBetween(startWeek, w.date) / 7);
     if (i < 0 || i >= weeks) continue;
     const type = w.type === "cross" ? "cross" : w.type === "easy" || w.type === "long" ? w.type : "threshold";
-    out[i].push({ date: w.date, type, km: type === "cross" ? 0 : plannedKmOf(w), durationMin: w.durationMin, steps: w.steps });
+    out[i].push({ date: w.date, type, km: type === "cross" ? 0 : plannedKmOf(w), durationMin: w.durationMin, steps: w.steps, ...(w.blueprint ? { blueprint: w.blueprint } : {}) });
   }
   return out.map((items) => items.sort((a, b) => a.date.localeCompare(b.date)));
 }
