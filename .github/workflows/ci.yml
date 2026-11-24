@@ -1,4 +1,6 @@
-name: ci
+# One workflow for both CI (audit, docs, test, smoke) and CD (image, deploy), so the CD jobs can wait on
+# the CI jobs with `needs:`. See docs/decisions/ci-cd-one-workflow.md.
+name: ci-cd
 on:
   push: { branches: [main], tags: ["*-v*"] }
   pull_request:
