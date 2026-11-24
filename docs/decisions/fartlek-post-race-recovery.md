@@ -59,7 +59,7 @@ Settled with the user on 2026-11-24, as a spec for a build session. It closes th
 - **The result and how the race felt** (a slow finish, cramps, a DNF) could lengthen or shorten recovery. Parked for v1; the race result is already stored ([race results](fartlek-race-results.md)).
 - **Modifiers for heat, a hilly course and age.** Parked for v1.
 - **A B race in the middle of a block** keeps today's behaviour: the block ends at the B race week (`racePlanFor`), and the next block gets the shorter B recovery. A B race in the weeks of a re-plan gets the B rows through `replanRace`.
-- **Plans of several blocks (8–28 weeks).** A follow-up feature: one plan from today to the race and through its recovery, built from the existing blocks. The `recovery` role is designed for it.
+- ~~**Plans of several blocks (8–28 weeks).**~~ Decided 2026-11-24 in [race plan skeleton](fartlek-race-plan-skeleton.md): a skeleton to the race and through these recovery weeks, reusing the role and the table; this page's build plan comes first.
 - **The long run's way back.** After the recovery weeks the long-run ladder steps up from the longest run planned in them, about 8 % a week, which may be slower than the weekly volume's re-entry. Check in the scenarios before changing it.
 - **The threshold ladder after recovery** resumes at the rung the last threshold session left (`seed.rung`); whether it should step back a rung or two after a marathon is untested.
 
