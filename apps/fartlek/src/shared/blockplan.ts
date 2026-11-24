@@ -346,7 +346,8 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
   let longest = seed.longestKm, any = seed.longestKm;
   // The race phase's blueprints step on along the plan: one step each time a full session is planned (a held one never advances).
   const steps: Record<string, number> = { ...(seed.phase?.steps ?? {}) };
-  let ladderUsed = 0;
+  // The next rung: phase weeks go on from where the build weeks before the phase left the ladder.
+  let ladderNext = 0;
   return vols.map((v, i) => {
     const ws = weekSeedOf(seed, i, 0, 0, [], false);
     const phase = seed.phase && v.role !== "race" ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
@@ -372,12 +373,13 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
       phased = { long: l ? item(l) : null, quality: q ? [{ ...item(q), ...(qSlot?.day ? { date: qSlot.day } : {}) }] : [] };
       // A quality session of the phase takes the threshold session's place, the ladder stays as a third from `highKm` a week.
       const third = v.role === "build" && v.km >= RACE_PHASE.highKm && daysOf(ws).slots.length >= NEXT.secondMinDays;
-      if (q || !qSlot && !phase.quality) thr = third ? [rung(seed.rung + ladderUsed++)] : [];
-      else thr = v.lighter ? [{ ...NEXT.lighterThr }] : [rung(seed.rung + ladderUsed++)];
+      if (q || !qSlot && !phase.quality) thr = third ? [rung(seed.rung + ladderNext++)] : [];
+      else thr = v.lighter ? [{ ...NEXT.lighterThr }] : [rung(seed.rung + ladderNext++)];
     } else if (v.role === "race") thr = [{ ...RACE_SHARPEN }];
     else if (v.lighter) thr = [{ ...NEXT.lighterThr }];
     else {
       const main = rung(seed.rung + buildIdx[i]);
+      ladderNext = buildIdx[i] + 1;
       // A second session in the last `second` build weeks, deepest first.
       thr = buildIdx[i] >= builds - shape.second ? [main, { ...NEXT.second }] : [main];
     }
@@ -638,7 +640,8 @@ export function asWeekSuggestion(seed: WeekSeed, s: BlockSuggestion, clipped?: {
       : { pct: gb ? Math.round((km / gb - 1) * 100) : 0 };
     return { id, km, form: tr.form ?? e.low, state: tr.state === "info" ? "ok" : tr.state, params };
   });
-  const thrItem = w.items.find((it) => it.type === "threshold");
+  // The ladder session, not a race-phase one (tagged, typed threshold, placed first).
+  const thrItem = w.items.find((it) => it.type === "threshold" && !it.blueprint);
   const reps = thrItem ? thresholdReps(thrItem.steps) : null;
   const thr: Thr | null = reps ? { reps: reps.reps, min: Math.round(reps.min), rest: 2 } : null;
   const at = !lighter && thr ? NEXT.ladder.findIndex((x) => x.reps === thr.reps && x.min === thr.min) : -1;

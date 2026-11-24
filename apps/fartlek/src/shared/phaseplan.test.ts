@@ -3,7 +3,7 @@ import { addDays, daysBetween } from "./dates";
 import { BLUEPRINTS, parseBlueprintTag } from "./blueprints";
 import { suggestBlock, raceRoles, type BlockSeed } from "./blockplan";
 import { COACH } from "./coach";
-import { NEXT } from "./nextweek";
+import { NEXT, thresholdReps } from "./nextweek";
 import { RACE_PHASE, type PhaseSeed } from "./racephase";
 import type { StepRefs } from "./steps";
 
@@ -59,6 +59,16 @@ describe("the race phase in the plan", () => {
     }
     // A lighter week and the taper keep to the blueprint's one session.
     for (const w of s.weeks.filter((x) => x.role === "lighter" || x.role === "taper")) expect(w.items.filter((it) => it.type === "threshold" && !it.blueprint)).toHaveLength(0);
+  });
+
+  it("in a block that starts before the phase, the ladder goes on from the build weeks before it instead of starting over", () => {
+    const { s } = plan(70, { weeks: 10 });
+    const at = s.weeks.filter((w) => w.role === "build").map((w) => {
+      const r = thresholdReps(w.items.find((it) => it.type === "threshold" && !it.blueprint)?.steps ?? null);
+      return r ? NEXT.ladder.findIndex((x) => x.reps === r.reps && x.min === r.min) : -1;
+    }).filter((i) => i >= 0);
+    expect(at.length).toBeGreaterThan(2);
+    for (let i = 1; i < at.length; i++) expect(at[i], `ladder ${at.join(", ")}`).toBeGreaterThanOrEqual(Math.min(at[i - 1] + 1, NEXT.ladder.length - 1));
   });
 
   it("steps each blueprint on along the plan, and a held session in the lighter week never advances", () => {
