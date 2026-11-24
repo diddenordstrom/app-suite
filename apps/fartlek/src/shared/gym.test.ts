@@ -137,6 +137,8 @@ describe("Bolt import", () => {
     expect(a.entries.map((e) => e.exercise)).toEqual(["bench_press", "pull_up", "x:Cable Thing"]);
     expect(a.entries[0].sets).toEqual([{ kind: "warmup", kg: 40, reps: 10, seconds: null }, w(6, 62.5)]);
     expect(a.entries[1].sets).toEqual([w(7)]);
+    // The notes column becomes the exercise's comment.
+    expect(a.entries.map((e) => e.note)).toEqual([undefined, undefined, 'said "slow", then fast']);
     expect(b.entries[0].sets.map((s) => s.kind)).toEqual(["work", "drop"]);
   });
 

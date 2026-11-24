@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · note · Fartlek gym: Bolt notes become exercise comments ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: remove a set, weight follows down, comment per exercise ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Fartlek gym: search in both languages, reorder exercises ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: one session a week is full body ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module, first version built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module: flow from Idag, no tab, joint check-in ([log/2026-11.md](log/2026-11.md))
-- 2026-11-23 · decision · Fartlek trend cards: today's value on top, key numbers underneath ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
