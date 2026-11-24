@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · decision · CI and CD stay in one workflow, renamed ci-cd ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: Bolt notes become exercise comments ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: remove a set, weight follows down, comment per exercise ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Fartlek gym: search in both languages, reorder exercises ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · note · Gym on the Fartlek landing page, its own news note ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym module, first version built ([log/2026-11.md](log/2026-11.md))
-- 2026-11-23 · decision · Fartlek gym module: flow from Idag, no tab, joint check-in ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -21,6 +21,7 @@
 - [Porting Autarki (garden) to the suite stack](decisions/autarki-port.md): Autarki moves from Nuxt/Vue/Nitro to Hono + server-kit + React in three steps, server first, without keeping any data _(decision · accepted · 2026-11-12)_
 - [How Fartlek charts are laid out](decisions/chart-layout.md): One y-axis per chart; stacked panels for a single activity's curves; a pill switch for related trends; no dual axes; trend cards share one anatomy (today's value on top, key numbers underneath) _(decision · accepted · 2026-11-23)_
 - [CI always audits production dependencies](decisions/ci-audit-gate.md): The audit job runs on every push and PR, independent of what changed, with the same gate as the garden repo _(decision · accepted · 2026-11-09)_
+- [CI and CD share one workflow, named ci-cd](decisions/ci-cd-one-workflow.md): Why test and deploy jobs live in the same workflow file instead of separate ci and cd workflows _(decision · accepted · 2026-11-24)_
 - [CI starts every app's image on pull requests](decisions/ci-image-smoke.md): A smoke job builds each image and waits for /api/health, because tests run the source and never the production bundle _(decision · accepted · 2026-11-22)_
 - [Demo mode with a throwaway database per visitor](decisions/demo-mode.md): Portfolio visitors without an account try runplan, shopsplit and Etapp through /demo, each in their own capped, short-lived SQLite file _(decision · accepted · 2026-11-10)_
 - [Dependabot auto-merge when the checks pass](decisions/dependabot-automerge.md): How non-major Dependabot PRs merge themselves, and the repo settings the workflow depends on _(decision · accepted · 2026-11-23)_
