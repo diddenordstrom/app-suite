@@ -249,7 +249,8 @@ export function matchSteps(steps: WorkoutSteps, rawLaps: Lap[], stream: Stream |
     };
   });
 
-  const work = results.filter((r) => r.flat.role === "work");
+  // Reps with no target (strides) are not counted: "0 of 3 in target" for strides said nothing.
+  const work = results.filter((r) => r.flat.role === "work" && r.target.judge != null);
   const judgedWork = work.filter((r) => r.status === "in" || r.status === "near" || r.status === "off");
   const withHr = work.filter((r) => r.hr != null);
   const used = pairs.filter((p) => p.seg).length;

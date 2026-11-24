@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · decision · Strides are not counted as judged reps ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Easy HR is a ceiling in plan vs actual ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · CI and CD stay in one workflow, renamed ci-cd ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek: gaps in marathon training outside the race phase ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · decision · Fartlek: race-specific phase for marathon and half ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: Bolt notes become exercise comments ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: remove a set, weight follows down, comment per exercise ([log/2026-11.md](log/2026-11.md))
-- 2026-11-23 · note · Fartlek gym: search in both languages, reorder exercises ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
