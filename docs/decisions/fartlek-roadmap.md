@@ -3,7 +3,7 @@ title: Fartlek roadmap: progress graphs for data nerds, today first
 summary: Who Fartlek is for (self-coached, data-loving marathon runners), what it won't try to be, and the build order from late 2026 to the 2028 triathlon
 type: decision
 status: accepted
-updated: 2026-11-20
+updated: 2026-11-24
 ---
 
 # Fartlek roadmap: progress graphs for data nerds, today first
@@ -55,7 +55,7 @@ Trends already has threshold pace, threshold HR, easy pace in an HR band (pace a
 
 After comparing with Runna again (Fartlek should be an alternative to it, the only other pure running app):
 
-- **Mål till plan** first: a goal (race, date, goal or recent time, run days) to a plan in two minutes, working before Garmin history. Planned in [mål till plan](fartlek-goal-to-plan.md).
+- **Mål till plan** first: a goal (race, date, goal or recent time, run days) to a plan in two minutes, working before Garmin history. Planned in [mål till plan](fartlek-goal-to-plan.md); its whole-road view (a skeleton of phases to an A marathon or half) is specified in [race plan skeleton](fartlek-race-plan-skeleton.md).
 - **Later: the morning notification at scale.** It syncs Garmin for one user at a time; with a few hundred users at the default 08:00 the last one would wait close to an hour. Parallel syncs with a cap and a small spread around the time, before an open instance has that many users ([morning notification](fartlek-morning-push.md)).
 - Garmin's Connect Developer Program (Health API for sync, Training API for workouts to the watch) is what an open hosted instance needs; personal API keys don't scale past friends.
 

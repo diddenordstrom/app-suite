@@ -3,7 +3,7 @@ title: Fartlek adapts at week level: Monday check-in, reasons for misses, pause 
 summary: How the block engine reacts to struck, moved, short and too-hard sessions: evaluate per week not per day, ask why after two misses in a row, a pause repeats the week and shifts the block, a skipped easy run may lift the long run slightly past the 30-day rule
 type: decision
 status: accepted
-updated: 2026-11-14
+updated: 2026-11-24
 ---
 
 # Fartlek adapts at week level: Monday check-in, reasons for misses, pause by repeating the week
@@ -52,7 +52,7 @@ The reasons are stored per miss so Fartlek can later show patterns (always missi
 
 ## Pause: repeat the week
 
-A pause **extends the block by one week and shifts everything after it**. The result reads: the week where a lot was skipped, the same week again, then the block carries on. The repeated week is built from what was actually done (re-entry logic, `weekCapWith`), not copied. Severity picks the size: a few days out is one repeated week, a week or more is re-entry from the load that is left. With a fixed race date the block cannot grow, so the engine compresses instead and says what gives (a smaller peak week, a shorter taper).
+A pause **extends the block by one week and shifts everything after it**. The result reads: the week where a lot was skipped, the same week again, then the block carries on. The repeated week is built from what was actually done (re-entry logic, `weekCapWith`), not copied. Severity picks the size: a few days out is one repeated week, a week or more is re-entry from the load that is left. With a fixed race date the block cannot grow, so the engine compresses instead and says what gives (a smaller peak week, a shorter taper). *Amended 2026-11-24 by [race plan skeleton](fartlek-race-plan-skeleton.md):* the taper and the race-specific phase are never shortened; a break costs the phase it falls in and km are never made up; 8 days or more off makes the next block's first week at most 70 %.
 
 ## Catch-up on the long run, bending the 10 % rule
 

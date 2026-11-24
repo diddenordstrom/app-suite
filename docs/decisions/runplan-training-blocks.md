@@ -3,10 +3,12 @@ title: runplan plans in training blocks
 summary: Blocks replace phases; the plan is written, edited as text and judged per block; races are reminders with taper suggestions
 type: decision
 status: accepted
-updated: 2026-11-09
+updated: 2026-11-24
 ---
 
 # runplan plans in training blocks
+
+*Partly superseded on 2026-11-24:* the "no cycle level above blocks" rule, by [race plan skeleton](fartlek-race-plan-skeleton.md). The rest stands.
 
 Settled in a design interview (Nov 2026). Evidence behind it: [research/training-blocks.md](../research/training-blocks.md).
 
@@ -17,7 +19,7 @@ The plan page has three parts that don't know about each other: `phases` only co
 ## Settled
 
 - **Fitness projection ends where the plan ends** (later: the end of the last block), not at race day. The caption reports fitness/form at the plan's end, and on the race only if the plan reaches it.
-- **Blocks replace phases.** A block has a kind (base, build, specific/peak, taper, recovery), a free length and a name; hierarchy is block → weeks → workouts. No extra "cycle" level above blocks.
+- **Blocks replace phases.** A block has a kind (base, build, specific/peak, taper, recovery), a free length and a name; hierarchy is block → weeks → workouts. ~~No extra "cycle" level above blocks.~~ *Partly superseded on 2026-11-24 by [race plan skeleton](fartlek-race-plan-skeleton.md):* before an A marathon or half a race plan (a skeleton of phases with a km target per week) sits above the blocks; blocks stay the unit sessions are made and judged in.
 - **Workouts belong to a block by date**, not by foreign key. Moving a workout to another date moves it to whichever block covers that date.
 - **Races are not linked to blocks.** A race is a reminder; the user plans blocks toward it, and the app suggests (e.g. taper 2 weeks before an A race: volume −40–60 %, keep intensity and frequency).
 - **The quick-add text is a two-way view of the block.** Opening it renders the block's workouts back as one line per week (same grammar as quick-add). Saving it applies the difference:
