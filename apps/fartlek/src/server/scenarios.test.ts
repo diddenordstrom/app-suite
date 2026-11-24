@@ -38,6 +38,22 @@ group("planning scenarios", () => {
     expect(h.race!.km[1], describe(h)).toBeGreaterThan(h.race!.km[0]);
   });
 
+  it("projects the road to an A marathon or half (docs/decisions/fartlek-race-plan-skeleton.md)", () => {
+    const m20 = r("marathon in 20"), m28 = r("marathon in 28"), h12 = r("half in 12"), m10 = r("marathon in 10");
+    expect(m20.road!.lengths, describe(m20)).toEqual({ base: 8, build: 6, specific: 4, taper: 2 });
+    expect(m28.road!.lengths, describe(m28)).toEqual({ base: 12, build: 8, specific: 6, taper: 2 });
+    expect(h12.road!.lengths, describe(h12)).toEqual({ base: 3, build: 4, specific: 3, taper: 2 });
+    expect(m10.road!.short?.minWeeks, describe(m10)).toBe(12);
+    expect(m10.road!.lengths, describe(m10)).toEqual({ base: 0, build: 4, specific: 4, taper: 2 });
+    // The long-run peak lands 8 to 5 weeks before a marathon; every week to the end of recovery has a target.
+    for (const x of [m20, m28]) {
+      expect(x.road!.longPeak!.wip, describe(x)).toBeGreaterThanOrEqual(5);
+      expect(x.road!.longPeak!.wip, describe(x)).toBeLessThanOrEqual(8);
+      expect(x.road!.weeks.filter((w) => w.phase === "recovery"), describe(x)).toHaveLength(4);
+      expect(x.road!.weeks.every((w) => (w.km ?? 0) > 0), describe(x)).toBe(true);
+    }
+  });
+
   it("brings a runner returning from a dip back towards the 35 km run before, not a lighter week", () => {
     const x = r("dip and return");
     expect(x.week.chosen, describe(x)).toBe("volume");

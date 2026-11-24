@@ -3,7 +3,9 @@ import type { Db } from "../db";
 import * as t from "../db/schema";
 import * as repo from "../repo";
 import { ctxFor, type Ctx } from "../analysis";
-import { kmByDay, longestRun, recoveryRaceFor, weeksBefore } from "./blocks";
+import { breakBefore, kmByDay, longestRun, recoveryRaceFor, weeksBefore } from "./blocks";
+import { activePlanRace, farRaceFor, otherRacesInBlock, phaseAtFor, planRaceFor, planRows, planStartOf, roadFor, roadOthers, skeletonInputs, writePlan, type BlockWeek, type PlanRace } from "../raceplan";
+import { chunkKind, PLAN_PHASES, projectSkeleton, RACE_PLAN, type RaceRoad } from "../../shared/raceplan";
 import { hardOn, insertItems, parseItems, restoreRows, runUndo, seedFor } from "./nextweek";
 import { phaseView, racePaceGate } from "../racephase";
 import { addDays, daysBetween, weekStartOf, type ISODate } from "../../shared/dates";
@@ -12,7 +14,8 @@ import { diffPlans, planRange, rangeWeeks, workoutWeeks } from "../../shared/pla
 import { COACH } from "../../shared/coach";
 import { BLOCK, blockDaysAdvice, raceChunks, raceRoles, RECOVERY, recoveryRoles, recoveryRow, tolerance, weekKm, withRecovery, type BlockSeed, type RaceChunk, type RecoveryRace, type WeekRole } from "../../shared/blockplan";
 import { NEXT, type SuggestItem } from "../../shared/nextweek";
-import type { Block, Race, Workout } from "../../shared/types";
+import type { PlanPhase } from "../../shared/raceplan";
+import { BLOCK_KINDS, type Block, type Race, type Workout } from "../../shared/types";
 import { body, date, idParam, num, optStr, router, BadRequest } from "./util";
 
 /*
@@ -39,7 +42,7 @@ const replacedBy = (ctx: Ctx, from: ISODate, to: ISODate) => plannedIn(ctx, from
  * back from it; within 8 weeks the build and the form-peak block are planned together, further out only the first
  * block (which puts the runner in phase). A B race inside the block's weeks: the block ends with its race week.
  */
-type RacePlan = { race: { name: string; date: ISODate; priority: "A" | "B" }; weeksToRace: number; chunks: RaceChunk[]; now: number };
+type RacePlan = { race: { name: string; date: ISODate; priority: "A" | "B" }; weeksToRace: number; chunks: (RaceChunk & { blockKind?: Block["kind"] })[]; now: number };
 function racePlanFor(race: { name: string; date: ISODate; priority?: string } | null, startWeek: ISODate, weeks: number): { plan: RacePlan; weeks: number; roles: WeekRole[] | null } | null {
   if (!race || race.date < startWeek) return null;
   const priority: "A" | "B" = race.priority === "A" ? "A" : "B";
@@ -94,7 +97,9 @@ function raceInOpenWeeks(ctx: Ctx, from: ISODate, end: ISODate) {
 /** Run km per week for the `weeks` weeks before `weekStart`, oldest first (actual, planned ahead). */
 
 /** The block engine's seed for `weeks` weeks from `startWeek` (a week that hasn't started). */
-function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: number | null; buildWeeksDone: number; lighterLast: boolean; light?: boolean; lighterWeeks?: boolean[]; roles?: WeekRole[] | null; race?: BlockSeed["race"]; recovery?: RecoveryRace | null }): BlockSeed {
+function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: number | null; buildWeeksDone: number; lighterLast: boolean; light?: boolean; lighterWeeks?: boolean[]; roles?: WeekRole[] | null; race?: BlockSeed["race"]; recovery?: RecoveryRace | null;
+  /** Other races in the weeks (docs/decisions/fartlek-race-plan-skeleton.md), and the first build week's cap after a break. */
+  otherRaces?: { date: ISODate }[]; backKm?: number | null }): BlockSeed {
   const w = seedFor(ctx, startWeek, { formOverTarget: true, weeks });
   const seed: BlockSeed = {
     startWeek, weeks, ctl: w.ctl, atl: w.atl, kmBefore: w.kmBefore, past: w.past,
@@ -108,6 +113,8 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
     ...(w.phase ? { phase: w.phase } : {}),
     ...(o.lighterWeeks ? { lighterWeeks: o.lighterWeeks } : {}),
     ...(o.race ? { race: o.race } : {}),
+    ...(o.otherRaces?.length ? { otherRaces: o.otherRaces } : {}),
+    ...(o.backKm != null ? { backKm: o.backKm } : {}),
   };
   // After a race of 10 km+ (docs/decisions/fartlek-post-race-recovery.md): the race is not the long run the ladder and the spike rule step from.
   if (o.recovery) {
@@ -193,7 +200,7 @@ function blockParts(raw: unknown, n: number, name: string | null, allRecovery = 
   if (!Array.isArray(raw) || !raw.length) return [{ weeks: n, kind: allRecovery ? "recovery" : "base", name }];
   const parts = raw.slice(0, 4).map((p: Record<string, unknown>, i) => ({
     weeks: Math.trunc(Number(p?.weeks)) || 0,
-    kind: BLOCK_KIND_OF[p?.kind as RaceChunk["kind"]] ?? "base",
+    kind: BLOCK_KINDS.includes(p?.kind as Block["kind"]) ? p.kind as Block["kind"] : BLOCK_KIND_OF[p?.kind as RaceChunk["kind"]] ?? "base",
     name: optStr(p?.name, `blocks[${i}].name`, 60),
   }));
   if (parts.some((p) => p.weeks < 1) || parts.reduce((a, p) => a + p.weeks, 0) !== n) throw new BadRequest("blocks must add up to the weeks");
@@ -203,12 +210,75 @@ function blockParts(raw: unknown, n: number, name: string | null, allRecovery = 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 /** Weekly targets for the weeks written: their km, and a note on the lighter and taper weeks (a re-plan reads `backoff`). */
 function writeTargets(tx: Tx, userId: number, startWeek: ISODate, weeks: SuggestItem[][], roles: (WeekRole | boolean)[]) {
+  // The block's weeks hold exactly the block's targets: one that went stale never stays (docs/decisions/fartlek-race-plan-skeleton.md).
+  tx.delete(t.weekTargets).where(and(eq(t.weekTargets.userId, userId), gte(t.weekTargets.weekStart, startWeek), lte(t.weekTargets.weekStart, addDays(startWeek, (weeks.length - 1) * 7)))).run();
   weeks.forEach((items, i) => {
     const ws = addDays(startWeek, i * 7);
     const role = roles[i] === true ? "lighter" : roles[i] === false ? "build" : roles[i];
     const target = { km: weekKm(items), minutes: null, note: role === "lighter" ? BACKOFF_NOTE : role === "taper" || role === "race" ? TAPER_NOTE : role === "recovery" ? RECOVERY_NOTE : null };
     tx.insert(t.weekTargets).values({ userId, weekStart: ws, ...target })
       .onConflictDoUpdate({ target: [t.weekTargets.userId, t.weekTargets.weekStart], set: target }).run();
+  });
+}
+
+/* ---------- The race plan (docs/decisions/fartlek-race-plan-skeleton.md) ---------- */
+
+const longOf = (items: SuggestItem[]) => items.filter((it) => it.type === "long").reduce<number | null>((m, it) => (m == null || it.km > m ? it.km : m), null);
+const blockWeeksOf = (weeks: { weekStart: ISODate; role: WeekRole; items: SuggestItem[] }[]): BlockWeek[] =>
+  weeks.map((w) => ({ weekStart: w.weekStart, km: weekKm(w.items), role: w.role, longKm: longOf(w.items) }));
+const postedWeeks = (startWeek: ISODate, weeks: SuggestItem[][], roles: WeekRole[]) =>
+  blockWeeksOf(weeks.map((items, i) => ({ weekStart: addDays(startWeek, i * 7), role: roles[i], items })));
+
+/** Each chunk's block kind: the phase most of its weeks have. */
+function withBlockKinds(plan: RacePlan, phaseAt: (ws: ISODate) => PlanPhase, startWeek: ISODate) {
+  let at = 0;
+  plan.chunks = plan.chunks.map((c) => {
+    const phases = Array.from({ length: c.weeks }, (_, i) => phaseAt(addDays(startWeek, (at + i) * 7)));
+    at += c.weeks;
+    return { ...c, blockKind: chunkKind(phases) };
+  });
+}
+
+/** The road after the block's weeks: the skeleton projected from `firstWeek`. */
+function roadAfter(ctx: Ctx, pr: PlanRace, blockWeeks: BlockWeek[], firstWeek: ISODate): RaceRoad {
+  const input = skeletonInputs(ctx, pr, firstWeek, blockWeeks);
+  return roadFor(ctx, pr, { planStart: input.planStart, skeleton: projectSkeleton(input), blockWeeks, stored: false, others: roadOthers(ctx, pr, input.planStart) });
+}
+
+/** The rows to store for the block's weeks and the skeleton after them. */
+function planAfter(ctx: Ctx, pr: PlanRace, blockWeeks: BlockWeek[], firstWeek: ISODate) {
+  const input = skeletonInputs(ctx, pr, firstWeek, blockWeeks);
+  return planRows(pr, input.planStart, blockWeeks, projectSkeleton(input));
+}
+
+/** After a break of 8+ days: the first week is at most 70 % of what the plan had for it (or of the tolerance). */
+function backAfterBreak(ctx: Ctx, startWeek: ISODate): { days: number; km: number } | null {
+  const days = breakBefore(ctx, startWeek);
+  if (days <= RACE_PLAN.back.absorbDays) return null;
+  const stored = repo.listPlanWeeks(ctx.db, ctx.userId, startWeek, startWeek)[0]?.km ?? null;
+  const base = stored ?? tolerance(weeksBefore(ctx, startWeek, BLOCK.tolerance.lookbackWeeks)).km;
+  return base > 0 ? { days, km: Math.floor(RACE_PLAN.back.share * base * 2) / 2 } : null;
+}
+
+const farOf = (ctx: Ctx, startWeek: ISODate) => {
+  const f = farRaceFor(ctx, startWeek);
+  return f ? { name: f.race.name, date: f.race.date, weeksToRace: f.weeksToRace, planFrom: f.planFrom } : null;
+};
+
+/** The plan rows undo puts back: at most 60, each checked. */
+function planBeforeParam(ctx: Ctx, raw: unknown, from: ISODate) {
+  if (raw === undefined) return null;
+  if (!Array.isArray(raw) || raw.length > 60) throw new BadRequest("planBefore must be up to 60 weeks");
+  const races = new Set(repo.listRaces(ctx.db, ctx.userId).map((r) => r.id));
+  const n = (v: unknown, label: string) => (v == null ? null : typeof v === "number" && Number.isFinite(v) && v >= 0 && v <= 500 ? v : (() => { throw new BadRequest(`${label} must be a number`); })());
+  return raw.map((x: Record<string, unknown>, i) => {
+    if (!x || typeof x !== "object") throw new BadRequest(`planBefore[${i}] must be an object`);
+    const weekStart = date(x.weekStart, `planBefore[${i}].weekStart`);
+    if (weekStart < from) throw new BadRequest(`planBefore[${i}].weekStart must be in the range`);
+    if (!PLAN_PHASES.includes(x.phase as PlanPhase)) throw new BadRequest(`planBefore[${i}].phase is unknown`);
+    if (!ROLES.includes(x.role as WeekRole)) throw new BadRequest(`planBefore[${i}].role is unknown`);
+    if (!Number.isInteger(x.raceId) || !races.has(x.raceId as number)) throw new BadRequest(`planBefore[${i}].raceId is not one of your races`);
+    return { weekStart, raceId: x.raceId as number, phase: x.phase as string, role: x.role as string, km: n(x.km, `planBefore[${i}].km`), longKm: n(x.longKm, `planBefore[${i}].longKm`) };
   });
 }
 
@@ -223,8 +293,11 @@ export function blockPlanRoutes(db: Db) {
     const startWeek = startParam(ctx, c.req.query("startWeek"), blocks);
     const asked = weeksParam(c.req.query("weeks"));
     // An A or B race ahead decides the weeks and their roles; the rhythm asked for applies only without one.
-    const raceAhead = raceNear(ctx, startWeek, repo.listWorkouts(db, ctx.userId, startWeek, addDays(startWeek, BLOCK.raceWindowWeeks * 7)), addDays(startWeek, asked * 7 - 1));
+    // An A marathon or half up to 30 (half 20) weeks out decides them through its race plan (docs/decisions/fartlek-race-plan-skeleton.md).
+    const pr = planRaceFor(ctx, startWeek);
+    const raceAhead = pr ? pr.race : raceNear(ctx, startWeek, repo.listWorkouts(db, ctx.userId, startWeek, addDays(startWeek, BLOCK.raceWindowWeeks * 7)), addDays(startWeek, asked * 7 - 1));
     const rp = racePlanFor(raceAhead, startWeek, asked);
+    if (rp && pr) withBlockKinds(rp.plan, phaseAtFor(planStartOf(ctx, pr, startWeek), pr.race, pr.kind), startWeek);
     const weeks = rp ? rp.weeks : asked;
     // "1:1" (the rhythm picked in "Skapa block"): two weeks, the second lighter. The engine's own rule has no lighter week under three.
     // After a race of 10 km+ the first weeks are recovery weeks (docs/decisions/fartlek-post-race-recovery.md).
@@ -238,15 +311,18 @@ export function blockPlanRoutes(db: Db) {
     // The running week is planned from today on; the days before stay as they were (shown locked with what was run).
     const from = startWeek > ctx.today ? startWeek : ctx.today;
     const replaces = replacedBy(ctx, startWeek, end);
+    const back = pr ? backAfterBreak(ctx, startWeek) : null;
     const { seed, suggestion, advice } = repo.tuned(db, uid(c), () => {
       // The block's weeks as a range, planned by the one engine entry (shared/planrange.ts).
       const rw = rangeWeeks({ from: startWeek, to: end }, ctx.settings.weekStart);
       const raceIn = rp && rp.roles?.includes("race") ? { date: rp.plan.race.date, priority: rp.plan.race.priority } : null;
       // A race of 10 km+ inside the weeks: its days after the race are gated too.
-      const inside = raceIn && raceAhead && "distanceKm" in raceAhead && raceAhead.distanceKm >= RECOVERY.minKm
-        ? { date: raceIn.date, distanceKm: raceAhead.distanceKm, priority: raceIn.priority, peakKm: null } : null;
+      const aheadKm = (raceAhead as { distanceKm?: number } | null)?.distanceKm ?? 0;
+      const inside = raceIn && aheadKm >= RECOVERY.minKm ? { date: raceIn.date, distanceKm: aheadKm, priority: raceIn.priority, peakKm: null } : null;
       const recovery = rec ? { date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, peakKm: rec.peakKm } : inside;
-      const seed = blockSeedFor(ctx, rw.startWeek, rw.weeks, { goalKm: null, buildWeeksDone: 0, lighterLast: true, lighterWeeks, roles: withRecovery(rp?.roles ?? null, recRoles), race: raceIn, recovery });
+      const ob = pr ? otherRacesInBlock(ctx, pr, rw.startWeek, rw.weeks, withRecovery(rp?.roles ?? null, recRoles)) : null;
+      const seed = blockSeedFor(ctx, rw.startWeek, rw.weeks, { goalKm: null, buildWeeksDone: 0, lighterLast: true, lighterWeeks, roles: ob ? ob.roles : withRecovery(rp?.roles ?? null, recRoles), race: raceIn,
+        recovery: recovery ?? ob?.recovery ?? null, otherRaces: ob?.otherRaces, backKm: back?.km ?? null });
       const plan = planRange(seed, { from, to: end });
       const suggestion = from > startWeek ? { ...plan.suggestion, eval: plan.eval, weeks: plan.suggestion.weeks.map((w, i) => ({ ...w, items: plan.items[i] })) } : plan.suggestion;
       // Not enough run days for the block: the dialog offers another one. Never when re-planning a running block.
@@ -256,7 +332,9 @@ export function blockPlanRoutes(db: Db) {
     const next = repo.listRaces(db, ctx.userId).find((x) => (x.priority === "A" || x.priority === "B") && x.date >= startWeek) ?? null;
     const doneDays = from > startWeek ? Object.fromEntries(kmByDay(ctx, startWeek, addDays(from, -1))) : {};
     return c.json({ startWeek, defaultStart: firstStart, earliest, weeks, ok: true, seed, suggestion, replaces, advice, race: next && { name: next.name, date: next.date }, racePlan: rp?.plan ?? null, today: ctx.today, doneDays, racePace: phaseView(ctx, startWeek, weeks),
-      recovery: rec && hasRecovery ? { name: rec.name, date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, weeks: recRoles.filter(Boolean).length } : null });
+      recovery: rec && hasRecovery ? { name: rec.name, date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, weeks: recRoles.filter(Boolean).length } : null,
+      road: pr ? roadAfter(ctx, pr, blockWeeksOf(suggestion.weeks), addDays(startWeek, weeks * 7)) : null, back,
+      farRace: pr ? null : farOf(ctx, startWeek) });
   });
 
   r.post("/plan/block-suggest", async (c) => {
@@ -281,7 +359,12 @@ export function blockPlanRoutes(db: Db) {
     if (!sameShown(current, b.replace)) return c.json({ error: "the weeks changed since the suggestion", conflict: "changed" }, 409);
     const gate = racePaceGate(ctx, startWeek, n);
     if (gate.blocked) return c.json({ error: "choose the race paces first", conflict: "racePace" }, 409);
-    const targetsBefore = [...repo.getTargets(db, ctx.userId, startWeek, end).values()];
+    // With their weeks, so undo can put them back (the values alone have none).
+    const targetsBefore = [...repo.getTargets(db, ctx.userId, startWeek, end)].map(([weekStart, v]) => ({ weekStart, ...v }));
+    // The race plan: the skeleton after the posted weeks, written with them (docs/decisions/fartlek-race-plan-skeleton.md).
+    const planBefore = repo.listPlanWeeks(db, ctx.userId, startWeek, "9999-12-31").map((w) => ({ weekStart: w.weekStart, raceId: w.raceId, phase: w.phase, role: w.role, km: w.km, longKm: w.longKm }));
+    const pr = planRaceFor(ctx, startWeek);
+    const plan = pr ? planAfter(ctx, pr, postedWeeks(startWeek, weeks, roles), addDays(startWeek, n * 7)) : null;
     let ids: number[] = [];
     const blockIds: number[] = [];
     db.transaction((tx) => {
@@ -294,9 +377,10 @@ export function blockPlanRoutes(db: Db) {
       }
       ids = weeks.flatMap((items) => insertItems(tx, ctx, items));
       writeTargets(tx, ctx.userId, startWeek, weeks, roles);
+      if (plan) writePlan(tx, ctx.userId, startWeek, plan, ctx.today);
     });
     gate.done();
-    return c.json({ id: blockIds[0], blockIds, ids, removed: current, targetsBefore });
+    return c.json({ id: blockIds[0], blockIds, ids, removed: current, targetsBefore, planBefore });
   });
 
   /** Undo a suggested block: the block, its sessions and targets go, and what they replaced comes back. */
@@ -313,7 +397,9 @@ export function blockPlanRoutes(db: Db) {
     if (ids.length > 60) throw new BadRequest("too many sessions");
     const rows = restoreRows(ctx, b.restore, from, to);
     const targets = Array.isArray(b.targetsBefore) ? (b.targetsBefore as Record<string, unknown>[]) : [];
+    const planBefore = planBeforeParam(ctx, b.planBefore, from);
     db.transaction((tx) => {
+      if (planBefore) writePlan(tx, ctx.userId, from, planBefore, ctx.today);
       runUndo(tx, ctx, ids, rows, from, to);
       tx.delete(t.weekTargets).where(and(eq(t.weekTargets.userId, ctx.userId), gte(t.weekTargets.weekStart, from), lte(t.weekTargets.weekStart, to))).run();
       for (const tg of targets.slice(0, 8)) {
@@ -414,7 +500,9 @@ export function blockPlanRoutes(db: Db) {
     const replaces = editable(plannedIn(ctx, st.first, st.newEnd), true);
     const suggestion = { ...plan.suggestion, eval: plan.eval, weeks: plan.suggestion.weeks.map((w, i) => ({ ...w, items: plan.items[i] })) };
     const diff = diffPlans(seed, workoutWeeks(replaces, st.first, st.weeksLeft - st.extend), plan.items);
+    const pr = planRaceFor(ctx, st.first);
     return c.json({
+      road: pr ? roadAfter(ctx, pr, blockWeeksOf(suggestion.weeks), addDays(st.newEnd, 1)) : null,
       ok: true, block, seed, suggestion, replaces, diff, extend: st.extend, compressed,
       // Run km per day of the range's first week that is already over: the editor shows those days locked.
       done: { km: st.doneKm, weeks: st.doneWeeks, sick: st.sick, days: Object.fromEntries([...st.doneDays].filter(([d]) => d >= seed.startWeek && d < ctx.today)) },
@@ -443,15 +531,38 @@ export function blockPlanRoutes(db: Db) {
     const goalKm = r1(s.doneKm + weeks.reduce((sum, w) => sum + weekKm(w), 0));
     const gate = racePaceGate(ctx, s.first, weeks.length);
     if (gate.blocked) return c.json({ error: "choose the race paces first", conflict: "racePace" }, 409);
+    const pr = planRaceFor(ctx, s.first);
+    const plan = pr ? planAfter(ctx, pr, postedWeeks(s.first, weeks, roles), addDays(s.newEnd, 1)) : null;
     let ids: number[] = [];
     db.transaction((tx) => {
       for (const w of current) tx.delete(t.workouts).where(and(eq(t.workouts.userId, ctx.userId), eq(t.workouts.id, w.id))).run();
       ids = weeks.flatMap((items) => insertItems(tx, ctx, items));
       writeTargets(tx, ctx.userId, s.first, weeks, roles);
+      if (plan) writePlan(tx, ctx.userId, s.first, plan, ctx.today);
       tx.update(t.blocks).set({ goalKm, weeks: block.weeks + extend }).where(and(eq(t.blocks.userId, ctx.userId), eq(t.blocks.id, block.id))).run();
     });
     gate.done();
     return c.json({ ids, goalKm });
+  });
+
+  /** The road to the earliest A marathon or half whose recovery has not ended (docs/decisions/fartlek-race-plan-skeleton.md). */
+  r.get("/plan/race-plan", (c) => {
+    const ctx = ctxFor(db, uid(c));
+    const pr = activePlanRace(ctx);
+    if (!pr) return c.json({ ok: false, reason: "noRace" });
+    const rows = repo.planWeeksOf(db, ctx.userId, pr.race.id);
+    if (rows.length) {
+      const planStart = rows[0].weekStart;
+      return c.json({ ok: true, road: roadFor(ctx, pr, { planStart, skeleton: null, stored: true, others: roadOthers(ctx, pr, planStart) }) });
+    }
+    const next = startWeeks(ctx, repo.listBlocks(db, ctx.userId)).byDefault;
+    if (!planRaceFor(ctx, next)) {
+      const f = farRaceFor(ctx, next);
+      const race = { id: pr.race.id, name: pr.race.name, date: pr.race.date, distanceKm: pr.race.distanceKm };
+      return f ? c.json({ ok: false, reason: "far", race, weeksToRace: f.weeksToRace, planFrom: f.planFrom }) : c.json({ ok: false, reason: "noRace" });
+    }
+    const input = skeletonInputs(ctx, pr, next, []);
+    return c.json({ ok: true, road: roadFor(ctx, pr, { planStart: input.planStart, skeleton: projectSkeleton(input), stored: false, others: roadOthers(ctx, pr, input.planStart) }) });
   });
 
   return r;

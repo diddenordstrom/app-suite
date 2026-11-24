@@ -10,6 +10,7 @@ import { createDb } from "./db";
 import { addDays, todayIn, weekday, weekStartOf, type ISODate } from "../shared/dates";
 import type { Suggestion } from "../shared/nextweek";
 import type { BlockSuggestion, PlannedWeek } from "../shared/blockplan";
+import type { RaceRoad } from "../shared/raceplan";
 
 export interface Scenario {
   name: string;
@@ -126,6 +127,31 @@ export const SCENARIOS: Scenario[] = [
     weeks: [38, 40, 41, 40, 39, 41, 40, 40, 41, 40, 30, 25],
     runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190, raceAgo: { days: 10, priority: "A", distanceKm: 21.0975 },
   },
+  // The race plan's skeleton (docs/decisions/fartlek-race-plan-skeleton.md): the whole road, phases and km per week.
+  {
+    name: "marathon in 20",
+    note: "a steady 45 km runner with an A marathon 20 weeks out: 8/6/4/2, the long-run peak 8 to 5 weeks before the race",
+    weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 45],
+    runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, race: { inWeeks: 20, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 + 30 * 60 },
+  },
+  {
+    name: "marathon in 28",
+    note: "the same runner 28 weeks out: 12/8/6/2, extra time into base",
+    weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 45],
+    runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, race: { inWeeks: 28, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 + 30 * 60 },
+  },
+  {
+    name: "half in 12",
+    note: "a 35 km runner with an A half 12 weeks out: 3/4/3/2",
+    weeks: [34, 35, 36, 35, 34, 36, 35, 35, 36, 35, 34, 35],
+    runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190, race: { inWeeks: 12, priority: "A", distanceKm: 21.0975, goalSeconds: 1 * 3600 + 40 * 60 },
+  },
+  {
+    name: "marathon in 10",
+    note: "a 45 km runner with an A marathon only 10 weeks out: short, base gone, the goal offered lower",
+    weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 45],
+    runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, race: { inWeeks: 10, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 },
+  },
 ];
 
 const ORIGIN = "http://localhost:5173";
@@ -149,6 +175,8 @@ export interface ScenarioResult {
   blocks: { weeks: number; km: number[]; state: string; chosen: string; deepestPct: number | null }[];
   /** "Skapa block" with the race ahead: the weeks' roles and km, the blocks it makes now, and form on race day. */
   race: { roles: string; km: number[]; chunks: string; now: number; raceForm: number | null; state: string; weeks: PlannedWeek[]; warnings: BlockSuggestion["phaseWarnings"] } | null;
+  /** The race plan's road, when the race has one. */
+  road?: RaceRoad | null;
 }
 
 export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe/Stockholm")): Promise<ScenarioResult> {
@@ -206,7 +234,8 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
       const date = addDays(weekStart, (sc.race.inWeeks - 1) * 7 + 5);
       await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}) }));
     }
-    const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string }>(`/api/plan/block-suggest?startWeek=${weekStart}`);
+    const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string; road?: RaceRoad | null }>(`/api/plan/block-suggest?startWeek=${weekStart}`);
+    const road = b.road ?? null;
     if (b.ok && b.suggestion) {
       race = {
         roles: b.suggestion.weeks.map((w) => w.role[0]).join(""),
@@ -216,7 +245,7 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
         weeks: b.suggestion.weeks, warnings: b.suggestion.phaseWarnings,
       };
     } else race = { roles: "", km: [], chunks: `refused: ${b.reason}`, now: 0, raceForm: null, state: "", weeks: [], warnings: null };
-    return { scenario: sc, weekStart, week: { chosen: s.chosen, km: s.eval.km, items, why, form: s.eval.form, formPct: s.eval.formPct, state: s.eval.state, growth: s.eval.growth }, blocks, race };
+    return { scenario: sc, weekStart, week: { chosen: s.chosen, km: s.eval.km, items, why, form: s.eval.form, formPct: s.eval.formPct, state: s.eval.state, growth: s.eval.growth }, blocks, race, road };
   }
   for (const weeks of [2, 4]) {
     const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; reason?: string }>(`/api/plan/block-suggest?startWeek=${weekStart}&weeks=${weeks}`);
@@ -242,7 +271,11 @@ export function describe(r: ScenarioResult): string {
     `    ${w.items}`,
     `    ${w.why}`,
     ...r.blocks.map((b) => `  block ${b.weeks} w: ${b.km.join(" → ") || "–"} km · ${b.state}${b.chosen ? ` via ${b.chosen}` : ""}${b.deepestPct != null ? ` · deepest ${Math.round(b.deepestPct)} %` : ""}`),
-    ...(r.race ? r.race.weeks.map((w) => `    ${w.weekStart} ${w.role[0]} ${w.items.map((it) => `${it.type === "threshold" ? "T" : it.type === "long" ? "L" : it.type === "cross" ? "X" : "E"}${it.km}${it.blueprint ? `[${it.blueprint}]` : ""}`).join(" ")}`) : []),
+    ...(r.road ? [
+      `  road ${r.road.lengths.base}/${r.road.lengths.build}/${r.road.lengths.specific}/${r.road.lengths.taper}${r.road.short ? ` · short (min ${r.road.short.minWeeks})` : ""} · long-run peak ${r.road.longPeak ? `${r.road.longPeak.km} km at wip ${r.road.longPeak.wip}` : "–"}${r.road.warnings.length ? ` · ${r.road.warnings.join(", ")}` : ""}`,
+      ...r.road.weeks.map((w) => `    ${w.weekStart} wip ${w.wip} ${w.phase} ${w.role} ${w.km ?? "–"} km long ${w.longKm ?? "–"} (${w.source})`),
+    ] : []),
+    ...(r.race && !r.road ? r.race.weeks.map((w) => `    ${w.weekStart} ${w.role[0]} ${w.items.map((it) => `${it.type === "threshold" ? "T" : it.type === "long" ? "L" : it.type === "cross" ? "X" : "E"}${it.km}${it.blueprint ? `[${it.blueprint}]` : ""}`).join(" ")}`) : []),
     ...(r.race?.warnings && (r.race.warnings.lowWeek || r.race.warnings.shortLong) ? [`    warnings: ${JSON.stringify(r.race.warnings)}`] : []),
     ...(r.race ? [`  race plan ${r.race.chunks} (now ${r.race.now}): ${r.race.roles} · ${r.race.km.join(" → ")} km · ${r.race.state} · race-day form ${r.race.raceForm ?? "–"}`] : []),
   ].join("\n");

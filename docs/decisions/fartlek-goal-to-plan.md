@@ -42,7 +42,7 @@ The point of Fartlek is placing the runner exactly in the build from real traini
 
 1. **Reading where the runner stands** for step 2: weekly km, longest run, form and best efforts from the history (all exist), and the too-little-history check above.
 2. **The realism check** for step 3: today's prediction for the goal distance (exists for races) against the goal, the gap in seconds per km and the threshold it needs (`neededThreshold`). Shown, never a rule that changes the plan.
-3. **The whole road as a preview**: `raceChunks` already counts the blocks; the preview needs km per phase without generating every session (decided: phases with km, the first block with real sessions). Specified with a build plan on 2026-11-24 in [race plan skeleton](fartlek-race-plan-skeleton.md).
+3. **The whole road as a preview**: `raceChunks` already counts the blocks; the preview needs km per phase without generating every session (decided: phases with km, the first block with real sessions). Specified with a build plan on 2026-11-24 in [race plan skeleton](fartlek-race-plan-skeleton.md). *Built 2026-11-24* (the road in "Skapa block").
 4. **Goals without a race**: "Bli snabbare på X km" as a time goal on a date the runner picks (planned like a race toward a time trial, so the taper and the check work the same), and "Tillbaka efter uppehåll" as a target end week back at the load before the break (the engine's re-entry already aims there).
 5. **Strings and the dialog** (shared UI where it fits), sv and en.
 

@@ -1,6 +1,6 @@
 ---
 title: Fartlek plans the whole road to an A marathon or half as a skeleton of phases, with sessions one block at a time
-summary: An A marathon or half up to 30 (half 20) weeks out gets a race plan, a skeleton of typed weeks (base, build, specific, taper, race, recovery) with a km target for every week to the end of post-race recovery; sessions are still made for the next block only; phase lengths are a function of the weeks to the race; skeleton targets live in their own table and never count as tolerance; includes a step-by-step build plan
+summary: An A marathon or half up to 30 (half 20) weeks out gets a race plan, a skeleton of typed weeks (base, build, specific, taper, race, recovery) with a km target for every week to the end of post-race recovery; sessions are still made for the next block only; phase lengths are a function of the weeks to the race; skeleton targets live in their own table and never count as tolerance; built 2026-11-24 from the step-by-step build plan
 type: decision
 status: accepted
 updated: 2026-11-24
@@ -8,7 +8,7 @@ updated: 2026-11-24
 
 # Fartlek plans the whole road to an A marathon or half as a skeleton of phases, with sessions one block at a time
 
-Settled with the user on 2026-11-24, as a spec for a build session. It decides item 3 of [Mål till plan](fartlek-goal-to-plan.md) ("the whole road as a preview: phases with km, the first block with real sessions") and the multi-block plan left open in [post-race recovery](fartlek-post-race-recovery.md). It partly supersedes "no extra cycle level above blocks" in [runplan training blocks](runplan-training-blocks.md): for an A marathon or half there is now a plan above the blocks, but blocks stay the unit sessions are made in, so "blocks you can follow up, not one long plan" in [race blocks](fartlek-race-blocks.md) still holds. The [build plan](#build-plan) below is written so the work can be done without re-deriving anything; nothing of it is built yet.
+Settled with the user on 2026-11-24, as a spec for a build session. It decides item 3 of [Mål till plan](fartlek-goal-to-plan.md) ("the whole road as a preview: phases with km, the first block with real sessions") and the multi-block plan left open in [post-race recovery](fartlek-post-race-recovery.md). It partly supersedes "no extra cycle level above blocks" in [runplan training blocks](runplan-training-blocks.md): for an A marathon or half there is now a plan above the blocks, but blocks stay the unit sessions are made in, so "blocks you can follow up, not one long plan" in [race blocks](fartlek-race-blocks.md) still holds. The [build plan](#build-plan) below was written so the work could be done without re-deriving anything. **Built 2026-11-24**; what changed while building is under [Built](#built).
 
 ## Decided
 
@@ -72,9 +72,24 @@ Under the minimum weeks, start from the lengths at the minimum and take the miss
 
 **Fixed at the plan's start.** The lengths come from `n` at the plan's first week (`planStart`, the first stored row), not from the weeks left at each block, so a plan started 28 weeks out keeps its 6-week specific phase. Because every phase is counted back from the race, time lost to a break falls on the phase it happens in: a break in base shortens base, one in build shortens build, and the taper and specific phase are never moved earlier or shortened by the plan. The km lost are never made up (the skeleton is recomputed from what was run).
 
+## Built
+
+Built on 2026-11-24, steps 1–9 except the optional ghost bands in `pages/Blocks.tsx`. What was settled or changed while building:
+
+- **The golden projection holds exactly.** The prototype's numbers in test 7 (every week's role, km and long run, `peakKm` 62.5, `longPeak` at wip 6) came out of the real code unchanged.
+- **Test 11's "B race at wip 3" became two cases.** In the 2:2 peak block wip 3 is a build week, not a taper week, so a race there gets a race week (honoured, `close`). The rule that a taper week keeps its role and km is tested with a race in the taper week (wip 2): the whole skeleton is then unchanged.
+- **Strings are `road.*`, not `rp.*`.** `rp.title`, `rp.button` and `rp.banner` already belong to the re-plan dialog ("Räkna om resten"); the keys are otherwise as in the table.
+- **`GET /plan` carries `skeleton`.** There is no `GET /plan/weeks`; the calendar's own route got the map, and the week header shows the dashed `road.weekTarget` chip when the week has no target.
+- **Undo of a block now restores the targets it replaced.** `targetsBefore` was sent without each target's week, so undo refused it whenever one of the block's weeks already had a target. The POST now returns `{ weekStart, km, minutes, note }`; step 5.1 (delete, then insert) relies on it.
+- **Overlapping recovery of other races:** a chunk's seed holds one recovery race, so the one whose recovery reaches furthest decides, instead of a per-week merge of the lower share. Recovery never replaces the plan race's taper or race week.
+- **Other races before the plan** (up to `RECOVERY.lookbackDays` before `planStart`) feed the projection's recovery weeks but are not listed on the road (`road.other` is for races inside the plan).
+- **Back after a break.** In the pure projection the cap is `RACE_PLAN.back.share × anchorKm` (the input has no stored km). In "Skapa block" it is applied only when a plan race decides the weeks, from the stored skeleton km of the start week, else the tolerance.
+- **Signatures:** `writePlan(tx, userId, fromWeek, rows, computedOn)` (each row carries its `raceId`); `roadFor` also takes `planStart` and the other races. `planRows`, `activePlanRace`, `otherRacesInBlock` and `phaseAtFor` are small helpers in `server/raceplan.ts`.
+- **Scenarios** ("marathon in 20", "marathon in 28", "half in 12", "marathon in 10"): phase lengths and the long-run peak (wip 6) as decided. Two things to tune later: at 20 weeks from a 17 km long run the ladder tops out at 24 km, so `longShort` is shown; at 28 weeks the careful cap compounds from 45 to about 85 km a week, a steep road for a 45 km runner (each block is still capped by what was actually run when it is made).
+
 ## Build plan
 
-Drafted 2026-11-24 from the code at that date. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. Two or three PRs (engine, then server, then UI), each with `npm run check` green, a gitmoji commit message (`✨`), and every UI string through `t()` in both `en` and `sv`. When it is built, mark this page built and extend it with what changed while building.
+Drafted 2026-11-24 from the code at that date, kept as the record of what was built (see [Built](#built) for what changed). Paths are relative to `apps/fartlek/src`.
 
 **Prerequisite:** the [post-race recovery](fartlek-post-race-recovery.md) build plan (the `recovery` role, `RECOVERY`, `recoveryRow`, `recoveryRoles`, `withRecovery`, `recoveryRaceFor`, the `recovery` branch in `volumes()`). Build it first; this plan only calls it.
 

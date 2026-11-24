@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · note · Fartlek race plan skeleton built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek post-race recovery built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race plan honours every race the runner entered ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race plan: a skeleton to an A marathon or half, with a build plan ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · decision · Fartlek gym: the last finished session is the new template ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek race phase built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Strides are not counted as judged reps ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · decision · Easy HR is a ceiling in plan vs actual ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -45,7 +45,7 @@
 - [Fartlek's morning notification: today's session and today's form](decisions/fartlek-morning-push.md): A push at a time the runner picks with today's sessions and form score; with Garmin it syncs first and waits up to two hours for last night's HRV or sleep _(decision · accepted · 2026-11-20)_
 - [Fartlek starts the block after a 10 km+ race with recovery weeks gated by days since the race](decisions/fartlek-post-race-recovery.md): After an A or B race of 10 km or longer the next block's first weeks get a new `recovery` role (volume as a share of the pre-race peak, distance and priority decide how many), quality returns by day gates in the order strides, threshold, intervals; the 14-day refusal goes; built 2026-11-24 from the step-by-step build plan _(decision · accepted · 2026-11-24)_
 - [Fartlek plans the weeks up to an A or B race backwards (peak builds, then a two-week taper)](decisions/fartlek-race-blocks.md): Spec for race-mode block planning: from the race date, two taper weeks, up to three build weeks before them, a lighter week ahead of those, and the base engine's guards kept; replaces the "race within 16 weeks refuses" rule _(decision · accepted · 2026-11-24)_
-- [Fartlek plans the whole road to an A marathon or half as a skeleton of phases, with sessions one block at a time](decisions/fartlek-race-plan-skeleton.md): An A marathon or half up to 30 (half 20) weeks out gets a race plan, a skeleton of typed weeks (base, build, specific, taper, race, recovery) with a km target for every week to the end of post-race recovery; sessions are still made for the next block only; phase lengths are a function of the weeks to the race; skeleton targets live in their own table and never count as tolerance; includes a step-by-step build plan _(decision · accepted · 2026-11-24)_
+- [Fartlek plans the whole road to an A marathon or half as a skeleton of phases, with sessions one block at a time](decisions/fartlek-race-plan-skeleton.md): An A marathon or half up to 30 (half 20) weeks out gets a race plan, a skeleton of typed weeks (base, build, specific, taper, race, recovery) with a km target for every week to the end of post-race recovery; sessions are still made for the next block only; phase lengths are a function of the weeks to the race; skeleton targets live in their own table and never count as tolerance; built 2026-11-24 from the step-by-step build plan _(decision · accepted · 2026-11-24)_
 - [Fartlek uses races as the answer key for its predictions](decisions/fartlek-race-results.md): Races get results (from "Was this a race?" on a run, or added by hand), and each is logged with what every prediction model said the day before and the inputs, per model version; shown as an answer key, never changing the prediction _(decision · accepted · 2026-11-13)_
 - [Fartlek gets a race-specific phase for the marathon and half, built from blueprints that scale per runner](decisions/fartlek-race-specific-phase.md): The last 8 weeks before an A-race marathon or half replace generic quality with race-pace sessions from a catalogue of blueprints in the repo, scaled to the runner; MP comes from today's prediction and is locked for the phase; the last build weeks may aim deep in the existing form band; real injury stops progression; no guard is loosened _(decision · accepted · 2026-11-24)_
 - [Fartlek's today's form is 10 minus a list of deductions](decisions/fartlek-readiness.md): Dagsform is built from sliding, weighted deductions (HRV, soreness, km ACWR, resting HR, pain, form, sleep); the verdict follows the score; pain 8+ vetoes for 3 days; mood and Body Battery are out _(decision · accepted · 2026-11-11)_

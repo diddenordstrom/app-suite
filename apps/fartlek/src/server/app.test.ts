@@ -500,6 +500,93 @@ describe("api", () => {
     await app.request(`/api/blocks/${again.id}?workouts=1`, { method: "DELETE", headers: { origin: ORIGIN } });
   });
 
+  it("plans the road to an A marathon as a skeleton: shown, stored with the block, undone, dropped with the race (docs/decisions/fartlek-race-plan-skeleton.md)", async () => {
+    const fresh = () => { const db = createDb(":memory:"); return { db, app: createApp(db, config) }; };
+    const g = async <T>(a: ReturnType<typeof createApp>, p: string) => (await a.request(p)).json() as Promise<T>;
+    const today = todayIn("Europe/Stockholm");
+    const S = addDays(weekStartOf(today, "monday"), 7);
+    const raceOn = (weeks: number) => addDays(S, (weeks - 1) * 7 + 6);
+    type Road = { weeks: { weekStart: string; source: string; km: number | null }[]; short: { minWeeks: number } | null; lengths: { base: number; build: number; specific: number; taper: number }; stored: boolean };
+    type S2 = { ok: boolean; road: Road | null; farRace: { planFrom: string } | null; racePlan: { chunks: { weeks: number; kind: string; blockKind?: string }[]; now: number } | null;
+      suggestion: { weeks: { weekStart: string; role: string; items: unknown[] }[] }; replaces: { id: number }[] };
+
+    const { db, app: a } = fresh();
+    await a.request("/api/settings");
+    const [race] = await (await a.request("/api/races", json({ name: "Vårmaran", date: raceOn(16), distanceKm: 42.195, priority: "A" }))).json() as { id: number }[];
+    const s = await g<S2>(a, `/api/plan/block-suggest?startWeek=${S}`);
+    expect(s.ok).toBe(true);
+    expect(s.road!.weeks).toHaveLength(16 + 4);
+    expect(s.road!.weeks.slice(0, 4).map((w) => w.source)).toEqual(["now", "now", "now", "now"]);
+    expect(s.road!.weeks.slice(4).every((w) => w.source === "skeleton" && (w.km ?? 0) > 0)).toBe(true);
+    expect(s.racePlan!.chunks[0].blockKind).toBe("base");
+
+    // A target set before in one of the block's weeks goes; the block's weeks hold the block's targets.
+    const w2 = addDays(S, 7);
+    await a.request(`/api/targets/${w2}`, json({ km: 99, note: "old" }, "PUT"));
+    const weeks = s.suggestion.weeks.map((w) => w.items), roles = s.suggestion.weeks.map((w) => w.role);
+    const blocks = s.racePlan!.chunks.slice(0, s.racePlan!.now).map((c) => ({ weeks: c.weeks, kind: c.blockKind ?? c.kind }));
+    const r = await a.request("/api/plan/block-suggest", json({ startWeek: S, weeks, roles, blocks, replace: s.replaces.map((x) => x.id) }));
+    expect(r.status).toBe(200);
+    const made = await r.json() as { id: number; blockIds: number[]; ids: number[]; removed: unknown[]; targetsBefore: unknown[]; planBefore: unknown[] };
+    expect(made.planBefore).toEqual([]);
+    const rows = repo.planWeeksOf(db, 1, race.id);
+    expect(rows).toHaveLength(20);
+    expect(rows.slice(0, 4).every((x) => x.km == null)).toBe(true);
+    const plan = await g<{ ok: boolean; road: Road }>(a, "/api/plan/race-plan");
+    expect(plan.ok).toBe(true);
+    expect(plan.road.stored).toBe(true);
+    expect(plan.road.weeks.slice(0, 4).map((w) => w.source)).toEqual(["block", "block", "block", "block"]);
+    const targets = repo.getTargets(db, 1, S, addDays(S, 21));
+    expect(targets.get(w2)?.note).not.toBe("old");
+    expect(targets.get(w2)?.km).not.toBe(99);
+    expect((await g<{ kind: string }[]>(a, "/api/blocks").then((x) => (x as unknown as { blocks: { kind: string }[] }).blocks.map((b) => b.kind)))).toEqual(["base"]);
+
+    // Undo: plan rows and targets as they were.
+    const undo = await a.request("/api/plan/block-suggest/undo", json({ id: made.id, blockIds: made.blockIds, ids: made.ids, restore: made.removed, targetsBefore: made.targetsBefore, planBefore: made.planBefore }));
+    expect(undo.status, await undo.clone().text()).toBe(200);
+    expect(repo.planWeeksOf(db, 1, race.id)).toEqual([]);
+    expect(repo.getTargets(db, 1, w2, w2).get(w2)).toMatchObject({ km: 99, note: "old" });
+
+    // A skeleton row is never planned load: tolerance and the weeks before stay.
+    const seedOf = async () => (await g<{ seed: { kmBefore: number[]; tolerance: unknown } }>(a, `/api/plan/block-suggest?startWeek=${addDays(S, 28)}`)).seed;
+    const before = await seedOf();
+    db.$client.prepare("insert into race_plan_weeks (user_id, week_start, race_id, phase, role, km, long_km, computed_on) values (1, ?, ?, 'base', 'build', 80, 20, ?)").run(addDays(S, 21), race.id, today);
+    expect(await seedOf()).toEqual(before);
+
+    // Written again, then a new goal keeps the rows, a new date drops them; deleting the race drops them and keeps the block.
+    await a.request("/api/plan/block-suggest", json({ startWeek: S, weeks, roles, blocks, replace: s.replaces.map((x) => x.id) }));
+    expect(repo.planWeeksOf(db, 1, race.id).length).toBeGreaterThan(0);
+    const fields = { name: "Vårmaran", date: raceOn(16), distanceKm: 42.195, priority: "A" };
+    await a.request(`/api/races/${race.id}`, json({ ...fields, goalSeconds: 3 * 3600 }, "PUT"));
+    expect(repo.planWeeksOf(db, 1, race.id).length).toBeGreaterThan(0);
+    await a.request(`/api/races/${race.id}`, json({ ...fields, date: raceOn(17) }, "PUT"));
+    expect(repo.planWeeksOf(db, 1, race.id)).toEqual([]);
+    await a.request("/api/plan/block-suggest", json({ startWeek: S, weeks, roles, blocks, replace: [] }));
+    await a.request(`/api/races/${race.id}`, { method: "DELETE" });
+    expect(repo.planWeeksOf(db, 1, race.id)).toEqual([]);
+    expect(repo.listBlocks(db, 1).length).toBeGreaterThan(0);
+
+    // Further out than the window: when the plan starts, no road. A 10K A race: no road (only marathon and half).
+    const far = fresh();
+    await far.app.request("/api/settings");
+    await far.app.request("/api/races", json({ name: "Höstmaran", date: raceOn(34), distanceKm: 42.195, priority: "A" }));
+    const f = await g<S2>(far.app, `/api/plan/block-suggest?startWeek=${S}`);
+    expect(f.road).toBeNull();
+    expect(f.farRace!.planFrom).toBe(addDays(S, (34 - 30) * 7));
+    const ten = fresh();
+    await ten.app.request("/api/settings");
+    await ten.app.request("/api/races", json({ name: "Milen", date: raceOn(20), distanceKm: 10, priority: "A" }));
+    expect((await g<S2>(ten.app, `/api/plan/block-suggest?startWeek=${S}`)).road).toBeNull();
+
+    // Ten weeks to a marathon: short, base gone, build and specific kept.
+    const short = fresh();
+    await short.app.request("/api/settings");
+    await short.app.request("/api/races", json({ name: "Snabbmaran", date: raceOn(10), distanceKm: 42.195, priority: "A" }));
+    const sh = await g<S2>(short.app, `/api/plan/block-suggest?startWeek=${S}`);
+    expect(sh.road!.short!.minWeeks).toBe(12);
+    expect(sh.road!.lengths).toEqual({ base: 0, build: 4, specific: 4, taper: 2 });
+  });
+
   it("re-plans the weeks after an A half inside a block as recovery, not lighter (docs/decisions/fartlek-post-race-recovery.md)", async () => {
     const made = await (await app.request("/api/blocks", json({ kind: "base", name: "Half block", startWeek: "2037-01-05", text: "6 zone 2, 9 tröskel, 15 long run\n6 zone 2, 9 tröskel, 15 long run\n6 zone 2\n6 zone 2" }))).json() as { id: number };
     const race = await (await app.request("/api/races", json({ date: "2037-01-18", name: "Test half", distanceKm: 21.1, priority: "A" }))).json() as { id: number };
