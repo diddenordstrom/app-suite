@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent } from "react";
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent, type ReactNode } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { api, useApi } from "../http";
 import { useSettings } from "../prefs";
@@ -278,21 +278,68 @@ export function ExerciseCard({ entry, last, focus, onFocus, onTick, onChange, on
             <button type="button" onClick={() => onTick(j)} className="flex h-11 w-full items-center justify-center gap-2 rounded-md bg-primary font-semibold text-primary-foreground"><CheckIcon /> {t("gym.doneSet")}</button>
           </li>
         ) : (
-          <li key={j} className="flex items-center gap-2 px-1">
-            <button type="button" onClick={() => onFocus(j)} className="flex min-h-10 flex-1 items-center gap-3 text-left">
-              <span className="w-5 shrink-0 text-sm font-semibold tabular-nums">{j + 1}</span>
-              <span className="w-16 shrink-0 text-xs text-muted-foreground tabular-nums">{lastOf(j)}</span>
-              <span className={`whitespace-nowrap tabular-nums ${s.done ? "font-semibold" : "text-muted-foreground"}`}>{amountOf(s)}</span>
-            </button>
-            {onRemoveSet && <button type="button" aria-label={t("gym.removeSet", { n: j + 1 })} onClick={() => onRemoveSet(j)} className="grid size-8 place-items-center rounded-md text-muted-foreground"><XIcon /></button>}
-            {s.done
-              ? <button type="button" aria-label={t("gym.undoSet")} onClick={() => onTick(j)} className="grid size-10 place-items-center rounded-md bg-success text-background"><CheckIcon /></button>
-              : <button type="button" aria-label={t("gym.doneSet")} onClick={() => onTick(j)} className="size-10 rounded-md border border-dashed border-border" />}
-          </li>
+          <SwipeRow key={j} label={t("gym.remove")} onDelete={onRemoveSet && (() => onRemoveSet(j))}>
+            <div className="flex items-center gap-2 px-1">
+              <button type="button" onClick={() => onFocus(j)} className="flex min-h-10 flex-1 items-center gap-3 text-left">
+                <span className="w-5 shrink-0 text-sm font-semibold tabular-nums">{j + 1}</span>
+                <span className="w-16 shrink-0 text-xs text-muted-foreground tabular-nums">{lastOf(j)}</span>
+                <span className={`whitespace-nowrap tabular-nums ${s.done ? "font-semibold" : "text-muted-foreground"}`}>{amountOf(s)}</span>
+              </button>
+              {/* On a touch screen the row is swiped away instead. */}
+              {onRemoveSet && <button type="button" aria-label={t("gym.removeSet", { n: j + 1 })} onClick={() => onRemoveSet(j)} className="grid size-8 place-items-center rounded-md text-muted-foreground pointer-coarse:hidden"><XIcon /></button>}
+              {s.done
+                ? <button type="button" aria-label={t("gym.undoSet")} onClick={() => onTick(j)} className="grid size-10 place-items-center rounded-md bg-success text-background"><CheckIcon /></button>
+                : <button type="button" aria-label={t("gym.doneSet")} onClick={() => onTick(j)} className="size-10 rounded-md border border-dashed border-border" />}
+            </div>
+          </SwipeRow>
         ))}
       </ol>
       <button type="button" onClick={onAddSet} className="text-sm font-semibold text-primary">{t("gym.addSet")}</button>
     </Card>
+  );
+}
+
+const SWIPE_OPEN = 88;
+
+/** A row that a finger drags left to show a delete button behind it (touch only; a mouse uses the row's own button). */
+function SwipeRow({ label, onDelete, children }: { label: string; onDelete?: () => void; children: ReactNode }) {
+  const [x, setX] = useState(0);
+  const [drag, setDrag] = useState(false);
+  const from = useRef<{ x: number; y: number; base: number; horizontal: boolean | null } | null>(null);
+  const moved = useRef(false);
+  if (!onDelete) return <li>{children}</li>;
+  const open = x <= -SWIPE_OPEN / 2;
+  const onDown = (ev: PointerEvent<HTMLDivElement>) => {
+    if (ev.pointerType === "mouse") return;
+    from.current = { x: ev.clientX, y: ev.clientY, base: x, horizontal: null };
+    moved.current = false;
+  };
+  const onMove = (ev: PointerEvent<HTMLDivElement>) => {
+    const f = from.current;
+    if (!f) return;
+    const dx = ev.clientX - f.x, dy = ev.clientY - f.y;
+    if (f.horizontal == null && (Math.abs(dx) > 8 || Math.abs(dy) > 8)) {
+      f.horizontal = Math.abs(dx) > Math.abs(dy);
+      if (f.horizontal) { ev.currentTarget.setPointerCapture(ev.pointerId); setDrag(true); }
+    }
+    if (f.horizontal) { moved.current = true; setX(Math.min(0, Math.max(-SWIPE_OPEN - 24, f.base + dx))); }
+  };
+  const onUp = () => {
+    if (from.current?.horizontal) setX((v) => (v <= -SWIPE_OPEN / 2 ? -SWIPE_OPEN : 0));
+    setDrag(false);
+    from.current = null;
+  };
+  return (
+    <li className="relative overflow-hidden rounded-md">
+      <button type="button" aria-hidden={!open} tabIndex={open ? 0 : -1} onClick={() => { setX(0); onDelete(); }}
+        className="absolute inset-y-0 right-0 flex items-center justify-center bg-danger font-semibold text-background" style={{ width: SWIPE_OPEN }}>{label}</button>
+      <div className="relative touch-pan-y bg-card" style={{ transform: `translateX(${x}px)`, transition: drag ? "none" : "transform 150ms ease-out" }}
+        onPointerDown={onDown} onPointerMove={onMove} onPointerUp={onUp} onPointerCancel={onUp}
+        // A tap on an open row closes it instead of acting; a drag never counts as a tap.
+        onClickCapture={(ev) => { if (moved.current || x !== 0) { ev.stopPropagation(); ev.preventDefault(); moved.current = false; if (x !== 0) setX(0); } }}>
+        {children}
+      </div>
+    </li>
   );
 }
 
