@@ -1,9 +1,11 @@
 import { addDays, daysBetween, type ISODate } from "./dates";
 import { COACH, crossLoadPerDay, itemLoad } from "./coach";
-import { build, daysAdvice, type BackoffWhy, daysOf, evaluate, growthBase, longFor, longRun, NEXT, weekCapWith, rung, spikeMax, thresholdReps, whyOf, withinQuality, type PastWeek, type Suggestion, type SuggestItem, type Thr, type Try, type TryId, type WeekEval, type WeekSeed, type WeekState } from "./nextweek";
+import { build, daysAdvice, type BackoffWhy, daysOf, type Shape as WeekShape, evaluate, growthBase, longFor, longRun, NEXT, weekCapWith, rung, spikeMax, thresholdReps, whyOf, withinQuality, type PastWeek, type Suggestion, type SuggestItem, type Thr, type Try, type TryId, type WeekEval, type WeekSeed, type WeekState } from "./nextweek";
 import type { StepRefs } from "./steps";
 import type { Threshold } from "./types";
 import { tune } from "./tuning";
+import { blueprintById, blueprintTag, compileSlot, phaseWeekFor, type BlueprintId, type PhaseSlot } from "./blueprints";
+import { phaseWarnings, RACE_PHASE, type PhaseSeed, type PhaseWarnings } from "./racephase";
 import { formPct } from "./load";
 
 /*
@@ -112,6 +114,8 @@ export interface BlockSeed {
   race?: { date: ISODate; priority: "A" | "B" } | null;
   /** The taper's depth, as shares of the peak week (first taper week, race week); set by the search in `suggestBlock`. */
   taper?: { first: number; race: number };
+  /** The race-specific phase, when an A marathon or half is within 8 weeks of one of the weeks. */
+  phase?: PhaseSeed;
 }
 
 /**
@@ -146,6 +150,8 @@ export interface BlockSuggestion {
   /** What the weeks add up to, and how far that falls short of the goal asked for (0 when it fits). */
   goalKm: number;
   shortBy: number;
+  /** What the race-specific phase warns about; null outside a phase. */
+  phaseWarnings: PhaseWarnings | null;
 }
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
@@ -159,6 +165,7 @@ function weekSeedOf(seed: BlockSeed, i: number, ctl: number, atl: number, kmBefo
     runDays: seed.runDays, longRunDay: seed.longRunDay, threshold: seed.threshold, refs: seed.refs,
     crossMin: seed.crossMin, targetKm: null, backoff: false, hardBefore,
     longestKm, rung: seed.rung, tempoPace: seed.tempoPace, toleranceKm: seed.tolerance.km,
+    ...(seed.phase ? { phase: seed.phase } : {}),
   };
 }
 
@@ -337,20 +344,45 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
   const builds = buildIdx.filter((b) => b >= 0).length;
   // The long run steps up from the longest long run before it; the 30-day rule counts any run.
   let longest = seed.longestKm, any = seed.longestKm;
+  // The race phase's blueprints step on along the plan: one step each time a full session is planned (a held one never advances).
+  const steps: Record<string, number> = { ...(seed.phase?.steps ?? {}) };
+  let ladderUsed = 0;
   return vols.map((v, i) => {
     const ws = weekSeedOf(seed, i, 0, 0, [], false);
+    const phase = seed.phase && v.role !== "race" ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
+    const long = longRun(longest, v.lighter, seed.refs.easyPace, any);
+    const longKm = long ? longFor(long.km, v.km, longest, v.lighter) : null;
+    const maxKm = any > 0 ? spikeMax(any) : null;
+    // The phase's sessions: a held one (a share of the step) only in a lighter or taper week; where the week or the day can't hold the
+    // blueprint (or its fallback) the plain session of the week stays instead, so the runner always gets a week.
     let thr: Thr[];
-    if (v.role === "race") thr = [{ ...RACE_SHARPEN }];
+    let phased: WeekShape["phase"];
+    if (phase && seed.phase) {
+      const stepOf = (id: BlueprintId) => steps[id] ?? 0;
+      const ctx = { weekKm: v.km, maxKm, paces: seed.phase.paces };
+      const item = (c: NonNullable<ReturnType<typeof compileSlot>>) => {
+        if (!c.held) steps[c.id] = Math.min(c.step + 1, blueprintById(c.id).steps.length - 1);
+        return { steps: c.steps, blueprint: blueprintTag(c.id, c.step, c.held) };
+      };
+      const slot = (x: PhaseSlot | null) => (x && v.role === "build" && x.held != null ? { ...x, held: undefined } : x);
+      const lSlot = slot(phase.long), qSlot = slot(phase.quality);
+      const l = lSlot && longKm != null ? compileSlot(lSlot, stepOf, { ...ctx, longKm }) : null;
+      const q = qSlot ? compileSlot(qSlot, stepOf, ctx) : null;
+      phased = { long: l ? item(l) : null, quality: q ? [{ ...item(q), ...(qSlot?.day ? { date: qSlot.day } : {}) }] : [] };
+      // A quality session of the phase takes the threshold session's place, the ladder stays as a third from `highKm` a week.
+      const third = v.role === "build" && v.km >= RACE_PHASE.highKm && daysOf(ws).slots.length >= NEXT.secondMinDays;
+      if (q || !qSlot && !phase.quality) thr = third ? [rung(seed.rung + ladderUsed++)] : [];
+      else thr = v.lighter ? [{ ...NEXT.lighterThr }] : [rung(seed.rung + ladderUsed++)];
+    } else if (v.role === "race") thr = [{ ...RACE_SHARPEN }];
     else if (v.lighter) thr = [{ ...NEXT.lighterThr }];
     else {
       const main = rung(seed.rung + buildIdx[i]);
       // A second session in the last `second` build weeks, deepest first.
       thr = buildIdx[i] >= builds - shape.second ? [main, { ...NEXT.second }] : [main];
     }
-    const long = longRun(longest, v.lighter, seed.refs.easyPace, any);
-    const tempo = shape.tempo && !v.lighter && thr.length === 1 ? seed.tempoPace : null;
-    const built = build(ws, { km: v.km, longKm: long ? longFor(long.km, v.km, longest, v.lighter) : null, tempo, thr: withinQuality(thr, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
-      maxKm: any > 0 ? spikeMax(any) : null });
+    const tempo = shape.tempo && !v.lighter && thr.length === 1 && !phase ? seed.tempoPace : null;
+    const built = build(ws, { km: v.km, longKm, tempo, thr: withinQuality(thr, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
+      maxKm, ...(phased ? { phase: phased } : {}) });
     const items = seed.race ? aroundRace(built, seed.race.date, ws.weekStart) : built;
     longest = Math.max(longest, ...items.filter((it) => it.type === "long").map((it) => it.km));
     any = Math.max(any, ...items.filter(isRun).map((it) => it.km));
@@ -493,6 +525,8 @@ export function suggestBlock(seed: BlockSeed): BlockSuggestion {
   };
   const finished = (id: BlockTryId, r: { weeks: PlannedWeek[]; e: BlockEval }): BlockSuggestion => ({
     weeks: r.weeks, eval: r.e, tries, chosen: id, goalKm: r.e.km, shortBy: goalAsked != null ? Math.max(0, r1(goalAsked - r.e.km)) : 0,
+    phaseWarnings: seed.phase ? phaseWarnings(r.weeks.map((w) => ({ weekStart: w.weekStart, build: w.role === "build", km: weekKm(w.items),
+      longKm: w.items.filter((it) => it.type === "long").reduce<number | null>((m, it) => (m == null || it.km > m ? it.km : m), null) })), seed.phase) : null,
   });
 
   const noHistory = !seed.kmBefore.some((k) => k > 0);
@@ -536,6 +570,7 @@ export function weekAsBlock(seed: WeekSeed): BlockSeed {
     lighterLast: false, goalKm: null, lighterFirst: !!seed.backoff, lighterFirstWhy: seed.backoffWhy ?? null, buildWeeksDone: 0, hardBefore: !!seed.hardBefore,
     longestKm: seed.longestKm, rung: seed.rung, tempoPace: seed.tempoPace ?? null, firstWeekMax: null,
     fixedKm: [seed.targetKm ?? null],
+    ...(seed.phase ? { phase: seed.phase } : {}),
   };
 }
 

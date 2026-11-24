@@ -1,6 +1,6 @@
 import type { SessionView } from "./compliance";
-import type { ISODate } from "./dates";
-import { RACE_PHASE, type RacePaces } from "./racephase";
+import { addDays, weekday, type ISODate } from "./dates";
+import { RACE_PHASE, wipOf, type PhaseSeed, type RacePaces } from "./racephase";
 import type { StepDef, StepItem, StepTarget, WorkoutSteps } from "./steps";
 
 /*
@@ -102,8 +102,8 @@ export const blueprintById = (id: BlueprintId): Blueprint => BLUEPRINTS.find((b)
 
 /* ---------- Schedule ---------- */
 
-/** One slot of a phase week: a blueprint, `held` (a share of the step's size, in a lighter or taper week), `daysOut` (the day to place it). */
-export interface PhaseSlot { id: BlueprintId; held?: number; daysOut?: number }
+/** One slot of a phase week: a blueprint, `held` (a share of the step's size, in a lighter or taper week), `daysOut` (the day to place it), `day` (the day found for it). */
+export interface PhaseSlot { id: BlueprintId; held?: number; daysOut?: number; day?: ISODate }
 /** The long run and the quality session of a week; null is an easy long run / no phase session. */
 export interface PhaseWeek { long: PhaseSlot | null; quality: PhaseSlot | null }
 
@@ -146,6 +146,8 @@ export interface CompileCtx {
   /** The most km the day may hold; null when unbounded. */
   maxKm: number | null;
   paces: RacePaces;
+  /** Compile a held session: the step's sizes scaled by this share (a lighter or taper week; never advances the progression). */
+  hold?: number;
   /** Run days in the week, for `requires.minRunDays`; not checked when missing. */
   runDays?: number;
 }
@@ -247,6 +249,7 @@ export function compileBlueprint(bp: Blueprint, step: number, c: CompileCtx): { 
     }
     if (!used) return null;
   }
+  if (c.hold != null && c.hold < 1) used = scaled(used, c.hold);
   return { steps: wrap([easyStep(warm), ...workItems(used, c.paces), easyStep(cool)]), step: at };
 }
 
@@ -282,4 +285,47 @@ export function stepFor(sessions: SessionView[], id: BlueprintId, before: ISODat
   if (!last?.tag) return entry;
   const advance = RAN.has(last.s.outcome) && !last.tag.held;
   return Math.min(last.tag.step + (advance ? 1 : 0), blueprintById(id).steps.length - 1);
+}
+
+/* ---------- The phase week by week ---------- */
+
+/**
+ * The day of a marathon's dress rehearsal: the run day nearest race − 10 inside race − 13 … race − 9, the long-run
+ * day left out when another will do; null when no run day is in the window.
+ */
+export function dressDay(race: ISODate, runDays: number[], longRunDay: number): ISODate | null {
+  const run = runDays.length ? runDays : [longRunDay];
+  const days = [13, 12, 11, 10, 9].map((n) => addDays(race, -n)).filter((d) => run.includes(weekday(d)));
+  const pool = days.some((d) => weekday(d) !== longRunDay) ? days.filter((d) => weekday(d) !== longRunDay) : days;
+  // The nearest to race − 10; the earlier one on a tie, which leaves more days to recover.
+  return pool.sort((a, b) => Math.abs(dayGap(a, race) - 10) - Math.abs(dayGap(b, race) - 10) || a.localeCompare(b))[0] ?? null;
+}
+const dayGap = (d: ISODate, race: ISODate) => Math.round((Date.parse(race) - Date.parse(d)) / 864e5);
+
+/**
+ * The schedule's entry for the week starting `weekStart`, or null outside the phase (and in the race week, which is as
+ * before). A marathon's dress rehearsal sits in the week that holds its day: W2 for a race on Thursday–Sunday, W3 for
+ * Monday–Wednesday (it then replaces W3's quality session, and W2 has none); with no run day in the window there is none.
+ */
+export function phaseWeekFor(phase: PhaseSeed, weekStart: ISODate, runDays: number[], longRunDay: number): PhaseWeek | null {
+  const wip = wipOf(weekStart, phase.race.date);
+  if (wip < 2 || wip > RACE_PHASE.weeks) return null;
+  const entry = PHASE_SCHEDULE[phase.race.kind][wip];
+  if (phase.race.kind !== "marathon") return entry;
+  const day = dressDay(phase.race.date, runDays, longRunDay);
+  const here = day != null && day >= weekStart && day <= addDays(weekStart, 6);
+  if (here) return { ...entry, quality: { id: "dress-rehearsal", daysOut: 10, day } };
+  return entry.quality?.id === "dress-rehearsal" ? { ...entry, quality: null } : entry;
+}
+
+/** A phase session compiled: the blueprint planned (the fallback when `requires` failed), its step and steps. */
+export interface PhaseSession { id: BlueprintId; step: number; steps: WorkoutSteps; held: boolean }
+
+/** A slot as steps: the blueprint, or its fallback when `requires` fail; null when nothing fits (a plain session then). */
+export function compileSlot(slot: PhaseSlot, stepOf: (id: BlueprintId) => number, c: CompileCtx): PhaseSession | null {
+  for (let id: BlueprintId | null = slot.id; id; id = blueprintById(id).fallback) {
+    const r = compileBlueprint(blueprintById(id), stepOf(id), { ...c, ...(slot.held != null ? { hold: slot.held } : {}) });
+    if (r) return { id, step: r.step, steps: r.steps, held: slot.held != null };
+  }
+  return null;
 }

@@ -1,6 +1,6 @@
 import { useMemo, useState, type ReactNode } from "react";
-import { RacePaceCard, RacePaceNote } from "./racepace";
-import type { RacePaceView } from "@/shared/racephase";
+import { PhaseWarningsNote, RacePaceCard, RacePaceNote } from "./racepace";
+import { phaseWarnings, type RacePaceView } from "@/shared/racephase";
 import { api, useApi } from "./http";
 import { lang, t, tn, WEEKDAY_LONG } from "./i18n";
 import { useFmt } from "./prefs";
@@ -10,7 +10,7 @@ import { MoreDays, PILL, signed, signedInt, SimLines, skipVerdict, type Line, ty
 import { BlockWarnings, useBlockWeeks, WeekEditor } from "./blockeditor";
 import { addDays, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { sessionText } from "@/shared/blocktext";
-import { BLOCK, evaluateBlock, type BlockEval, type BlockSeed, type BlockSuggestion, type BlockTry, type RaceChunk, type WeekRole } from "@/shared/blockplan";
+import { BLOCK, evaluateBlock, weekKm, type BlockEval, type BlockSeed, type BlockSuggestion, type BlockTry, type RaceChunk, type WeekRole } from "@/shared/blockplan";
 import { diffPlans, workoutWeeks, type DayChange, type PlanDiff } from "@/shared/planrange";
 import { COACH } from "@/shared/coach";
 import { FORM, formPct, formState } from "@/shared/load";
@@ -373,6 +373,11 @@ function BlockEditor({ res, own, rhythm, extended, names, onExtend, onUnextend, 
     return out;
   }, [names, rp]);
   const ev = useMemo(() => evaluateBlock(b.seed, b.weeks), [b.seed, b.weeks]);
+  // The race phase's warnings follow the weeks as they are edited.
+  const phaseWarn = useMemo(() => (b.seed.phase ? phaseWarnings(b.weeks.map((items, i) => ({
+    weekStart: addDays(b.seed.startWeek, i * 7), build: b.roles[i] === "build", km: weekKm(items),
+    longKm: items.filter((it) => it.type === "long").reduce<number | null>((m, it) => (m == null || it.km > m ? it.km : m), null),
+  })), b.seed.phase) : null), [b.seed, b.weeks, b.roles]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const [kept, setKept] = useState(false);
@@ -413,6 +418,7 @@ function BlockEditor({ res, own, rhythm, extended, names, onExtend, onUnextend, 
           {ev.race && rp && <RaceForm ev={ev} name={rp.race.name} />}
           <BlockStats seed={b.seed} ev={ev} race={race} panel towardRace={!!rp} />
           <BlockWarnings ev={ev} />
+          <PhaseWarningsNote warnings={phaseWarn} />
           <BlockCharts seed={b.seed} ev={ev} stacked />
         </>} />
       <Footer seed={b.seed} s={s} weeks={b.weeks} edited={b.changed} busy={busy} replaces={replaces.length} onBack={onBack}

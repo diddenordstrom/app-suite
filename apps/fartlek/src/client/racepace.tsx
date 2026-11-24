@@ -3,7 +3,8 @@ import { api } from "./http";
 import { t } from "./i18n";
 import { useFmt } from "./prefs";
 import { Button, ErrorText } from "./ui";
-import type { PaceView, RacePaceView } from "@/shared/racephase";
+import { weekNumber } from "@/shared/dates";
+import type { PaceView, PhaseWarnings, RacePaceView } from "@/shared/racephase";
 
 /*
  * The paces of the race phase (docs/decisions/fartlek-race-specific-phase.md): a card that asks which pace to train
@@ -49,6 +50,18 @@ export function RacePaceCard({ view, onAnswered }: { view: RacePaceView; onAnswe
         {q.kind === "recalc" && q.current && <Button variant="outline" disabled={!!busy} onClick={() => void answer("keep")}>{t("racepace.keep", { pace: of(q.current) })}</Button>}
       </div>
       <ErrorText>{err}</ErrorText>
+    </div>
+  );
+}
+
+/** What the phase warns about (never a refusal): a thin build week, a long run that never gets long. */
+export function PhaseWarningsNote({ warnings }: { warnings: PhaseWarnings | null }) {
+  const fmt = useFmt();
+  if (!warnings || (!warnings.lowWeek && !warnings.shortLong)) return null;
+  return (
+    <div className="space-y-1 rounded-lg border border-warning/40 bg-warning/10 px-3 py-2 text-sm">
+      {warnings.lowWeek && <p>{t("racepace.warn.lowWeek", { week: weekNumber(warnings.lowWeek.weekStart), dist: fmt.dist(warnings.lowWeek.km, 0) })}</p>}
+      {warnings.shortLong && <p>{t("racepace.warn.shortLong", { dist: fmt.dist(warnings.shortLong.km, 0) })}</p>}
     </div>
   );
 }

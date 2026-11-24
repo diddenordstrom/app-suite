@@ -1,4 +1,5 @@
 import { addDays, daysBetween, weekday, type ISODate } from "./dates";
+import type { PhaseSeed } from "./racephase";
 import { FORM, formPct } from "./load";
 import { COACH, crossLoadPerDay, itemLoad } from "./coach";
 import { stepTotals, stridesRepeat, THRESHOLD_WARM_COOL_MIN, withStrides, type StepRefs, type WorkoutSteps } from "./steps";
@@ -193,6 +194,8 @@ export interface WeekSeed {
   tempoPace: number | null;
   /** The load already handled (the block's tolerance: the best recent week, faded with time); 0 = none. */
   toleranceKm?: number;
+  /** The race-specific phase, when an A marathon or half is within 8 weeks (docs/decisions/fartlek-race-specific-phase.md). */
+  phase?: PhaseSeed;
 }
 
 export type WeekState = "under" | "ok" | "over";
@@ -467,7 +470,13 @@ export interface Shape {
   crossMin: number;
   /** Most km any session may have (the 30-day rule); null = no limit. */
   maxKm?: number | null;
+  /**
+   * The race-specific phase's sessions (blueprints compiled to steps): the long run replaces the plain or faster-finish one,
+   * and the quality sessions come before the threshold ones, typed `threshold` and tagged. A `date` is the day they are placed on.
+   */
+  phase?: { long: PhaseItem | null; quality: (PhaseItem & { date?: ISODate })[] };
 }
+export interface PhaseItem { steps: WorkoutSteps; blueprint: string }
 
 /** Warm-up and cool-down (min) a threshold session tries, shortest last, to stay under the 30-day rule. */
 const WARM_COOL: [number, number][] = [[THRESHOLD_WARM_COOL_MIN, THRESHOLD_WARM_COOL_MIN], [10, 8], [8, 8], [8, 5], [5, 5]];
@@ -492,11 +501,17 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   const items: SuggestItem[] = [];
   const total = half(shape.km);
   const longKm = shape.longKm ?? Math.max(NEXT.easyMinKm, half(total * NEXT.longShare));
-  const longSteps = shape.tempo ? tempoLong(longKm, shape.tempo) : null;
-  items.push({ date: longDay, type: "long", km: longSteps ? stepsKm(longSteps, seed.refs) : longKm, durationMin: null, steps: longSteps });
+  const phaseLong = shape.phase?.long ?? null;
+  const longSteps = phaseLong ? phaseLong.steps : shape.tempo ? tempoLong(longKm, shape.tempo) : null;
+  items.push({ date: longDay, type: "long", km: longSteps ? stepsKm(longSteps, seed.refs) : longKm, durationMin: null, steps: longSteps, ...(phaseLong ? { blueprint: phaseLong.blueprint } : {}) });
   if (slots.length === 1) return items;
 
-  const thr = shape.thr.slice(0, Math.max(0, slots.length - 1));
+  // The phase's quality sessions come first, then the threshold ones, on the run days furthest from the hard days.
+  const quals: (PhaseItem & { date?: ISODate })[] = [
+    ...(shape.phase?.quality ?? []),
+    ...shape.thr.map((s) => ({ steps: thresholdFor(s, seed.refs, shape.maxKm), blueprint: "" })),
+  ].slice(0, Math.max(0, slots.length - 1));
+  const thr = quals;
   const others = slots.filter((d) => d !== longDay);
   // Days apart around the week: the long run comes back on the same day every week, so a Monday is next to
   // the Sunday long run before it, not six days from it.
@@ -507,7 +522,9 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   for (let k = 0; k < thr.length; k++) {
     // The free run day furthest from every hard day so far; earlier wins a tie.
     let best: ISODate | null = null, gap = -1;
-    for (const d of others) {
+    const wanted = thr[k].date;
+    if (wanted && others.includes(wanted) && !thrDays.includes(wanted)) best = wanted;
+    else for (const d of others) {
       if (thrDays.includes(d)) continue;
       const g = Math.min(...hardDays.map((h) => apart(h, d)));
       if (g > gap) { gap = g; best = d; }
@@ -516,11 +533,10 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
     hardDays.push(best!);
   }
   let used = items[0].km;
-  thr.forEach((s, k) => {
-    const steps = thresholdFor(s, seed.refs, shape.maxKm);
-    const km = stepsKm(steps, seed.refs);
+  thr.forEach((q, k) => {
+    const km = stepsKm(q.steps, seed.refs);
     used += km;
-    items.push({ date: thrDays[k], type: "threshold", km, durationMin: null, steps });
+    items.push({ date: thrDays[k], type: "threshold", km, durationMin: null, steps: q.steps, ...(q.blueprint ? { blueprint: q.blueprint } : {}) });
   });
 
   // Zone 2 fills the rest: halves, the last run takes what is left so the week adds up. As few easy runs as

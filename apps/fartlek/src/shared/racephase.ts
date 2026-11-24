@@ -1,5 +1,6 @@
 import { riegel } from "./bestefforts";
-import type { ISODate } from "./dates";
+import { daysBetween, type ISODate } from "./dates";
+import type { BlueprintId } from "./blueprints";
 
 /*
  * The race-specific phase before an A-race marathon or half (docs/decisions/fartlek-race-specific-phase.md).
@@ -105,4 +106,38 @@ export interface PaceQuestion {
 export interface RacePaceView {
   raceId: number; name: string; date: ISODate; kind: "marathon" | "half"; wip: number;
   paces: PaceView; locked: boolean; lockedOn: ISODate | null; question: PaceQuestion | null;
+}
+
+/* ---------- The phase in the planner ---------- */
+
+/** What the planner needs to plan the race-specific phase; set on the seed when an A marathon or half is within 8 weeks. */
+export interface PhaseSeed {
+  race: { date: ISODate; kind: "marathon" | "half" };
+  /** The paces the sessions are trained at (locked, else the proposal). */
+  paces: RacePaces;
+  paceSource: PaceSource;
+  /** The step each blueprint starts at for the first week planned (`stepFor`): what was done before decides it. */
+  steps: Record<BlueprintId, number>;
+  /** The runner backed off (pain or missed paces): no deep aim (build plan step 6). */
+  backOff: boolean;
+  /** Real injury: every step is held and the deep aim is off (build plan step 5). */
+  injury: boolean;
+}
+
+/** Weeks in phase for a week: `floor(days from the week's start to the race / 7) + 1`, so the race week is 1. */
+export const wipOf = (weekStart: ISODate, raceDate: ISODate): number => Math.floor(daysBetween(weekStart, raceDate) / 7) + 1;
+
+/** What the phase warns about (never a refusal): a build week under `warn.weekKm`, a longest long run under `warn.longKm`. */
+export interface PhaseWarnings { lowWeek: { weekStart: ISODate; km: number } | null; shortLong: { km: number } | null }
+
+/** `weeks`: the planned weeks, with their role, run km and long runs; weeks outside the phase and the race week don't count. */
+export function phaseWarnings(weeks: { weekStart: ISODate; build: boolean; km: number; longKm: number | null }[], phase: PhaseSeed): PhaseWarnings {
+  const inPhase = weeks.filter((w) => { const wip = wipOf(w.weekStart, phase.race.date); return wip >= 2 && wip <= RACE_PHASE.weeks; });
+  const low = inPhase.filter((w) => w.build && w.km < RACE_PHASE.warn.weekKm).sort((a, b) => a.km - b.km)[0];
+  const longs = inPhase.map((w) => w.longKm).filter((k): k is number => k != null);
+  const longest = longs.length ? Math.max(...longs) : null;
+  return {
+    lowWeek: low ? { weekStart: low.weekStart, km: low.km } : null,
+    shortLong: longest != null && longest < RACE_PHASE.warn.longKm ? { km: longest } : null,
+  };
 }
