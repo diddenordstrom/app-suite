@@ -88,6 +88,15 @@ describe("history and results", () => {
     expect(last.pull_up.date).toBe("2026-11-02");
   });
 
+  it("last time carries the exercise note, even when it sits on a warm-up", () => {
+    const rows = [
+      { sessionId: 1, date: "2026-11-02", startedAt: null, exercise: "split_squat", kind: "work", kg: 10, reps: 8, seconds: null, note: "old" },
+      { sessionId: 2, date: "2026-11-09", startedAt: null, exercise: "split_squat", kind: "warmup", kg: 5, reps: 8, seconds: null, note: "left leg first" },
+      { sessionId: 2, date: "2026-11-09", startedAt: null, exercise: "split_squat", kind: "work", kg: 12, reps: 8, seconds: null },
+    ];
+    expect(latestByExercise(rows).split_squat).toEqual({ date: "2026-11-09", note: "left leg first", sets: [w(8, 12)] });
+  });
+
   it("improvements: more weight, or the same weight for more reps; volume skips warm-ups", () => {
     const last = { bench_press: { date: "x", sets: [w(5, 62.5)] }, db_curl: { date: "x", sets: [w(10, 12)] }, pull_up: { date: "x", sets: [w(8)] } };
     const entries = [
@@ -128,6 +137,8 @@ describe("Bolt import", () => {
     expect(a.entries.map((e) => e.exercise)).toEqual(["bench_press", "pull_up", "x:Cable Thing"]);
     expect(a.entries[0].sets).toEqual([{ kind: "warmup", kg: 40, reps: 10, seconds: null }, w(6, 62.5)]);
     expect(a.entries[1].sets).toEqual([w(7)]);
+    // The notes column becomes the exercise's comment.
+    expect(a.entries.map((e) => e.note)).toEqual([undefined, undefined, 'said "slow", then fast']);
     expect(b.entries[0].sets.map((s) => s.kind)).toEqual(["work", "drop"]);
   });
 

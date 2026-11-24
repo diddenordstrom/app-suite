@@ -353,4 +353,6 @@ export const gymSets = sqliteTable("gym_sets", {
   kg: real("kg"),
   reps: integer("reps"),
   seconds: integer("seconds"),
+  /** The comment on the exercise in this session; kept on the exercise's first set (`setIndex` 0). */
+  note: text("note"),
 }, (t) => [index("gym_sets_session").on(t.sessionId), index("gym_sets_user_exercise").on(t.userId, t.exercise)]);

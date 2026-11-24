@@ -1,0 +1,1 @@
+ALTER TABLE `gym_sets` ADD `note` text;
