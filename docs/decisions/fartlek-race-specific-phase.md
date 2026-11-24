@@ -186,7 +186,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
    - `rungBefore` must ignore tagged workouts, or MP sessions reset the threshold ladder.
    - Add `stepFor(sessions, id, before, entry)`.
    - Done when tests cover done → +1, missed → same, held → same and the ignored rung, and an `app.test.ts` round-trip keeps the tag.
-3. **Marathon pace and lock.**
+3. **Marathon pace and lock.** *Built.* `racePace` also takes the runner's `choice` (`prediction` or `goal`), since the cap and the 3 % question depend on it. The next A race is the one that counts: when it is not a marathon or half there is no phase. A pace with source `none` is never locked.
    - Add `racePace`, `server/racephase.ts` with `phaseRace(ctx, weekStart)` and `racePaceProposal`, the route, and the client choice card.
    - `phaseRace` finds the next A race within 1 km of 42.195 or 21.0975 with wip ≤ 8.
    - Done when there are tests for the cap, the runner's own choice over the cap, the 3 % question, each fallback and the recalculation after a B race.
