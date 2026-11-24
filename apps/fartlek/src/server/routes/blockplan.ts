@@ -96,7 +96,7 @@ function raceInOpenWeeks(ctx: Ctx, from: ISODate, end: ISODate) {
 
 /** The block engine's seed for `weeks` weeks from `startWeek` (a week that hasn't started). */
 function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: number | null; buildWeeksDone: number; lighterLast: boolean; light?: boolean; lighterWeeks?: boolean[]; roles?: WeekRole[] | null; race?: BlockSeed["race"] }): BlockSeed {
-  const w = seedFor(ctx, startWeek, { formOverTarget: true });
+  const w = seedFor(ctx, startWeek, { formOverTarget: true, weeks });
   const seed: BlockSeed = {
     startWeek, weeks, ctl: w.ctl, atl: w.atl, kmBefore: w.kmBefore, past: w.past,
     tolerance: tolerance(weeksBefore(ctx, startWeek, BLOCK.tolerance.lookbackWeeks)),
@@ -106,6 +106,7 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
     lighterFirst: !!o.light || (o.buildWeeksDone === 0 && w.backoff),
     lighterFirstWhy: o.light ? "light" : o.buildWeeksDone === 0 && w.backoff ? w.backoffWhy ?? "form" : null,
     longestKm: w.longestKm, rung: w.rung, tempoPace: w.tempoPace,
+    ...(w.phase ? { phase: w.phase } : {}),
     ...(o.lighterWeeks ? { lighterWeeks: o.lighterWeeks } : {}),
     ...(o.race ? { race: o.race } : {}),
   };

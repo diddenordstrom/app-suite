@@ -190,7 +190,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
    - Add `racePace`, `server/racephase.ts` with `phaseRace(ctx, weekStart)` and `racePaceProposal`, the route, and the client choice card.
    - `phaseRace` finds the next A race within 1 km of 42.195 or 21.0975 with wip ≤ 8.
    - Done when there are tests for the cap, the runner's own choice over the cap, the 3 % question, each fallback and the recalculation after a B race.
-4. **Planner wiring.**
+4. **Planner wiring.** *Built.* Settled with the user while building: the dress rehearsal sits in the week that holds its day (race − 13 to − 9), which is W3 for a race on Monday–Wednesday (it then replaces W3's quality session and W2 has none). A held session is only held in a lighter or taper week (the schedule's `held` is dropped in a build week, so a phase shorter than 8 weeks gets a full session there). When the day or week can't hold a blueprint or its fallback, the week keeps the plain threshold session. `PhaseSeed.backOff` and `injury` are in place but always false until steps 5 and 6. The block editor shows `phaseWarnings`.
    - Add `PhaseSeed { race, paces, paceSource, steps, backOff, injury }` on `WeekSeed` (via `seedFor` / `keySessionSeed`), on `BlockSeed` and in `weekAsBlock`.
    - In `weeksFor` (`shared/blockplan.ts`), phase weeks use the schedule: the ladder goes (or stays as a third session per the rule above) and tempo turns off.
    - `build` (`shared/nextweek.ts`) gains `Shape.phase` with the long run and the quality sessions, placed before the threshold, typed `threshold` and tagged.

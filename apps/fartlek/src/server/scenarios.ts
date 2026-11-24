@@ -9,7 +9,7 @@ import { loadConfig } from "./config";
 import { createDb } from "./db";
 import { addDays, todayIn, weekday, weekStartOf, type ISODate } from "../shared/dates";
 import type { Suggestion } from "../shared/nextweek";
-import type { BlockSuggestion } from "../shared/blockplan";
+import type { BlockSuggestion, PlannedWeek } from "../shared/blockplan";
 
 export interface Scenario {
   name: string;
@@ -23,7 +23,7 @@ export interface Scenario {
   threshold?: { pace: number; hr: number };
   maxHr?: number;
   /** A race this many weeks from the block's start (1 = its first week), on Saturday: "Skapa block" plans toward it. */
-  race?: { inWeeks: number; priority: "A" | "B" };
+  race?: { inWeeks: number; priority: "A" | "B"; /** Default 21.1 (a half). */ distanceKm?: number; goalSeconds?: number };
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -94,6 +94,24 @@ export const SCENARIOS: Scenario[] = [
     weeks: [26, 27, 28, 29, 30, 31, 30, 31, 32, 34, 36, 38],
     runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190, race: { inWeeks: 4, priority: "A" },
   },
+  {
+    name: "marathon in 8 at 45",
+    note: "a steady 45 km runner with an A marathon eight weeks out: the race phase, two quality sessions a week",
+    weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 45],
+    runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, race: { inWeeks: 8, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 + 30 * 60 },
+  },
+  {
+    name: "marathon in 8 at 70",
+    note: "a 70 km runner with an A marathon eight weeks out: the ladder stays as a third session",
+    weeks: [68, 70, 71, 70, 69, 71, 70, 70, 71, 70, 69, 70],
+    runDays: [1, 2, 3, 4, 6, 0], longRunDay: 0, threshold: { pace: 235, hr: 172 }, maxHr: 190, race: { inWeeks: 8, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 },
+  },
+  {
+    name: "half in 6",
+    note: "a 40 km runner with an A half marathon six weeks out: the phase starts at once, the weeks counted back from the race",
+    weeks: [38, 40, 41, 40, 39, 41, 40, 40, 41, 40, 39, 40],
+    runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190, race: { inWeeks: 6, priority: "A", distanceKm: 21.0975, goalSeconds: 1 * 3600 + 40 * 60 },
+  },
 ];
 
 const ORIGIN = "http://localhost:5173";
@@ -116,7 +134,7 @@ export interface ScenarioResult {
   week: { chosen: string; km: number; items: string; why: string; form: number; formPct: number; state: string; growth: number | null };
   blocks: { weeks: number; km: number[]; state: string; chosen: string; deepestPct: number | null }[];
   /** "Skapa block" with the race ahead: the weeks' roles and km, the blocks it makes now, and form on race day. */
-  race: { roles: string; km: number[]; chunks: string; now: number; raceForm: number | null; state: string } | null;
+  race: { roles: string; km: number[]; chunks: string; now: number; raceForm: number | null; state: string; weeks: PlannedWeek[]; warnings: BlockSuggestion["phaseWarnings"] } | null;
 }
 
 export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe/Stockholm")): Promise<ScenarioResult> {
@@ -162,7 +180,7 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
   let race: ScenarioResult["race"] = null;
   if (sc.race) {
     const date = addDays(weekStart, (sc.race.inWeeks - 1) * 7 + 5);
-    await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: 21.1 }));
+    await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}) }));
     const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string }>(`/api/plan/block-suggest?startWeek=${weekStart}`);
     if (b.ok && b.suggestion) {
       race = {
@@ -170,8 +188,9 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
         km: b.suggestion.weeks.map((x) => Math.round(x.items.filter((it) => it.type !== "cross").reduce((a, it) => a + it.km, 0) * 10) / 10),
         chunks: (b.racePlan?.chunks ?? []).map((c) => `${c.kind}:${c.weeks}`).join(" + "), now: b.racePlan?.now ?? 0,
         raceForm: b.suggestion.eval.race?.form ?? null, state: b.suggestion.eval.state,
+        weeks: b.suggestion.weeks, warnings: b.suggestion.phaseWarnings,
       };
-    } else race = { roles: "", km: [], chunks: `refused: ${b.reason}`, now: 0, raceForm: null, state: "" };
+    } else race = { roles: "", km: [], chunks: `refused: ${b.reason}`, now: 0, raceForm: null, state: "", weeks: [], warnings: null };
     return { scenario: sc, weekStart, week: { chosen: s.chosen, km: s.eval.km, items, why, form: s.eval.form, formPct: s.eval.formPct, state: s.eval.state, growth: s.eval.growth }, blocks, race };
   }
   for (const weeks of [2, 4]) {
@@ -198,6 +217,8 @@ export function describe(r: ScenarioResult): string {
     `    ${w.items}`,
     `    ${w.why}`,
     ...r.blocks.map((b) => `  block ${b.weeks} w: ${b.km.join(" → ") || "–"} km · ${b.state}${b.chosen ? ` via ${b.chosen}` : ""}${b.deepestPct != null ? ` · deepest ${Math.round(b.deepestPct)} %` : ""}`),
+    ...(r.race ? r.race.weeks.map((w) => `    ${w.weekStart} ${w.role[0]} ${w.items.map((it) => `${it.type === "threshold" ? "T" : it.type === "long" ? "L" : it.type === "cross" ? "X" : "E"}${it.km}${it.blueprint ? `[${it.blueprint}]` : ""}`).join(" ")}`) : []),
+    ...(r.race?.warnings && (r.race.warnings.lowWeek || r.race.warnings.shortLong) ? [`    warnings: ${JSON.stringify(r.race.warnings)}`] : []),
     ...(r.race ? [`  race plan ${r.race.chunks} (now ${r.race.now}): ${r.race.roles} · ${r.race.km.join(" → ")} km · ${r.race.state} · race-day form ${r.race.raceForm ?? "–"}`] : []),
   ].join("\n");
 }

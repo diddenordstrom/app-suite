@@ -12,8 +12,9 @@ import { plannedLoad, pmc } from "../../shared/load";
 import { asWeekSuggestion, suggestWeek, weekAsBlock } from "../../shared/blockplan";
 import { planRange } from "../../shared/planrange";
 import { daysAdvice, formHeavy, NEXT, rungBefore, type BackoffWhy, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
-import { phaseView, racePaceGate } from "../racephase";
-import { parseBlueprintTag } from "../../shared/blueprints";
+import { phaseRaceIn, phaseView, racePaceGate, racePaceView } from "../racephase";
+import { BLUEPRINTS, entryStep, parseBlueprintTag, stepFor } from "../../shared/blueprints";
+import type { PhaseSeed } from "../../shared/racephase";
 import { parseSteps, plannedFromSteps, stepsText, type WorkoutSteps } from "../../shared/steps";
 import { goalPace } from "../../shared/recovery";
 import { thresholdOn } from "../../shared/threshold";
@@ -53,7 +54,7 @@ function weekParam(ctx: Ctx, v: unknown): ISODate {
  * The seed for a week. `formOverTarget`: heavy form makes the week lighter even when the week has a target (Skapa block
  * does: a target a block or a copy left behind isn't the runner deciding the week); only a target noted "backoff" counts as asked.
  */
-export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: boolean } = {}): WeekSeed {
+export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: boolean; /** Weeks planned from `weekStart` (a block); the race phase may start in any of them. */ weeks?: number } = {}): WeekSeed {
   const thr = thresholdOn(ctx.thresholds, ctx.today);
   const block = blockOn(weekStart, repo.listBlocks(ctx.db, ctx.userId));
   const habit = crossHabit(ctx);
@@ -93,7 +94,7 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
     runDays: ctx.settings.runDays, longRunDay: ctx.settings.longRunDay,
     threshold: thr, refs: stepRefs(ctx, ctx.today), crossMin,
     targetKm: target?.km ?? null, backoff: backoffWhy != null, backoffWhy, hardBefore, toleranceKm,
-    ...keySessionSeed(ctx, weekStart),
+    ...keySessionSeed(ctx, weekStart, { weeks: o.weeks, toleranceKm }),
   };
 }
 
@@ -102,7 +103,7 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
  * after the last threshold session before it that was run or is still to run (`rungBefore`), and the
  * faster finish's pace.
  */
-export function keySessionSeed(ctx: Ctx, weekStart: ISODate): Pick<WeekSeed, "longestKm" | "rung" | "tempoPace"> {
+export function keySessionSeed(ctx: Ctx, weekStart: ISODate, o: { weeks?: number; toleranceKm?: number } = {}): Pick<WeekSeed, "longestKm" | "rung" | "tempoPace" | "phase"> {
   const dayBefore = addDays(weekStart, -1);
   const sessions = weekSummaries(ctx, addDays(weekStart, -7 * PAST_WEEKS), dayBefore).flatMap((w) => w.sessions);
   const T = NEXT.tempo;
@@ -111,7 +112,16 @@ export function keySessionSeed(ctx: Ctx, weekStart: ISODate): Pick<WeekSeed, "lo
     .sort((a, b) => a.date.localeCompare(b.date))[0];
   const thr = thresholdOn(ctx.thresholds, ctx.today);
   const tempoPace = race ? goalPace(race.goalSeconds!, race.distanceKm) + T.racePlus : thr?.paceSecPerKm != null ? thr.paceSecPerKm + T.thrPlus : null;
-  return { longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore), rung: rungBefore(weekStart, sessions, thr?.paceSecPerKm ?? null), tempoPace };
+  // The race-specific phase: the paces and where each blueprint stands, from what was done before the week.
+  const ph = phaseRaceIn(ctx, weekStart, o.weeks ?? 1);
+  let phase: PhaseSeed | undefined;
+  if (ph) {
+    const paces = racePaceView(ctx, ph).paces;
+    const steps = Object.fromEntries(BLUEPRINTS.filter((b) => b.race === ph.kind)
+      .map((b) => [b.id, stepFor(sessions, b.id, weekStart, entryStep(b, o.toleranceKm ?? 0))])) as PhaseSeed["steps"];
+    phase = { race: { date: ph.race.date, kind: ph.kind }, paces: { mp: paces.mp, hmp: paces.hmp }, paceSource: paces.source, steps, backOff: false, injury: false };
+  }
+  return { longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore), rung: rungBefore(weekStart, sessions, thr?.paceSecPerKm ?? null), tempoPace, ...(phase ? { phase } : {}) };
 }
 
 const HARD = new Set(["threshold", "intervals", "long", "race"]);
