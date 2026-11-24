@@ -1,13 +1,15 @@
 import { and, eq } from "drizzle-orm";
 import * as t from "./db/schema";
 import * as repo from "./repo";
-import type { Ctx } from "./analysis";
+import { stepMatchFor, type Ctx } from "./analysis";
 import { perfData } from "./performance";
 import { addDays, daysBetween, type ISODate } from "../shared/dates";
 import { AUTO_WINDOW_DAYS, autoCriticalSpeed, bestCurve, chooseCs, predictRace, trainingContext } from "../shared/bestefforts";
 import { HALF_M, MARATHON_M } from "../shared/racemodels";
 import { RACE_PHASE, racePace, type PaceChoice, type PaceSource, type PaceView, type RacePaceResult, type RacePaceView } from "../shared/racephase";
+import type { SessionView } from "../shared/compliance";
 import { injuryStop, type InjuryStop } from "../shared/recovery";
+import { stepSummary } from "../shared/stepmatch";
 import { thresholdOn } from "../shared/threshold";
 import type { Race } from "../shared/types";
 
@@ -54,6 +56,21 @@ function inputs(ctx: Ctx, race: Race, choice: PaceChoice | null) {
 
 /** Real injury now (pain of level 8 or more, or level 5 or more on 3 days, in the last week); null when there is none. */
 export const injuryNow = (ctx: Ctx): InjuryStop | null => injuryStop(repo.listPain(ctx.db, ctx.userId, addDays(ctx.today, -RACE_PHASE.injury.windowDays)), ctx.today);
+
+/**
+ * The runner should not be pushed deeper: pain of level 5 or more in the last week, or under half of the judged work reps in
+ * target in either of the last two tagged sessions that were run (`sessions`, oldest first).
+ */
+export function backOffNow(ctx: Ctx, sessions: SessionView[]): boolean {
+  const L = RACE_PHASE.injury;
+  if (repo.listPain(ctx.db, ctx.userId, addDays(ctx.today, -L.windowDays)).some((p) => p.level >= L.repeatLevel && p.date <= ctx.today)) return true;
+  const ran = sessions.filter((s) => s.workout.blueprint && s.activity && s.workout.steps && (s.outcome === "done" || s.outcome === "short"))
+    .sort((a, b) => a.workout.date.localeCompare(b.workout.date)).slice(-2);
+  return ran.some((s) => {
+    const m = stepSummary(stepMatchFor(ctx, s.activity!, s.workout.steps!, s.workout.date));
+    return !!m && m.workJudged > 0 && m.workIn / m.workJudged < RACE_PHASE.paceMissShare;
+  });
+}
 
 const view = (r: RacePaceResult): PaceView => ({ mp: r.mp, hmp: r.hmp, source: r.source, overCap: r.overCap });
 

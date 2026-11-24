@@ -17,7 +17,7 @@ const phase = (race: string, kind: "marathon" | "half" = "marathon", over: Parti
 });
 
 /** A runner at `km` a week, an A race `weeks` weeks out (the race on the given weekday of the last week, Monday = 0). */
-function plan(km: number, o: { weeks?: number; raceDay?: number; kind?: "marathon" | "half"; runDays?: number[]; injury?: boolean; step?: number } = {}) {
+function plan(km: number, o: { weeks?: number; raceDay?: number; kind?: "marathon" | "half"; runDays?: number[]; injury?: boolean; backOff?: boolean; step?: number } = {}) {
   const weeks = o.weeks ?? 8;
   const race = addDays(MONDAY, (weeks - 1) * 7 + (o.raceDay ?? 5));
   const seed: BlockSeed = {
@@ -27,7 +27,7 @@ function plan(km: number, o: { weeks?: number; raceDay?: number; kind?: "maratho
     threshold: { id: 1, effectiveDate: "2026-01-01", paceSecPerKm: 255, hr: 169 }, refs: REFS,
     crossMin: 0, lighterLast: false, goalKm: null, buildWeeksDone: 0, hardBefore: false,
     longestKm: Math.round(km * 0.34), rung: 0, tempoPace: 275,
-    roles: raceRoles(weeks, "A"), race: { date: race, priority: "A" }, phase: phase(race, o.kind, { injury: !!o.injury }, o.step ?? 0),
+    roles: raceRoles(weeks, "A"), race: { date: race, priority: "A" }, phase: phase(race, o.kind, { injury: !!o.injury, backOff: !!o.backOff }, o.step ?? 0),
   };
   return { seed, race, s: suggestBlock(seed) };
 }
@@ -131,7 +131,8 @@ describe("the race phase in the plan", () => {
   });
 
   it("holds every step in an injury and changes nothing but those steps", () => {
-    const calm = plan(45, { step: 1 }), hurt = plan(45, { step: 1, injury: true });
+    // Both without the deep aim (an injury turns it off), so only the steps can differ.
+    const calm = plan(45, { step: 1, backOff: true }), hurt = plan(45, { step: 1, injury: true });
     const sessions = (x: typeof calm) => x.s.weeks.flatMap((w) => w.items);
     // Same weeks, same days and types, same km a week.
     expect(hurt.s.weeks.map((w) => w.targetKm)).toEqual(calm.s.weeks.map((w) => w.targetKm));
@@ -144,5 +145,38 @@ describe("the race phase in the plan", () => {
     expect(Math.max(...tags(calm).map((t) => t.step))).toBeGreaterThan(1);
     // The deep aim is the next step's job; the form on race day still lands in the window.
     expect(hurt.s.eval.race?.form).toBeGreaterThanOrEqual(COACH.race.low);
+  });
+
+  describe("the deep aim in the last two build weeks", () => {
+    const builds = (x: ReturnType<typeof plan>) => x.s.weeks.map((w, i) => ({ ...w, i })).filter((w, _i, all) => {
+      const taper = all.find((y) => y.role === "taper")!.i;
+      return w.role === "build" && w.i >= taper - 2;
+    });
+
+    it("goes deeper for a calm runner, inside the cap and the aim, and says so as a try", () => {
+      const calm = plan(45), plain = plan(45, { backOff: true });
+      const deep = builds(calm), flat = builds(plain);
+      expect(deep).toHaveLength(2);
+      expect(calm.s.tries.some((t) => t.id === "deep")).toBe(true);
+      deep.forEach((w, k) => {
+        expect(w.targetKm).toBeLessThanOrEqual(w.cap);
+        expect(w.targetKm).toBeGreaterThanOrEqual(flat[k].targetKm);
+        expect(calm.s.eval.weeks[w.i].lowPct).toBeGreaterThanOrEqual(RACE_PHASE.deepAim);
+      });
+      expect(deep.reduce((a, w) => a + w.targetKm, 0)).toBeGreaterThan(flat.reduce((a, w) => a + w.targetKm, 0));
+      // Nothing else moves: the weeks before the two stay as they were, and race-day form is still in its window.
+      expect(calm.s.weeks.slice(0, deep[0].i).map((w) => w.targetKm)).toEqual(plain.s.weeks.slice(0, deep[0].i).map((w) => w.targetKm));
+      expect(calm.s.eval.race!.form).toBeGreaterThanOrEqual(COACH.race.low);
+      expect(calm.s.eval.race!.form).toBeLessThanOrEqual(COACH.race.high);
+    });
+
+    it("is off with back-off (pain or missed paces) or injury, and for a half or marathon only", () => {
+      const plain = plan(45, { backOff: true });
+      expect(plain.s.tries.some((t) => t.id === "deep")).toBe(false);
+      expect(plan(45, { injury: true }).s.tries.some((t) => t.id === "deep")).toBe(false);
+      expect(plan(45, { injury: true }).s.weeks.map((w) => w.targetKm)).toEqual(plain.s.weeks.map((w) => w.targetKm));
+      const none = suggestBlock({ ...plan(45).seed, phase: undefined });
+      expect(none.tries.some((t) => t.id === "deep")).toBe(false);
+    });
   });
 });

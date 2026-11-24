@@ -8,7 +8,7 @@ updated: 2026-11-24
 
 # Fartlek gets a race-specific phase for the marathon and half, built from blueprints that scale per runner
 
-Settled with the user on 2026-11-24. Not built yet; the [build plan](#build-plan) below says how. It amends "no branches per distance" in [goal to plan](fartlek-goal-to-plan.md): the method stays one engine, but the last weeks before a long race now get race-pace sessions, because those sessions are what every marathon method has in common ([research](../research/marathon-specific-phase.md)). It answers the open pre-race phase in [block progression](fartlek-block-progression.md) and the distance-specific blocks left open in [race blocks](fartlek-race-blocks.md).
+Settled with the user on 2026-11-24. Built in six steps (2026-11-24 to 2026-11-25); the [build plan](#build-plan) below says how, and what was settled while building. It amends "no branches per distance" in [goal to plan](fartlek-goal-to-plan.md): the method stays one engine, but the last weeks before a long race now get race-pace sessions, because those sessions are what every marathon method has in common ([research](../research/marathon-specific-phase.md)). It answers the open pre-race phase in [block progression](fartlek-block-progression.md) and the distance-specific blocks left open in [race blocks](fartlek-race-blocks.md).
 
 ## Decided
 
@@ -50,7 +50,7 @@ Noted on 2026-11-24 and not decided. The engine's year-round base (easy running,
 
 ## Build plan
 
-Drafted 2026-11-24 from the code at that date, to be built by a later session. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. Each PR runs `npm run check`, has a gitmoji commit message, and puts every UI string through `t()` in both `en` and `sv`. When a step is built, mark it here, and when all are built, mark the page built.
+Drafted 2026-11-24 from the code at that date and built step by step. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. Each PR runs `npm run check`, has a gitmoji commit message, and puts every UI string through `t()` in both `en` and `sv`. When a step is built, mark it here, and when all are built, mark the page built.
 
 ### Blueprint format
 
@@ -207,7 +207,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
    - `server/racephase.ts` reads `repo.listPain`. When it fires, every step is held and the deep aim is off.
    - GETs return `injury`, and the client offers the existing re-plan (`/blocks/:id/replan?light=1`). The runner chooses; readiness alone never re-plans.
    - Done when there are tests at both limits, and a test that nothing but the held steps changes.
-6. **Deep aim in the last two build weeks.**
+6. **Deep aim in the last two build weeks.** *Built.* The deep aim only runs with a phase (an A marathon or half). `PhaseSeed.backOff` is set from pain of level 5 or more in the last 7 days, or from under half of the judged work reps in target in either of the last two run tagged sessions (`backOffNow`). When the taper can't land race-day form in `COACH.race` on the deeper weeks, the plain weeks stay. The page is built.
    - In `suggestBlock`, before `taperFit`: for the two build weeks right before the first taper week, when there is no back-off or injury, bisect km between the planned km and the week's cap for the largest km whose deepest form is −25 % or higher and is not too hard. Add the try id `"deep"`.
    - Revert if race-day form then leaves `COACH.race`.
    - Leave `COACH.floor`, `rampRisk`, `weekGrowth`, `floorFor`, `fitWeeks` and the spike rule untouched.
