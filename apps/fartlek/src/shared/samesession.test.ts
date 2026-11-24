@@ -24,7 +24,7 @@ function result(flat: ReturnType<typeof flatOf>[number], s: { start: number; dur
   return {
     flat, laps: s ? [1] : [], startS: s?.start ?? null, endS: s ? s.start + s.dur : null, durationS: s?.dur ?? null, distanceM: s?.dist ?? null,
     pace: s ? s.dur / (s.dist / 1000) : null, hr: s?.hr ?? null, hrTrimmed: true, cadence: null,
-    target: { pace: null, hr: null, hrRef: null, judge: null }, judge: null, status: s ? "in" : "missing", delta: null, merged: null,
+    target: { pace: null, hr: null, hrRef: null, hrCeiling: false, judge: null }, judge: null, status: s ? "in" : "missing", delta: null, merged: null,
   };
 }
 

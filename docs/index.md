@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · decision · Easy HR is a ceiling in plan vs actual ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · CI and CD stay in one workflow, renamed ci-cd ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek: gaps in marathon training outside the race phase ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race-specific phase: build plan and last details ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · note · Fartlek gym: Bolt notes become exercise comments ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: remove a set, weight follows down, comment per exercise ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Fartlek gym: search in both languages, reorder exercises ([log/2026-11.md](log/2026-11.md))
-- 2026-11-23 · decision · Fartlek gym: one session a week is full body ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -55,7 +55,7 @@
 - [Fartlek "Skapa block": one entry, two steps, one editor](decisions/fartlek-skapa-block.md): Why the plan has one "Skapa block" button, what step 1 asks, and why the block editor shows the weeks as columns with the numbers beside them _(decision · accepted · 2026-11-16)_
 - [Fartlek takes sleep from Garmin, not from the check-in](decisions/fartlek-sleep-from-garmin.md): Today's form uses Garmin's sleep score (under 60 is poor); the sleep question is gone from the daily check-in; old manual values are only a fallback _(decision · accepted · 2026-11-11)_
 - [Fartlek step detection from the stream](decisions/fartlek-stream-steps.md): When a run's laps don't fit its workout's steps, the step changes are found in the 1 s stream (grade-adjusted, Garmin's GAP when present) and offered as a full set of lap splits; method, thresholds, what the real runs showed, and what's open _(decision · accepted · 2026-11-12)_
-- [Fartlek structured workouts and planned vs actual](decisions/fartlek-structured-workouts.md): Planned sessions get optional steps with pace/HR targets; laps are matched to the steps and each step is judged in target / near / off, with a lap split for forgotten presses and step changes found in the stream (built); the session library put off _(decision · accepted · 2026-11-12)_
+- [Fartlek structured workouts and planned vs actual](decisions/fartlek-structured-workouts.md): Planned sessions get optional steps with pace/HR targets; laps are matched to the steps and each step is judged in target / near / off, with a lap split for forgotten presses and step changes found in the stream (built); the session library put off _(decision · accepted · 2026-11-24)_
 - [Fartlek suggests a week the runner then edits freely](decisions/fartlek-suggest-week.md): Föreslå veckan" builds one week that hasn't started from the coach's limits (form band, km ramp, one long run, at least one threshold session), shows what it tried, and hands over an editable week with live numbers; nothing is locked, the long run day is a setting _(decision · accepted · 2026-11-13)_
 - [Fartlek Home starts with "Idag", and suggests only when something happened](decisions/fartlek-today.md): Today's form and today's session in one card with the reasons behind ⓘ; a missed run can be moved or struck (and its km spread); low form on a key session asks how the body feels; week ring and list merged _(decision · accepted · 2026-11-12)_
 - [Fartlek workouts to the watch via intervals.icu](decisions/fartlek-watch-push.md): Structured workouts reach the Garmin watch through intervals.icu (API key now, OAuth later), not a .FIT download; how the push works and what it needs on the intervals.icu side _(decision · accepted · 2026-11-13)_

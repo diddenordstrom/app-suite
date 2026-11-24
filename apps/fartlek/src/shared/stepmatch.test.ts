@@ -35,6 +35,13 @@ describe("matching laps to steps", () => {
     expect(m).toMatchObject({ workTotal: 3, workJudged: 3, workIn: 2, hrDrift: 6, lapCount: 9, autoMerged: 2, extraLaps: 0 });
   });
 
+  it("counts easy HR below the band as in target, only above it as off", () => {
+    const slow: [number, number, number, LapTrigger][] = [[353, 1000, 118, "distance"], [353, 1000, 122, "manual"], ...session.slice(2)];
+    const m = matchSteps(steps, laps(slow), null, refs) as StepMatch;
+    expect(status(m)[0]).toBe("warmup:in");
+    expect(status(m).at(-1)).toBe("cooldown:near+3");
+  });
+
   it("folds a few-second closing lap into the step before it", () => {
     const withTail: [number, number, number, LapTrigger][] = [...session.slice(0, 6), [478, 1720, 172, "manual"], [365, 1000, 150, "manual"], [2, 5, 150, "end"]];
     const m = matchSteps(steps, laps(withTail), null, refs) as StepMatch;

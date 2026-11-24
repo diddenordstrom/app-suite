@@ -3,7 +3,7 @@ title: Fartlek structured workouts and planned vs actual
 summary: Planned sessions get optional steps with pace/HR targets; laps are matched to the steps and each step is judged in target / near / off, with a lap split for forgotten presses and step changes found in the stream (built); the session library put off
 type: decision
 status: accepted
-updated: 2026-11-12
+updated: 2026-11-24
 ---
 
 # Fartlek structured workouts and planned vs actual
@@ -26,6 +26,7 @@ The proposal below was mocked as a Claude Design canvas ("Fartlek – strukturer
 - **Language.** All code stays English; Swedish is only UI. The step keywords follow the UI language: the parser reads both (`@tröskel` and `@threshold`, `lugnt` and `easy`) and steps are written back in the user's language. The block text should work the same way; today it is English only, which is its own fix.
 - **Targets come from what Fartlek already knows**, nothing invented:
   - Easy, long, warm-up and cool-down steps are judged on the **easy HR band** from Settings; pace is shown as the outcome, there is no easy pace target.
+  - The easy band is a **ceiling** when judging (2026-11-24): below it is in target, as in the easy score. Without a band in Settings the ceiling is the top of zone 2. Before this, a run held below a band built from LTHR zones (Friel Z2, 85–89 % of LTHR) was marked "near, 4 bpm under" although it was exactly the easy run asked for.
   - Threshold reps are judged on **pace in the existing threshold window** (estimate −15/+20 s/km, as `rangeCheck`). HR is shown beside it with the threshold HR as a reference, not as a range.
   - The runner can switch what a step is judged on by tapping it; there is no row of toggles.
 - **Near** = at most 5 s/km or 5 bpm outside the target. Results are *in target / near / off*; the summary ("2 av 3 drag i mål") is only green when every rep is in target, and the week view uses the same colour.

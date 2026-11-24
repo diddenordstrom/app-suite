@@ -13,7 +13,7 @@ import { flattenSteps, resolveTarget, type FlatStep, type Judge, type ResolvedTa
  * 3. Segments are paired with the steps in order. A segment that covers two steps (a forgotten lap
  *    press) is flagged with where to split it; the step after it has no lap.
  * 4. Each step is judged on its judged target: in target, near (within NEAR_PACE s/km or NEAR_HR
- *    bpm) or off. HR on reps leaves out the first HR_SKIP_S seconds, while HR is still climbing.
+ *    bpm) or off. Easy HR is a ceiling: below the band is in target. HR on reps leaves out the first HR_SKIP_S seconds, while HR is still climbing.
  */
 
 export const NEAR_PACE = 5;
@@ -194,9 +194,10 @@ function splitPoint(seg: Seg, f: FlatStep, stream: Stream | null, refs: StepRefs
   return Math.round(seg.startS + expectedS(f, refs));
 }
 
-function judge(value: number | null, range: [number, number] | null, near: number): { status: StepStatus; delta: number | null } {
+/** `ceiling`: only the top of the range counts, so below it is in target (easy HR). */
+function judge(value: number | null, range: [number, number] | null, near: number, ceiling = false): { status: StepStatus; delta: number | null } {
   if (value == null || !range) return { status: "unjudged", delta: null };
-  const delta = value < range[0] ? value - range[0] : value > range[1] ? value - range[1] : 0;
+  const delta = value < range[0] && !ceiling ? value - range[0] : value > range[1] ? value - range[1] : 0;
   return { status: delta === 0 ? "in" : Math.abs(delta) <= near ? "near" : "off", delta: Math.round(delta) };
 }
 
@@ -241,7 +242,7 @@ export function matchSteps(steps: WorkoutSteps, rawLaps: Lap[], stream: Stream |
     }
     const pace = seg.distanceM > 0 ? seg.durationS / (seg.distanceM / 1000) : null;
     const judged = f.role === "recovery" || merged ? null : target.judge;
-    const j2 = judged === "pace" ? judge(pace, target.pace, NEAR_PACE) : judged === "hr" ? judge(hr, target.hr, NEAR_HR) : { status: "unjudged" as const, delta: null };
+    const j2 = judged === "pace" ? judge(pace, target.pace, NEAR_PACE) : judged === "hr" ? judge(hr, target.hr, NEAR_HR, target.hrCeiling) : { status: "unjudged" as const, delta: null };
     return {
       flat: f, laps: seg.laps, startS: seg.startS, endS: seg.endS, durationS: seg.durationS, distanceM: seg.distanceM, pace, hr: hr == null ? null : Math.round(hr), hrTrimmed,
       cadence: seg.cadSecs ? Math.round(seg.cadWeighted / seg.cadSecs) : null, target, judge: target.judge, status: j2.status, delta: j2.delta, merged,

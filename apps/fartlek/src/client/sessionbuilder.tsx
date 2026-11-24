@@ -165,7 +165,7 @@ function Goal({ def, refs, onJudge }: { def: StepDef; refs: StepRefs | null; onJ
   if (!def.target || def.target.kind === "jog" || def.target.kind === "strides") return <span className="text-xs text-muted-foreground">{t("steps.notJudged")}</span>;
   const r = resolveTarget(def, refs);
   if (!r.judge) return <span className="text-xs text-muted-foreground">{t("steps.noTarget")}</span>;
-  const range = (x: [number, number], kind: Judge) => (kind === "pace" ? `${fmt.pace(x[0]).split("/")[0]}–${fmt.pace(x[1])}` : `${x[0]}–${x[1]}`);
+  const range = (x: [number, number], kind: Judge) => (kind === "pace" ? `${fmt.pace(x[0]).split("/")[0]}–${fmt.pace(x[1])}` : r.hrCeiling ? `≤ ${x[1]}` : `${x[0]}–${x[1]}`);
   const parts = [r.judge === "pace" ? t("steps.goalPace", { range: range(r.pace!, "pace") }) : t("steps.goalHr", { range: range(r.hr!, "hr") })];
   if (r.judge === "pace") parts.push(r.hrRef ? `${t("steps.showHr")}, ${t("steps.hrRef", { hr: r.hrRef })}` : t("steps.showHr"));
   else parts.push(t("steps.showPace"));

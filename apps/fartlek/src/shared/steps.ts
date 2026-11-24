@@ -272,6 +272,8 @@ export interface ResolvedTarget {
   hr: [number, number] | null;
   /** Shown beside a pace target, never judged on its own (threshold HR). */
   hrRef: number | null;
+  /** The HR range is a ceiling: below it counts as in target (easy running can't be too easy). */
+  hrCeiling: boolean;
   judge: Judge | null;
 }
 
@@ -282,6 +284,7 @@ export interface ResolvedTarget {
 export function resolveTarget(def: StepDef, refs: StepRefs): ResolvedTarget {
   const t = def.target;
   let pace: [number, number] | null = null, hr: [number, number] | null = null, hrRef: number | null = null;
+  const hrCeiling = t?.kind === "easy";
   const tp = refs.thresholdPace;
   if (t?.kind === "easy") {
     if (refs.easyLow && refs.easyHigh) hr = [refs.easyLow, refs.easyHigh];
@@ -302,7 +305,7 @@ export function resolveTarget(def: StepDef, refs: StepRefs): ResolvedTarget {
   let judge = t?.kind === "strides" ? null : def.judge ?? defaultJudge(t);
   if (judge === "pace" && !pace) judge = hr ? "hr" : null;
   else if (judge === "hr" && !hr) judge = pace ? "pace" : null;
-  return { pace, hr, hrRef, judge };
+  return { pace, hr, hrRef, hrCeiling, judge };
 }
 
 /** The pace used to turn a step's time into distance or back: its target pace, else the easy pace. */
