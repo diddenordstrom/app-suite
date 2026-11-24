@@ -1,5 +1,6 @@
 import { addDays, daysBetween, weekday, type ISODate } from "./dates";
 import type { PhaseSeed } from "./racephase";
+import type { RecoveryRace } from "./blockplan";
 import { FORM, formPct } from "./load";
 import { COACH, crossLoadPerDay, itemLoad } from "./coach";
 import { stepTotals, stridesRepeat, THRESHOLD_WARM_COOL_MIN, withStrides, type StepRefs, type WorkoutSteps } from "./steps";
@@ -196,6 +197,8 @@ export interface WeekSeed {
   toleranceKm?: number;
   /** The race-specific phase, when an A marathon or half is within 8 weeks (docs/decisions/fartlek-race-specific-phase.md). */
   phase?: PhaseSeed;
+  /** A race of 10 km+ whose recovery reaches this week (docs/decisions/fartlek-post-race-recovery.md). */
+  recovery?: RecoveryRace | null;
 }
 
 export type WeekState = "under" | "ok" | "over";
@@ -470,6 +473,8 @@ export interface Shape {
   crossMin: number;
   /** Most km any session may have (the 30-day rule); null = no limit. */
   maxKm?: number | null;
+  /** Easy runs with strides this week; default NEXT.stridesPerWeek (0 in the first days after a race, docs/decisions/fartlek-post-race-recovery.md). */
+  strides?: number;
   /**
    * The race-specific phase's sessions (blueprints compiled to steps): the long run replaces the plain or faster-finish one,
    * and the quality sessions come before the threshold ones, typed `threshold` and tagged. A `date` is the day they are placed on.
@@ -561,7 +566,7 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   }
   // Without a ladder to step from (no run in 30 days), the long run takes what no easy run could.
   if (shape.longKm == null && !easyDays.length && rest > 0) items[0].km = half(items[0].km + rest);
-  addStrides(items, seed.refs);
+  addStrides(items, seed.refs, shape.strides ?? NEXT.stridesPerWeek);
   if (shape.crossMin > 0) {
     const free = days.find((d) => !items.some((it) => it.date === d));
     if (free) items.push({ date: free, type: "cross", km: 0, durationMin: shape.crossMin, steps: null });

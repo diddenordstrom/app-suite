@@ -24,6 +24,8 @@ export interface Scenario {
   maxHr?: number;
   /** A race this many weeks from the block's start (1 = its first week), on Saturday: "Skapa block" plans toward it. */
   race?: { inWeeks: number; priority: "A" | "B"; /** Default 21.1 (a half). */ distanceKm?: number; goalSeconds?: number };
+  /** A race run this many days before the block's start (a race-list row and a run that day): the block starts with recovery weeks. */
+  raceAgo?: { days: number; priority: "A" | "B"; distanceKm: number };
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -112,6 +114,18 @@ export const SCENARIOS: Scenario[] = [
     weeks: [38, 40, 41, 40, 39, 41, 40, 40, 41, 40, 39, 40],
     runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190, race: { inWeeks: 6, priority: "A", distanceKm: 21.0975, goalSeconds: 1 * 3600 + 40 * 60 },
   },
+  {
+    name: "after a marathon",
+    note: "a 45 km runner who ran an A marathon the day before the block: four recovery weeks (docs/decisions/fartlek-post-race-recovery.md)",
+    weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 30],
+    runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, raceAgo: { days: 1, priority: "A", distanceKm: 42.195 },
+  },
+  {
+    name: "after a half, late",
+    note: "a 40 km runner whose A half was 10 days before the block: one recovery week left, at 75 %, then the build",
+    weeks: [38, 40, 41, 40, 39, 41, 40, 40, 41, 40, 30, 25],
+    runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190, raceAgo: { days: 10, priority: "A", distanceKm: 21.0975 },
+  },
 ];
 
 const ORIGIN = "http://localhost:5173";
@@ -170,6 +184,15 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
   });
 
   const weekStart = addDays(thisWeek, 7);
+  if (sc.raceAgo) {
+    const date = addDays(weekStart, -sc.raceAgo.days);
+    await app.request("/api/races", json({ name: "Loppet", date, priority: sc.raceAgo.priority, distanceKm: sc.raceAgo.distanceKm }));
+    const km = sc.raceAgo.distanceKm;
+    if (date < today) {
+      q(`insert into activities (user_id, id, name, type_key, start_time_local, date, distance_m, duration_s, avg_hr, is_run)
+         values (1, ?, 'race', 'running', ?, ?, ?, ?, ?, 1)`, `sc:${++n}`, `${date} 09:00:00`, date, km * 1000, Math.round(km * (thr.pace + 20)), thr.hr);
+    } else q(`insert into workouts (user_id, date, type, distance_km) values (1, ?, 'race', ?)`, date, km);
+  }
   const w = await get<{ suggestion: Suggestion }>(`/api/plan/next-week?weekStart=${weekStart}`);
   const s = w.suggestion;
   const items = s.items.map((it) => `${it.type === "threshold" ? "T" : it.type === "long" ? "L" : it.type === "cross" ? "X" : "E"}${it.type === "cross" ? it.durationMin : it.km}`).join(" ");
@@ -178,9 +201,11 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
     s.why.reentryKm ? `re-entry to ${s.why.reentryKm}` : null].filter(Boolean).join(", ");
   const blocks: ScenarioResult["blocks"] = [];
   let race: ScenarioResult["race"] = null;
-  if (sc.race) {
-    const date = addDays(weekStart, (sc.race.inWeeks - 1) * 7 + 5);
-    await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}) }));
+  if (sc.race || sc.raceAgo) {
+    if (sc.race) {
+      const date = addDays(weekStart, (sc.race.inWeeks - 1) * 7 + 5);
+      await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}) }));
+    }
     const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string }>(`/api/plan/block-suggest?startWeek=${weekStart}`);
     if (b.ok && b.suggestion) {
       race = {

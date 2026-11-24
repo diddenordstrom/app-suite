@@ -3,7 +3,7 @@ import type { Db } from "../db";
 import * as t from "../db/schema";
 import * as repo from "../repo";
 import { ctxFor, loadsWithToday, stepRefs, weekSummaries, type Ctx } from "../analysis";
-import { crossHabit, kmByDay, longestRun, weeksBefore } from "./blocks";
+import { crossHabit, kmByDay, longestRun, recoveryRaceFor, weeksBefore } from "./blocks";
 import { BLOCK, tolerance } from "../../shared/blockplan";
 import { addDays, weekStartOf, type ISODate } from "../../shared/dates";
 import { blockOn } from "../../shared/blocks";
@@ -89,12 +89,16 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
   const heavy = formHeavy(seed.ctl, seed.atl) && (target == null || !!o.formOverTarget || asked);
   const backoffWhy: BackoffWhy | null = heavy ? "form" : asked ? "asked" : null;
   const toleranceKm = tolerance(weeksBefore(ctx, weekStart, BLOCK.tolerance.lookbackWeeks)).km;
+  // After a race of 10 km+ the week is a recovery week (docs/decisions/fartlek-post-race-recovery.md); the race is not the long run to step from.
+  const rec = recoveryRaceFor(ctx, weekStart);
+  const recovery = rec ? { date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, peakKm: rec.peakKm } : null;
   return {
     weekStart, ctl: seed.ctl, atl: seed.atl, kmBefore: past.slice(-3).map((w) => w.km), past,
     runDays: ctx.settings.runDays, longRunDay: ctx.settings.longRunDay,
     threshold: thr, refs: stepRefs(ctx, ctx.today), crossMin,
     targetKm: target?.km ?? null, backoff: backoffWhy != null, backoffWhy, hardBefore, toleranceKm,
     ...keySessionSeed(ctx, weekStart, { weeks: o.weeks, toleranceKm }),
+    ...(recovery ? { recovery, longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore, [recovery.date]) } : {}),
   };
 }
 

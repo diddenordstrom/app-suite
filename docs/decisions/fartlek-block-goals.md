@@ -39,6 +39,6 @@ Agreed with the user on 2026-11-13 after the week-47 review, mocked, then built 
 ## Open
 
 - Loose planned weeks outside blocks are not wrapped into blocks yet; "Föreslå veckan" stays for them.
-- A recovery block after a race is not generated. (Race blocks inside the 16 weeks are, since 2026-11-16: [race blocks](fartlek-race-blocks.md).) Decided 2026-11-24: the next block starts with recovery weeks, see [post-race recovery](fartlek-post-race-recovery.md).
+- A recovery block after a race is not generated. (Race blocks inside the 16 weeks are, since 2026-11-16: [race blocks](fartlek-race-blocks.md).) Decided 2026-11-24: the next block starts with recovery weeks, see [post-race recovery](fartlek-post-race-recovery.md) (built).
 - Whether the block coach and the block engine merge into one (they judge the same deepest week but are separate code).
 - ~~Whether the race window should depend on distance.~~ Decided 2026-11-24 in [race plan skeleton](fartlek-race-plan-skeleton.md): 30 weeks for an A marathon, 20 for a half, 16 for the rest.

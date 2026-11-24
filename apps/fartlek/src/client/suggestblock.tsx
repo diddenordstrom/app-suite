@@ -31,10 +31,12 @@ type SugBase = { startWeek: ISODate; defaultStart: ISODate; earliest: ISODate; t
 type RacePlan = { race: Race & { priority: "A" | "B" }; weeksToRace: number; chunks: RaceChunk[]; now: number };
 type SugOk = SugBase & { ok: true; seed: BlockSeed; suggestion: BlockSuggestion; replaces: Workout[]; race: Race | null; advice: DaysAdvice | null; racePlan: RacePlan | null;
   /** Days before `today` in a block that starts in the running week are over: locked, with the km run. */
-  doneDays: Record<ISODate, number>; racePace: RacePaceView | null };
+  doneDays: Record<ISODate, number>; racePace: RacePaceView | null;
+  /** The race the first weeks recover from (docs/decisions/fartlek-post-race-recovery.md); null without recovery weeks. */
+  recovery: { name: string; date: ISODate; distanceKm: number; priority: "A" | "B"; weeks: number } | null };
 type SugRes = SugBase & (
   | { ok: false; reason: "block"; block: Block }
-  | { ok: false; reason: "race" | "afterRace"; race: Race }
+  | { ok: false; reason: "race"; race: Race }
   | Omit<SugOk, keyof SugBase>);
 
 /** What "Använd blocket" wrote and what it replaced, for undo. */
@@ -140,13 +142,13 @@ function StartStep({ data, loading, rhythm, onRhythm, name, onName, mode, onMode
         {picker}
         <p className="text-sm text-muted-foreground">
           {data.reason === "block" ? t("blk.refused.block", { name: blockName(data.block) })
-            : t(data.reason === "afterRace" ? "blk.refused.afterRace" : "blk.refused.race", { name: data.race.name, date: fmtDay(data.race.date, { day: "numeric", month: "short", year: "numeric" }), weeks: BLOCK.raceWindowWeeks, days: BLOCK.afterRaceDays })}
+            : t("blk.refused.race", { name: data.race.name, date: fmtDay(data.race.date, { day: "numeric", month: "short", year: "numeric" }), weeks: BLOCK.raceWindowWeeks })}
         </p>
         <div className="flex justify-end"><Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button></div>
       </div>
     );
   }
-  const { seed, race, racePlan: rp } = data as SugOk;
+  const { seed, race, racePlan: rp, recovery } = data as SugOk;
   const form = seed.ctl - seed.atl;
   // A lighter first week is either heavy form (tired) or asked for (a backoff target, or a lighter start from the check-in).
   const lighter = !!seed.lighterFirst;
@@ -188,7 +190,11 @@ function StartStep({ data, loading, rhythm, onRhythm, name, onName, mode, onMode
         {picker}
       </div>
 
-      {rp ? <RacePlanView rp={rp} start={data.startWeek} /> : (
+      {rp ? <RacePlanView rp={rp} start={data.startWeek} /> : recovery && recovery.weeks > 0 ? (
+        <p className="text-sm text-muted-foreground">
+          {t("blk.recovery.note", { name: recovery.name, date: fmtDay(recovery.date, { day: "numeric", month: "short" }), weeks: tn("be.weeksN", recovery.weeks) })}
+        </p>
+      ) : (
       <fieldset className="space-y-2">
         <legend className="text-sm font-medium">{t("be.rhythm")}</legend>
         <p className="text-sm text-muted-foreground">{t("be.rhythm.intro")}</p>
@@ -241,8 +247,8 @@ function StartStep({ data, loading, rhythm, onRhythm, name, onName, mode, onMode
 
 /** The blocks counted back from the race, week by week, those planned now marked; and a line on what comes after. */
 function RacePlanView({ rp, start }: { rp: RacePlan; start: ISODate }) {
-  const color: Record<WeekRole, string> = { build: "bg-signature", lighter: "bg-signature opacity-45", taper: "bg-chart-4", race: "bg-chart-4" };
-  const height: Record<WeekRole, string> = { build: "70%", lighter: "40%", taper: "45%", race: "30%" };
+  const color: Record<WeekRole, string> = { build: "bg-signature", lighter: "bg-signature opacity-45", taper: "bg-chart-4", race: "bg-chart-4", recovery: "bg-signature opacity-30" };
+  const height: Record<WeekRole, string> = { build: "70%", lighter: "40%", taper: "45%", race: "30%", recovery: "25%" };
   let week = 0;
   const later = rp.chunks.slice(rp.now);
   return (
@@ -273,7 +279,7 @@ function RacePlanView({ rp, start }: { rp: RacePlan; start: ISODate }) {
     </section>
   );
 }
-const ROLE_SHORT = { build: "be.role.build", lighter: "be.role.lighter", taper: "be.role.taper", race: "be.role.race" } as const;
+const ROLE_SHORT = { build: "be.role.build", lighter: "be.role.lighter", taper: "be.role.taper", race: "be.role.race", recovery: "be.role.recovery" } as const;
 
 /* ---------- The simulation lines ---------- */
 

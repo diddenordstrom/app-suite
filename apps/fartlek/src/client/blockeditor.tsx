@@ -79,7 +79,7 @@ export function useBlockWeeks(seed: BlockSeed, start: SuggestItem[][], startRole
 }
 export type BlockWeeks = ReturnType<typeof useBlockWeeks>;
 
-const ROLE_LABEL = { build: "be.build", lighter: "blk.b.lighter", taper: "be.taper", race: "be.raceWeek" } as const;
+const ROLE_LABEL = { build: "be.build", lighter: "blk.b.lighter", taper: "be.taper", race: "be.raceWeek", recovery: "block.kind.recovery" } as const;
 
 type Quick = "easy" | "strides" | "threshold" | "long" | "cross";
 const QUICK: { kind: Quick; color: string }[] = [
@@ -156,6 +156,7 @@ function WeekHead({ b, i, ev, plan, deepest, editable, onRemove, compact, label 
             <option value="build">{t("be.build")}</option>
             <option value="lighter">{t("blk.b.lighter")}</option>
             {(b.seed.race || b.roles.includes("taper")) && <option value="taper">{t("be.taper")}</option>}
+            {(b.seed.recovery || b.roles.includes("recovery")) && <option value="recovery">{t("block.kind.recovery")}</option>}
           </select>
         ) : b.roles[i] !== "build" && <Badge className={b.roles[i] === "race" ? "bg-signature-soft text-signature-foreground" : undefined}>{t(ROLE_LABEL[b.roles[i]])}</Badge>}
         {deepest && <Badge className="bg-signature-soft text-signature-foreground">{t("blk.b.deepest")}</Badge>}

@@ -1,9 +1,12 @@
 import { describe, expect, it } from "vitest";
-import { addDays, weekday } from "./dates";
+import { addDays, daysBetween, weekday } from "./dates";
 import { COACH } from "./coach";
-import { BLOCK, blockWeekCap, evaluateBlock, floorFor, raceChunks, raceRoles, suggestBlock, suggestWeek, tolerance, weekKm, type BlockSeed } from "./blockplan";
+import { BLOCK, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
 import { COACH as COACH_RACE } from "./coach";
-import { weekCap } from "./nextweek";
+import { NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
+import { stridesOf, withStrides } from "./steps";
+import type { PhaseSeed } from "./racephase";
+const floorHalf = (n: number) => Math.floor(n * 2) / 2;
 import { longShareAt, tune } from "./tuning";
 import type { StepRefs } from "./steps";
 
@@ -365,5 +368,153 @@ describe("race planning (docs/decisions/fartlek-race-blocks.md)", () => {
     expect(at(4, "2026-12-12")).toEqual(["build", "build", "taper", "race"]);
     expect(at(3, "2026-12-05")).toEqual(["build", "taper", "race"]);
     expect(at(2, "2026-11-28")).toEqual(["taper", "race"]);
+  });
+});
+
+describe("post-race recovery (docs/decisions/fartlek-post-race-recovery.md)", () => {
+  const SUN = addDays(MONDAY, -1);
+  const rec = (distanceKm: number, priority: "A" | "B", peakKm: number | null = null, date = SUN): RecoveryRace => ({ date, distanceKm, priority, peakKm });
+  const runs = (items: SuggestItem[]) => items.filter((it) => it.type !== "cross");
+  const day = (r: RecoveryRace, d: string) => daysBetween(r.date, d);
+
+  it("has rows of the right shape, gates in order, B about 0.6 of A", () => {
+    for (const p of ["A", "B"] as const) {
+      for (const b of ["10k", "half", "marathon"] as const) {
+        const row = RECOVERY[p][b];
+        expect(row.volume).toHaveLength(row.weeks);
+        expect(row.strides).toBeLessThanOrEqual(row.thresholdShort);
+        expect(row.thresholdShort).toBeLessThanOrEqual(row.thresholdFull);
+        expect(row.thresholdFull).toBeLessThanOrEqual(row.intervals);
+        if (p === "B") {
+          const a = RECOVERY.A[b];
+          for (const k of ["strides", "thresholdShort", "thresholdFull", "intervals"] as const) expect(Math.abs(row[k] - Math.round(0.6 * a[k]))).toBeLessThanOrEqual(1);
+        }
+      }
+    }
+  });
+
+  it("buckets by distance, and has no row for a C race", () => {
+    expect([9.9, 10, 14.9, 15, 21.1, 29.9, 30, 42.2].map(recoveryBucket)).toEqual([null, "10k", "10k", "half", "half", "half", "marathon", "marathon"]);
+    expect(recoveryRow({ distanceKm: 21.1, priority: "C" })).toBeNull();
+  });
+
+  it("finds the recovery week from the week's middle day", () => {
+    expect(recoveryWeekOf("2026-11-22", "2026-11-23")).toBe(0);
+    expect(recoveryWeekOf("2026-11-22", "2026-11-30")).toBe(1);
+    expect(recoveryWeekOf("2026-11-21", "2026-11-23")).toBe(0);
+    expect(recoveryWeekOf("2026-11-18", "2026-11-23")).toBe(1);
+    expect(recoveryWeekOf("2026-11-16", "2026-11-23")).toBe(1);
+  });
+
+  it("gives recovery roles by distance and priority, dropping weeks already over", () => {
+    expect(recoveryRoles(rec(42.2, "A", null, "2026-11-08"), "2026-11-09", 4)).toEqual(["recovery", "recovery", "recovery", "recovery"]);
+    expect(recoveryRoles(rec(42.2, "A", null, "2026-11-08"), "2026-11-23", 4)).toEqual(["recovery", "recovery", null, null]);
+    expect(recoveryRoles(rec(21.1, "A", null, "2026-11-15"), "2026-11-16", 4)).toEqual(["recovery", "recovery", null, null]);
+    expect(recoveryRoles(rec(10, "A"), MONDAY, 4)).toEqual(["recovery", null, null, null]);
+    expect(recoveryRoles(rec(10, "B"), MONDAY, 4)).toEqual(["recovery", null, null, null]);
+    expect(recoveryRoles(rec(5, "A"), MONDAY, 4)).toEqual([null, null, null, null]);
+    expect(recoveryRoles({ date: SUN, distanceKm: 21.1, priority: "C" }, MONDAY, 4)).toEqual([null, null, null, null]);
+  });
+
+  it("puts recovery weeks first, keeping race weeks", () => {
+    expect(withRecovery(null, ["recovery", null])).toEqual(["recovery", "build"]);
+    expect(withRecovery(["build", "build", "taper", "race"], ["recovery", "recovery", null, null])).toEqual(["recovery", "recovery", "taper", "race"]);
+    expect(withRecovery(["build", "race"], ["recovery", "recovery"])).toEqual(["recovery", "race"]);
+    expect(withRecovery(["build", "taper"], ["recovery", "recovery"])).toEqual(["recovery", "recovery"]);
+    expect(withRecovery(null, [null, null])).toBeNull();
+    expect(withRecovery(["build", "lighter"], [null, null])).toEqual(["build", "lighter"]);
+  });
+
+  it("sizes recovery weeks as shares of the pre-race peak, then re-enters", () => {
+    const m = suggestBlock(seed({ recovery: rec(42.2, "A", 60), roles: ["recovery", "recovery", "recovery", "recovery"], runDays: [1, 2, 4, 6, 0] }));
+    expect(m.weeks.map((w) => w.targetKm)).toEqual([9, 27, 39, 48]);
+    const h = suggestBlock(seed({ recovery: rec(21.1, "A", 50), roles: ["recovery", "recovery", "build", "build"], runDays: [1, 2, 4, 6, 0],
+      tolerance: { km: 50, peakKm: 50, peakWeek: null, weeksAgo: 2 }, ctl: 40, atl: 35 }));
+    expect(h.weeks.slice(0, 2).map((w) => w.targetKm)).toEqual([25, 37.5]);
+    expect(h.weeks[2].role).toBe("build");
+    expect(h.weeks[2].reentry).toBe(true);
+    expect(h.weeks[2].targetKm).toBeGreaterThan(37.5);
+    // Without a peak from the runs, the tolerance's peak.
+    const t = suggestBlock(seed({ recovery: rec(21.1, "A"), roles: ["recovery", "recovery"], weeks: 2 }));
+    expect(t.weeks[0].targetKm).toBe(floorHalf(31 * 0.5));
+  });
+
+  it("runs nothing on the rest days after a marathon", () => {
+    const r = rec(42.2, "A", 50);
+    const s = suggestBlock(seed({ recovery: r, roles: ["recovery", "recovery", "recovery", "recovery"], runDays: [1, 2, 4, 6, 0], crossMin: 30 }));
+    expect(runs(s.weeks[0].items).filter((it) => day(r, it.date) <= 3)).toEqual([]);
+    expect(runs(s.weeks[0].items).length).toBeGreaterThan(0);
+  });
+
+  it("opens strides and threshold by day after a half and a marathon", () => {
+    const thrOf = (items: SuggestItem[]) => items.filter((it) => it.type === "threshold");
+    const r = rec(21.1, "A", 45);
+    const h = suggestBlock(seed({ recovery: r, roles: ["recovery", "recovery", "build", "build"], runDays: [1, 2, 4, 6, 0], tolerance: { km: 45, peakKm: 45, peakWeek: null, weeksAgo: 2 } }));
+    const all = h.weeks.flatMap((w) => w.items);
+    for (const it of thrOf(all)) expect(day(r, it.date)).toBeGreaterThanOrEqual(11);
+    for (const it of all.filter((x) => stridesOf(x.steps))) expect(day(r, it.date)).toBeGreaterThanOrEqual(6);
+    for (const it of thrOf(h.weeks[1].items)) expect(thresholdReps(it.steps)).toMatchObject({ reps: NEXT.lighterThr.reps, min: NEXT.lighterThr.min });
+    // Week 3 (day 15 on) has the ladder's rung, not the short session.
+    const w3 = thrOf(h.weeks[2].items);
+    expect(w3.length).toBeGreaterThan(0);
+    expect(thresholdReps(w3[0].steps)!.reps * thresholdReps(w3[0].steps)!.min).toBeGreaterThan(NEXT.lighterThr.reps * NEXT.lighterThr.min);
+
+    const mr = rec(42.2, "A", 50);
+    const m = suggestBlock(seed({ recovery: mr, roles: ["recovery", "recovery", "recovery", "recovery"], runDays: [1, 2, 4, 6, 0] }));
+    expect(thrOf([...m.weeks[0].items, ...m.weeks[1].items])).toEqual([]);
+    for (const it of thrOf(m.weeks[2].items)) expect(day(mr, it.date)).toBeGreaterThanOrEqual(21);
+    expect(m.weeks[0].items.some((it) => stridesOf(it.steps))).toBe(false);
+    for (const it of m.weeks.flatMap((w) => w.items).filter((x) => stridesOf(x.steps))) expect(day(mr, it.date)).toBeGreaterThanOrEqual(12);
+    expect(m.weeks.slice(2).some((w) => w.items.some((it) => stridesOf(it.steps)))).toBe(true);
+  });
+
+  it("caps the long run in recovery weeks, and steps from it after them", () => {
+    const r = rec(42.2, "A", 60);
+    const s = suggestBlock(seed({ recovery: r, roles: ["recovery", "recovery", "build", "build"], runDays: [1, 2, 4, 6, 0], longestKm: 32,
+      tolerance: { km: 60, peakKm: 60, peakWeek: null, weeksAgo: 2 } }));
+    for (const w of s.weeks.filter((x) => x.role === "recovery")) {
+      const long = w.items.find((it) => it.type === "long");
+      if (long) expect(long.km).toBeLessThanOrEqual(Math.max(NEXT.easyMinKm, Math.min(RECOVERY.longMaxKm, floorHalf(w.targetKm * RECOVERY.longShare))));
+    }
+    const recLongest = Math.max(...s.weeks.filter((x) => x.role === "recovery").flatMap((w) => runs(w.items).map((it) => it.km)));
+    const firstBuild = s.weeks.find((w) => w.role === "build")!;
+    expect(firstBuild.items.find((it) => it.type === "long")!.km).toBeLessThanOrEqual(spikeMax(recLongest));
+  });
+
+  it("is never fitted or deepened, and an all-recovery block is judged ok", () => {
+    const base = { recovery: rec(21.1, "A", 50), roles: ["recovery", "recovery"] as WeekRole[], weeks: 2 };
+    const tired = suggestBlock(seed({ ...base, ctl: 30, atl: 70 }));
+    const fresh = suggestBlock(seed({ ...base, ctl: 30, atl: 20 }));
+    expect(tired.weeks.map((w) => w.targetKm)).toEqual(fresh.weeks.map((w) => w.targetKm));
+    expect(fresh.eval.deepest).toBeNull();
+    expect(fresh.eval.state).toBe("ok");
+    const goal = suggestBlock(seed({ recovery: rec(21.1, "A", 50), roles: ["recovery", "recovery", "build", "build"], goalKm: 80 }));
+    expect(goal.weeks.slice(0, 2).map((w) => w.targetKm)).toEqual([25, 37.5]);
+  });
+
+  it("changes nothing for a race under 10 km or a C race", () => {
+    const plain = suggestBlock(seed()).weeks.map((w) => w.items);
+    expect(suggestBlock(seed({ recovery: rec(5, "A", 40) })).weeks.map((w) => w.items)).toEqual(plain);
+    expect(suggestBlock(seed({ recovery: { ...rec(21.1, "B", 40), priority: "C" as "B" } })).weeks.map((w) => w.items)).toEqual(plain);
+  });
+
+  it("plans no race-phase session in a recovery week", () => {
+    const phase: PhaseSeed = { race: { date: addDays(MONDAY, 7 * 7 + 6), kind: "marathon" }, paces: { mp: 300, hmp: 285 }, paceSource: "goal", steps: {} as PhaseSeed["steps"], backOff: false, injury: false };
+    const s = suggestBlock(seed({ recovery: rec(21.1, "B", 45), roles: ["recovery", "build", "build", "lighter"], phase, runDays: [1, 2, 4, 6, 0] }));
+    expect(s.weeks[0].items.some((it) => it.blueprint)).toBe(false);
+  });
+
+  it("gates single items: threshold swaps later or runs easy, strides wait, race day untouched", () => {
+    const half = RECOVERY.A.half, tenk = RECOVERY.A["10k"];
+    const r = { date: "2026-11-01" };
+    const thr: SuggestItem = { date: "2026-11-10", type: "threshold", km: 8, durationMin: null, steps: withStrides({ km: 8 }) };
+    const easy: SuggestItem = { date: "2026-11-13", type: "easy", km: 6, durationMin: null, steps: null };
+    const swapped = gateAfterRace([thr, easy], r, half);
+    expect(swapped.map((it) => [it.date, it.type])).toEqual([["2026-11-10", "easy"], ["2026-11-13", "threshold"]]);
+    expect(gateAfterRace([thr], r, half)).toEqual([{ date: "2026-11-10", type: "easy", km: 8, durationMin: null, steps: null }]);
+    const strides: SuggestItem = { date: "2026-11-04", type: "easy", km: 7, durationMin: null, steps: withStrides({ km: 6.5 }) };
+    expect(gateAfterRace([strides], r, tenk)[0].steps).toBeNull();
+    const before: SuggestItem = { date: "2026-10-30", type: "threshold", km: 8, durationMin: null, steps: null };
+    expect(gateAfterRace([before], r, half)).toEqual([before]);
   });
 });
