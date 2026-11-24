@@ -3,7 +3,7 @@ import type { Db } from "./db";
 import * as t from "./db/schema";
 import * as repo from "./repo";
 import { addDays, weekStartOf, type ISODate } from "../shared/dates";
-import { chooseTemplate, latestByExercise, volume, workSetCount, type GymDay, type GymEntry, type GymSessionFull, type GymSessionInput, type GymSummary, type JointFeel, type LastTime, type SetKind } from "../shared/gymplan";
+import { chooseTemplate, latestByExercise, volume, workSetCount, type GymDay, type GymEntry, type GymSessionFull, type GymSessionInput, type GymSummary, type JointFeel, type LastTime, type LayoutEntry, type SetKind, type TemplateLayout } from "../shared/gymplan";
 import type { Pattern, TemplateId } from "../shared/gym";
 import type { ImportedSession } from "../shared/boltcsv";
 
@@ -60,13 +60,27 @@ export function gymDay(db: Db, userId: number, date: ISODate): GymDay {
   const plannedDays = new Set(workouts.filter((w) => w.type === "strength" && w.date >= from && w.date <= date && w.status !== "dropped").map((w) => w.date));
   const weekFrom = weekStartOf(date, repo.getSettings(db, userId).weekStart);
   const perWeek = workouts.filter((w) => w.type === "strength" && w.status !== "dropped" && w.date >= weekFrom && w.date <= addDays(weekFrom, 6)).length;
+  const layouts: Partial<Record<TemplateId, TemplateLayout>> = {};
+  for (const s of sessions) {
+    const id = s.template as TemplateId | null;
+    if (!id || layouts[id] || !s.layout) continue;
+    const entries = parseLayout(s.layout);
+    if (entries.length) layouts[id] = { date: s.date, entries };
+  }
   return {
-    date, planned,
+    date, planned, layouts,
     suggested: chooseTemplate(date, workouts.filter((w) => w.date > date), (previous?.template as TemplateId | undefined) ?? null, perWeek),
     last: lastTimes(db, userId),
     logged: todays.map((s) => summary(s, entriesOf(sets.filter((x) => x.sessionId === s.id)))),
     recent: { done: doneDays.size, planned: Math.max(plannedDays.size, doneDays.size) },
   };
+}
+
+function parseLayout(json: string): LayoutEntry[] {
+  try {
+    const v = JSON.parse(json) as unknown;
+    return Array.isArray(v) ? v as LayoutEntry[] : [];
+  } catch { return []; }
 }
 
 /** Saves a session once per client id; a resend of the same session returns the stored one. */
@@ -79,6 +93,7 @@ export function saveSession(db: Db, userId: number, s: GymSessionInput | (Import
       userId, clientId: s.clientId, date: s.date, startedAt: s.startedAt,
       finishedAt: imported ? null : s.finishedAt, template: imported ? null : s.template, name: imported ? s.name || null : null,
       feel: imported ? null : s.feel, workoutId: imported ? null : s.workoutId, source: imported ? s.source : "fartlek",
+      layout: !imported && s.template && s.layout?.length ? JSON.stringify(s.layout.map((e) => ({ exercise: e.exercise.trim(), slot: e.slot ?? null, scheme: { sets: e.scheme.sets, low: e.scheme.low, high: e.scheme.high } }))) : null,
     }).returning({ id: t.gymSessions.id }).get();
     const values = s.entries.flatMap((e, position) => e.sets.map((x, setIndex) => ({
       userId, sessionId: row.id, position, setIndex, exercise: e.exercise.trim(), slot: e.slot, kind: x.kind,

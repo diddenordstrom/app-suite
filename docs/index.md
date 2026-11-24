@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · decision · Fartlek gym: the last finished session is the new template ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek race phase built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Strides are not counted as judged reps ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Easy HR is a ceiling in plan vs actual ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · note · Fartlek: gaps in marathon training outside the race phase ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race-specific phase: build plan and last details ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek: race-specific phase for marathon and half ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · note · Fartlek gym: Bolt notes become exercise comments ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -37,7 +37,7 @@
 - [Fartlek judges form as a share of fitness, and as a guard rather than a target](decisions/fartlek-form-relative.md): Form bands (fresh, building, heavy) are judged on (fitness − fatigue) / fitness, as intervals.icu does, instead of Friel's absolute TSB; a week above the build band is "calm" and fine, and the engines no longer add load to reach it _(decision · accepted · 2026-11-13)_
 - [Fartlek "Mål till plan": from a goal to a plan in two minutes, on Garmin history](decisions/fartlek-goal-to-plan.md): Plan for the first screen a new runner meets (race or time goal, date, run days), built on Garmin history: phases with the first block concrete, beside "Skapa block _(decision · accepted · 2026-11-24)_
 - [Fartlek asks which days gym and cross-training go on (plan, not built)](decisions/fartlek-gym-cross-days.md): Plan for the block planner to ask how many gym sessions and which days, and which days and minutes for cross-training, so the engine places them there and keeps the run days apart from them _(note · open · 2026-11-23)_
-- [Fartlek gym module: log sets in the gym, suggest sessions that suit the run week](decisions/fartlek-gym-module.md): A gym logger inside Fartlek (sets with last time's weight, swap or add an exercise in one tap, offline, Bolt import) and a rule-based choice of template from the run week; why it lives in Fartlek, how it compares with the gym apps that exist, what is built and what is left _(note · open · 2026-11-23)_
+- [Fartlek gym module: log sets in the gym, suggest sessions that suit the run week](decisions/fartlek-gym-module.md): A gym logger inside Fartlek (sets with last time's weight, swap or add an exercise in one tap, offline, Bolt import) and a rule-based choice of template from the run week; why it lives in Fartlek, how it compares with the gym apps that exist, what is built and what is left _(note · open · 2026-11-24)_
 - [Fartlek plans gym as its own session type, apart from cross-training](decisions/fartlek-gym-sessions.md): A planned "Gym" (strength) session matches only gym activities, and cross-train sessions never take a gym activity, so gym on Monday and swimming on Thursday each fill their own day _(decision · accepted · 2026-11-18)_
 - [Fartlek finds interval laps against the threshold estimate](decisions/fartlek-interval-laps.md): Interval laps are ≥ 3 min and at most 10 % slower than the threshold estimate; without one, near the median of the work laps instead of the fastest lap _(decision · accepted · 2026-11-11)_
 - [Fartlek plans the key sessions first, with the long run on a 30-day ladder](decisions/fartlek-key-sessions-first.md): Week and block suggestions place the long run (longest run of 30 days + 1 km, never more than 10 % over it), then the next threshold rung, then fill with zone 2; one dial; the 35 % long-run share is gone; Home offers to fix a key session ahead after a missed one _(decision · accepted · 2026-11-14)_

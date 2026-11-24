@@ -176,6 +176,13 @@
       "when": 1795514694509,
       "tag": "0024_race_phase",
       "breakpoints": true
+    },
+    {
+      "idx": 25,
+      "version": "6",
+      "when": 1795534108903,
+      "tag": "0025_gym_layout",
+      "breakpoints": true
     }
   ]
 }

@@ -1,0 +1,1 @@
+ALTER TABLE `gym_sessions` ADD `layout` text;

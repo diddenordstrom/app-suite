@@ -3,7 +3,7 @@ import { api, ApiError } from "./http";
 import { locale, t, type MsgKey } from "./i18n";
 import { customName, exercise, isCustom, schemeFor, type Pattern, type Scheme, type TemplateId } from "@/shared/gym";
 import { en as gymEn, sv as gymSv } from "./i18n/gym";
-import { suggestSets, workSets, type GymSet, type GymSessionInput, type JointFeel, type LastTime } from "@/shared/gymplan";
+import { suggestSets, workSets, type GymSet, type GymSessionInput, type JointFeel, type LastTime, type LayoutEntry } from "@/shared/gymplan";
 import type { ISODate } from "@/shared/dates";
 
 /*
@@ -23,6 +23,8 @@ export interface Draft {
   feel: JointFeel | null;
   workoutId: number | null;
   startedAt: number | null;
+  /** The date of the runner's own version this session started from, or null when it started from the suggestion. */
+  ownFrom?: ISODate | null;
   /** When the last set was ticked, for the rest clock. */
   lastSetAt: number | null;
   entries: DraftEntry[];
@@ -54,9 +56,22 @@ export function entryFor(id: string, slot: Pattern | null, scheme: Scheme | null
   return { uid: Math.random().toString(36).slice(2, 10), exercise: id, slot, scheme: sch, note: last?.note ?? "", sets: suggestSets(id, sch, last).sets.map((s) => ({ ...s, done: false })) };
 }
 
+/**
+ * The session as it stands, for the next session on the same template: every exercise still in it, skipped
+ * ones included, with the number of sets planned. An exercise whose sets were all removed is left out.
+ */
+export function layoutOf(d: Draft): LayoutEntry[] | null {
+  if (!d.template) return null;
+  return d.entries.flatMap((e) => {
+    const sets = workSets(e.sets).length;
+    return sets ? [{ exercise: e.exercise, slot: e.slot, scheme: { ...e.scheme, sets } }] : [];
+  });
+}
+
 export function toInput(d: Draft): GymSessionInput {
   return {
     clientId: d.clientId, date: d.date, startedAt: d.startedAt, finishedAt: Date.now(), template: d.template, feel: d.feel, workoutId: d.workoutId,
+    layout: layoutOf(d),
     entries: d.entries.map((e) => ({ exercise: e.exercise, slot: e.slot, note: e.note?.trim() || null, sets: e.sets.filter((s) => s.done).map((s) => ({ kind: s.kind, kg: s.kg, reps: s.reps, seconds: s.seconds })) })).filter((e) => e.sets.length),
   };
 }
