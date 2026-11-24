@@ -1,0 +1,73 @@
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { createApp } from "./app";
+import { loadConfig } from "./config";
+import { createDb } from "./db";
+
+const ORIGIN = "http://localhost:5173";
+const json = (body: unknown, method = "POST") => ({ method, body: JSON.stringify(body), headers: { "content-type": "application/json", origin: ORIGIN } });
+
+// A fixed Wednesday, as in scenarios.test.ts: the app reads the clock.
+const at = (day: string) => vi.setSystemTime(new Date(`${day}T10:00:00Z`));
+
+describe("race paces of the race phase", () => {
+  const app = createApp(createDb(":memory:"), loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv));
+  const get = async <T = Record<string, unknown>>(p: string) => (await app.request(p)).json() as Promise<T>;
+  type Pace = { mp: number | null; hmp: number | null; source: string; overCap: boolean };
+  type View = { raceId: number; kind: string; wip: number; paces: Pace; locked: boolean; lockedOn: string | null; question: { kind: string } | null } | null;
+  type Next = { racePace: View };
+  type RaceRow = { id: number; mpSec: number | null; hmpSec: number | null; paceSource: string | null; paceLockedOn: string | null };
+  const item = (date: string) => [{ date, type: "easy", km: 6 }];
+
+  beforeAll(() => { vi.useFakeTimers({ toFake: ["Date"] }); at("2026-11-18"); });
+  afterAll(() => { vi.useRealTimers(); });
+
+  it("proposes, locks on the first write of phase weeks, and asks again only after a B race", async () => {
+    await app.request("/api/settings");
+    // Outside a phase there is nothing to show.
+    expect((await get<Next>("/api/plan/next-week?weekStart=2026-11-23")).racePace).toBeNull();
+
+    // A marathon five weeks out, a goal and no history: the goal is the pace, and nothing is asked.
+    const made = await (await app.request("/api/races", json({ name: "Marathon", date: "2026-12-27", distanceKm: 42.195, goalSeconds: 42.195 * 300, priority: "A" }))).json() as RaceRow[];
+    const id = made[0].id;
+    const first = (await get<Next>("/api/plan/next-week?weekStart=2026-11-23")).racePace!;
+    expect(first).toMatchObject({ raceId: id, kind: "marathon", wip: 5, locked: false, question: null, paces: { mp: 300, source: "goal" } });
+    expect((await get<RaceRow[]>("/api/races"))[0].paceLockedOn).toBeNull(); // a GET locks nothing
+
+    expect((await app.request("/api/plan/next-week", json({ weekStart: "2026-11-23", items: item("2026-11-24"), replace: [] }))).status).toBe(200);
+    expect((await get<RaceRow[]>("/api/races"))[0]).toMatchObject({ mpSec: 300, paceSource: "goal", paceLockedOn: "2026-11-18" });
+
+    // Nothing to answer, so keeping is refused only when nothing is locked; a pace question needs a phase week.
+    expect((await app.request(`/api/races/${id}/race-pace`, json({ choice: "nope" }))).status).toBe(400);
+
+    // A B race is run after the lock: the engine asks before it plans phase weeks again.
+    at("2026-11-25");
+    await app.request("/api/races", json({ name: "Tune-up", date: "2026-11-24", distanceKm: 10, priority: "B", resultSeconds: 2700 }));
+    const asked = (await get<Next>("/api/plan/next-week?weekStart=2026-11-30")).racePace!;
+    expect(asked).toMatchObject({ locked: true, lockedOn: "2026-11-18", question: { kind: "recalc" }, paces: { mp: 300 } });
+    const blocked = await app.request("/api/plan/next-week", json({ weekStart: "2026-11-30", items: item("2026-12-01"), replace: [] }));
+    expect(blocked.status).toBe(409);
+    expect(await blocked.json()).toMatchObject({ conflict: "racePace" });
+
+    // Keep: the locked paces stay, the date is re-stamped, and the write goes through.
+    const kept = await (await app.request(`/api/races/${id}/race-pace`, json({ choice: "keep" }))).json() as NonNullable<View>;
+    expect(kept).toMatchObject({ locked: true, lockedOn: "2026-11-25", question: null, paces: { mp: 300, source: "goal" } });
+    expect((await app.request("/api/plan/next-week", json({ weekStart: "2026-11-30", items: item("2026-12-01"), replace: [] }))).status).toBe(200);
+
+    // The goal as the answer re-locks from the goal; "prediction" with no history falls to the goal as well.
+    expect((await app.request(`/api/races/${id}/race-pace`, json({ choice: "goal" }))).status).toBe(200);
+    expect((await get<RaceRow[]>("/api/races")).find((r) => r.id === id)).toMatchObject({ mpSec: 300, paceSource: "goal" });
+  });
+
+  it("refuses an answer outside a phase, a goal without a goal time, and keep with nothing locked", async () => {
+    const a = createApp(createDb(":memory:"), loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv));
+    await a.request("/api/settings");
+    const far = await (await a.request("/api/races", json({ name: "Far", date: "2027-03-28", distanceKm: 42.195, priority: "A" }))).json() as RaceRow[];
+    expect((await a.request(`/api/races/${far[0].id}/race-pace`, json({ choice: "prediction" }))).status).toBe(400); // 18 weeks out
+    const near = await (await a.request("/api/races", json({ name: "Near", date: "2026-12-13", distanceKm: 21.0975, priority: "A" }))).json() as RaceRow[];
+    const nearId = near.find((r) => r.id !== far[0].id)!.id;
+    // The next A race is the one that counts: the near half, not the far marathon.
+    expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "goal" }))).status).toBe(400);
+    expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "keep" }))).status).toBe(400);
+    expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "prediction" }))).status).toBe(200);
+  });
+});
