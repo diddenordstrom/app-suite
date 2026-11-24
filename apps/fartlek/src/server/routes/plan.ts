@@ -131,7 +131,7 @@ export function planRoutes(db: Db) {
     const to = date((await body(c)).date);
     const src = db.select().from(t.workouts).where(own(t.workouts, uid(c), idParam(c.req.param("id")))).get();
     if (!src) return c.json({ error: "not found" }, 404);
-    const row = db.insert(t.workouts).values({ userId: src.userId, date: to, type: src.type, distanceKm: src.distanceKm, durationMin: src.durationMin, zone2: src.zone2, notes: src.notes, steps: src.steps }).returning().get();
+    const row = db.insert(t.workouts).values({ userId: src.userId, date: to, type: src.type, distanceKm: src.distanceKm, durationMin: src.durationMin, zone2: src.zone2, notes: src.notes, steps: src.steps, blueprint: src.blueprint }).returning().get();
     return c.json(repo.toWorkout(row));
   });
 
@@ -150,7 +150,7 @@ export function planRoutes(db: Db) {
       for (const w of src) {
         tx.insert(t.workouts).values({
           userId: ctx.userId, date: addDays(w.date, shift), type: w.type, distanceKm: w.distanceKm, durationMin: w.durationMin, zone2: w.zone2, notes: w.notes,
-          steps: w.steps ? JSON.stringify(w.steps) : null,
+          steps: w.steps ? JSON.stringify(w.steps) : null, blueprint: w.blueprint,
         }).run();
       }
       for (const [ws, tg] of targets) {

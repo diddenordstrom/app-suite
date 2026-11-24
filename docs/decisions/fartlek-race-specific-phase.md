@@ -181,7 +181,7 @@ racePace({ distanceKm, predMp, predHmp, csMps, goalSeconds, thresholdPace }) →
      - mp-alternations at 40 km a week steps down to a session of 12 km or less;
      - every compiled session round-trips through `stepsText` / `parseSteps`;
      - no pace source gives zone targets.
-2. **Data and tag plumbing.**
+2. **Data and tag plumbing.** *Built.* The tag helpers `blueprintTag` / `parseBlueprintTag` live in `shared/blueprints.ts` next to `stepFor`; migration `0024_race_phase`.
    - Files: schema and migration; `Workout.blueprint` and the `Race` pace fields in `shared/types.ts`; `toWorkout` in `server/repo.ts`; `SuggestItem.blueprint`; `parseItems`, `insertItems` and `restoreRows` in `server/routes/nextweek.ts` (validate against known ids); `workoutWeeks` in `shared/planrange.ts`; the copy path in `server/routes/plan.ts`.
    - `rungBefore` must ignore tagged workouts, or MP sessions reset the threshold ladder.
    - Add `stepFor(sessions, id, before, entry)`.

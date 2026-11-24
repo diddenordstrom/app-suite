@@ -352,7 +352,7 @@ describe("api", () => {
     // The long run gets a faster finish, kept as steps like strides on an easy run.
     const tempo = { v: 1, items: [{ kind: "step", step: { km: 7, target: { kind: "easy" } } }, { kind: "step", step: { km: 3, target: { kind: "pace", secPerKm: 275 } } }] };
     const strides = { v: 1, items: [{ kind: "step", step: { km: 4, target: { kind: "easy" } } }, { kind: "repeat", times: 6, work: { min: 1 / 3, target: { kind: "strides" } }, rest: { min: 1, target: { kind: "jog" } } }] };
-    const items = [...r.suggestion.items.map((i) => (i === long ? { ...i, date: "2034-01-08", km: 10, steps: tempo } : i)), { date: ws, type: "easy", km: 4.5, durationMin: null, steps: strides }];
+    const items = [...r.suggestion.items.map((i) => (i === long ? { ...i, date: "2034-01-08", km: 10, steps: tempo, blueprint: "fast-finish-long#1" } : i)), { date: ws, type: "easy", km: 4.5, durationMin: null, steps: strides }];
     const post = (body: unknown) => app.request("/api/plan/next-week", json(body));
     expect((await post({ weekStart: ws, items: [{ ...items[0], date: "2034-01-20" }], replace: [old.id] })).status).toBe(400);
     expect((await post({ weekStart: ws, items: [{ date: ws, type: "threshold", km: 8, steps: { v: 1, items: [{ kind: "nope" }] } }], replace: [old.id] })).status).toBe(400);
@@ -365,6 +365,14 @@ describe("api", () => {
     expect(written.find((w) => w.id === old.id)).toBeUndefined();
     expect(written.find((w) => w.type === "long")).toMatchObject({ date: "2034-01-08", distanceKm: 10 });
     expect(written.find((w) => w.type === "long")?.steps).toBeTruthy();
+    // The blueprint tag is kept when written and when the session is copied; an unknown tag is refused.
+    expect((written.find((w) => w.type === "long") as W & { blueprint: string | null }).blueprint).toBe("fast-finish-long#1");
+    expect((written.find((w) => w.date === ws) as W & { blueprint: string | null }).blueprint).toBeNull();
+    expect((await post({ weekStart: ws, items: [{ ...items[0], blueprint: "nope#1" }], replace: [old.id] })).status).toBe(400);
+    const tagged = written.find((w) => w.type === "long")!;
+    const taggedCopy = await (await app.request(`/api/workouts/${tagged.id}/copy`, json({ date: "2034-02-07" }))).json() as W & { blueprint: string | null };
+    expect(taggedCopy.blueprint).toBe("fast-finish-long#1");
+    expect((await app.request(`/api/workouts/${taggedCopy.id}`, json({}, "DELETE"))).status).toBeLessThan(300);
     expect(written.find((w) => w.date === ws)).toMatchObject({ type: "easy" });
     expect(written.find((w) => w.date === ws)?.steps).toBeTruthy();
     expect(written.find((w) => w.type === "threshold")?.steps).toBeTruthy();

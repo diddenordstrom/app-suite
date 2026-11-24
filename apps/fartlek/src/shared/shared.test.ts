@@ -16,7 +16,7 @@ const act = (p: Partial<Activity> & { id: string; date: string; km?: number }): 
 });
 const wo = (p: Partial<Workout> & { id: number; date: string }): Workout => ({
   type: "easy", distanceKm: null, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null,
-  manualActivityId: null, manualUnlinked: false, steps: null, ...p,
+  manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null, ...p,
 });
 
 describe("week numbers", () => {

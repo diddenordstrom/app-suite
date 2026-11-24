@@ -21,7 +21,7 @@ function seed(over: Partial<BlockSeed> = {}): BlockSeed {
 
 let id = 0;
 const wo = (date: string, type: Workout["type"], km: number, over: Partial<Workout> = {}): Workout =>
-  ({ id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, ...over });
+  ({ id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null, ...over });
 
 describe("rangeWeeks", () => {
   it("covers any range with whole weeks from the week it starts in", () => {

@@ -11,7 +11,7 @@ const RUN_DAYS = [2, 4, 6, 0];
 
 let id = 0;
 function s(date: string, type: Workout["type"], km: number | null, outcome: SessionView["outcome"] = date < TODAY ? "to_do" : "to_do", over: Partial<Workout> = {}): SessionView {
-  const workout: Workout = { id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, ...over };
+  const workout: Workout = { id: ++id, date, type, distanceKm: km, durationMin: null, zone2: false, notes: null, status: "planned", skipReason: null, manualActivityId: null, manualUnlinked: false, steps: null, blueprint: null, ...over };
   return { workout, outcome, match: null, activity: null };
 }
 
