@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-24 · decision · Fartlek race-specific phase: build plan and last details ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek: race-specific phase for marathon and half ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: Bolt notes become exercise comments ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek gym: remove a set, weight follows down, comment per exercise ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-23 · decision · Fartlek gym: one session a week is full body ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · note · Gym on the Fartlek landing page, its own news note ([log/2026-11.md](log/2026-11.md))
 - 2026-11-23 · decision · Fartlek gym: no joint check-in in the first version ([log/2026-11.md](log/2026-11.md))
-- 2026-11-23 · decision · Fartlek gym module, first version built ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
