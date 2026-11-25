@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-25 · decision · Fartlek marathon long-run track built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek marathon long runs: five runs, 30 km target, cap follows proven peak ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek marathon long-run plan settled ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · note · Fartlek marathon plan for a low-volume runner: long runs over 30 km ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-25 · decision · Fartlek "add a run day" no longer loops in a running week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek long run stops at 30 km, a race can cap the biggest week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek race plan skeleton built ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · note · Fartlek post-race recovery built ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

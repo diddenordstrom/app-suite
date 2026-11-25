@@ -8,7 +8,7 @@ updated: 2026-11-25
 
 # Fartlek marathon plan for a low-volume runner: long runs over 30 km need their own track
 
-Raised on 2026-11-25 when a runner with a proven peak week of about 35 km, a marathon far out and a half marathon on the way was shown a plan whose longest run stopped at about 21 km while the plan itself warned that under 25 km tends to give a slower finish. The points below were decided the same day; nothing is built yet. It builds on [long-run ceiling](fartlek-long-run-ceiling.md) and the [race plan skeleton](fartlek-race-plan-skeleton.md), and the answers should land in those (or supersede them).
+Raised on 2026-11-25 when a runner with a proven peak week of about 35 km, a marathon far out and a half marathon on the way was shown a plan whose longest run stopped at about 21 km while the plan itself warned that under 25 km tends to give a slower finish. The points below were decided the same day and built the same day (see "How it was built"). It builds on [long-run ceiling](fartlek-long-run-ceiling.md) and the [race plan skeleton](fartlek-race-plan-skeleton.md), and the answers should land in those (or supersede them).
 
 ## The problem
 
@@ -30,7 +30,7 @@ For a marathon the plan should put a handful of 26–32 km runs in the legs (mus
 
 ## Decided
 
-Settled with the user on 2026-11-25; not built yet.
+Settled with the user on 2026-11-25; built the same day.
 
 1. **Five long runs of 26 km or more before the taper, three of them 30 km or more**, without taking extra key sessions (revised later the same day; first it was three 30+ runs only):
    - one plain easy run of about 26–28 km at the end of the base / start of the build, about 12–13 weeks out;
@@ -59,8 +59,19 @@ Settled with the user on 2026-11-25; not built yet.
 
 `NEXT.longCeiling` and `longRun`/`longFor` in `apps/fartlek/src/shared/nextweek.ts`; `RACE_PLAN` (`marathonLongShare`, `capSuggest`, `longPeak`) and the skeleton in `apps/fartlek/src/shared/raceplan.ts`; the phase schedule and blueprints in `racephase.ts` and `blueprints.ts`; the preview in `apps/fartlek/src/client/suggestblock.tsx`.
 
+## How it was built
+
+The track lives in `RACE_PLAN.track` and `longTrack()` in [raceplan.ts](../../apps/fartlek/src/shared/raceplan.ts), and real blocks get it through `BlockSeed.track` in [blockplan.ts](../../apps/fartlek/src/shared/blockplan.ts), so the weeks you actually get follow the same targets as the preview. Choices made where the points above left room:
+
+- "Weeks out" counts the race week as 1. Targets: 27 km at 12, 30 at 10, 6 and 4 (32 when the week is at least 64 km), 27 (MP) at 3.
+- Rungs below 20 km are left to the ordinary ladder; from there the track adds a minimum rung only when the longest run of the last 30 days is behind it. Weeks between targets keep the 0.4 share, so the long run dips to about 24 km between them.
+- The 50 % share applies to the rungs toward a target too, not only the 30+ weeks; otherwise 26–28 km rungs never fit a low-volume week.
+- A target week right after a lighter week may return to the level before that lighter week (otherwise the 4-weeks-out run lands at 29.5 km under a 60 km cap).
+- A target within two weeks of a B race is capped at 28 km; the B race counts as a run of its distance.
+- The marathon window is 40 weeks (was 30); extra weeks go to the base. Specific 6 + taper 2 make up the 8-week race phase.
+- If a target is missed (too short a road), the preview warns `longTrackShort`. From 35 km, 38 and 28 weeks reach all five; 20 weeks reaches only two 30s and warns.
+
 ## Open
 
 - Warnings (too few weeks to reach 30 km safely, share above the limit, base too small for the goal), cross-training counting toward volume, and fuelling notes on long runs are not decided; take them after the engine change.
-- The race date the app uses versus the date the runner expects (28 weeks shown, about 39 expected): the skeleton covers a marathon only up to 30 weeks out, so a longer road needs the skeleton extended. The preview also shows 6 specific weeks where point 7 says 8.
-- Test with `npm run scenarios -w apps/fartlek` for a marathon at 38, 28 and 20 weeks, from a proven 35 km and from 55 km.
+- A runner from 35 km sits at the 60 km cap for about 12 weeks (from about 15 weeks out to 3 out), and gets six runs of 26 km or more (27, 28, 30 at 12–10 weeks out). Watch whether that is too much in practice.
