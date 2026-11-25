@@ -1,4 +1,5 @@
 import { simulate, simText, type SimInput } from "../simulate";
+import { parseTuning } from "../../shared/tuning";
 import { body, date, num, oneOf, router, BadRequest } from "./util";
 
 /*
@@ -44,6 +45,11 @@ export function parseSimInput(b: Record<string, unknown>): SimInput {
   if (b.rhythm !== undefined) out.rhythm = oneOf(b.rhythm, ["1:1", "2:1", "3:1"] as const, "rhythm");
   if (b.racePace !== undefined) out.racePace = oneOf(b.racePace, ["prediction", "goal"] as const, "racePace");
   if (b.acceptAdvice !== undefined) out.acceptAdvice = b.acceptAdvice === true;
+  if (b.tuning !== undefined) {
+    const t = parseTuning(b.tuning);
+    if (!t) throw new BadRequest("invalid tuning");
+    out.tuning = t;
+  }
   if (b.start !== undefined) {
     out.start = date(b.start, "start");
     if (new Date(`${out.start}T12:00:00Z`).getUTCDay() !== 1) throw new BadRequest("start must be a Monday");

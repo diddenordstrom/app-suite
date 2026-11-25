@@ -15,6 +15,7 @@ import { thresholdReps, type SuggestItem } from "../shared/nextweek";
 import type { BlockSuggestion, WeekRole } from "../shared/blockplan";
 import type { RaceRoad } from "../shared/raceplan";
 import type { CrossDay } from "../shared/types";
+import type { TuningOverrides } from "../shared/tuning";
 
 export interface SimInput {
   /** Run km per week before the plan starts, oldest first (the last one is the week before). Up to 26 weeks. */
@@ -39,6 +40,8 @@ export interface SimInput {
   acceptAdvice?: boolean;
   /** The plan's first Monday; default the next one. */
   start?: ISODate;
+  /** Engine tuning overrides, as an admin saves them in the developer settings (shared/tuning.ts). */
+  tuning?: TuningOverrides;
 }
 
 export interface SimWeek {
@@ -119,6 +122,7 @@ export async function simulate(input: SimInput): Promise<SimResult> {
   const thr = input.threshold ?? { pace: 270, hr: 170 };
   const settings = await get<Record<string, unknown>>("/api/settings");
   await send("/api/settings", { ...settings, runDays, longRunDay, gymDays: input.gymDays ?? [], crossDays: input.crossDays ?? [], doubles: input.doubles ?? "off", maxHr: input.maxHr ?? null }, "PUT");
+  if (input.tuning) await send("/api/admin/tuning", { values: input.tuning }, "PUT");
   await send("/api/thresholds", { effectiveDate: addDays(start, -400), paceSecPerKm: thr.pace, hr: thr.hr });
   const pace = { easy: thr.pace + 80, long: thr.pace + 85, threshold: thr.pace + 30 };
   const hr = { easy: thr.hr - 24, long: thr.hr - 22, threshold: thr.hr - 6 };
