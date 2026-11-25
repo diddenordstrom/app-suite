@@ -10,6 +10,8 @@ updated: 2026-11-25
 
 Settled with the user on 2026-11-25 after the [race plan skeleton](fartlek-race-plan-skeleton.md) was built, and built the same day. It closes two items the skeleton's scenarios raised: the long run topping out at about 24 km in a 20-week marathon plan, and a road that climbs from 45 to about 85 km a week.
 
+> **Partly overtaken (2026-11-25):** the 40 % share, the 30 / 32 km split, the 3 hour limit and the 1.5 × cap suggestion are to change for marathons in [the marathon long-run plan](fartlek-marathon-long-run-plan.md); until that is built, this page describes the code.
+
 ## Decided
 
 - **A plain long run stops at 30 km** (`NEXT.longCeiling.km`), or 3 hours at easy pace, whichever comes first. Runs over 30 km wear the body enough that they are kept for dedicated sessions.

@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-25 · decision · Fartlek marathon long-run plan settled ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · note · Fartlek marathon plan for a low-volume runner: long runs over 30 km ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek: a block from today keeps the running week's build target ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek "add a run day" no longer loops in a running week ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · note · Fartlek race plan skeleton built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek post-race recovery built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race plan honours every race the runner entered ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · decision · Fartlek race plan: a skeleton to an A marathon or half, with a build plan ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -43,7 +43,7 @@
 - [Fartlek plans the key sessions first, with the long run on a 30-day ladder](decisions/fartlek-key-sessions-first.md): Week and block suggestions place the long run (longest run of 30 days + 1 km, never more than 10 % over it), then the next threshold rung, then fill with zone 2; one dial; the 35 % long-run share is gone; Home offers to fix a key session ahead after a missed one _(decision · accepted · 2026-11-14)_
 - [Fartlek gets its own landing page on the portfolio, built from live components](decisions/fartlek-landing-page.md): /fartlek on the portfolio renders Fartlek's real components on hand-tuned demo data (no screenshots), with a theme toggle; the Fartlek card says "Läs mer" instead of "Öppna appen"; "öppen källkod" (present tense) without a GitHub link; about/contact waits for the owner _(decision · accepted · 2026-11-23)_
 - [Fartlek's long run stops at 30 km; only marathon key sessions go to 32, and a race can cap the biggest week](decisions/fartlek-long-run-ceiling.md): A plain long run stops at 30 km (or 3 h); only a marathon race-phase long blueprint may reach 32 km; in a marathon plan's build and race-phase weeks the long run may take 40 % of the week so 30 km comes at about 75 km a week; each race can carry a km cap on its build weeks, suggested at 1.5 × the proven peak week _(decision · accepted · 2026-11-25)_
-- [Fartlek marathon plan for a low-volume runner: long runs over 30 km need their own track](decisions/fartlek-marathon-long-run-plan.md): Open. Why a marathon plan for a runner with a 35 km proven peak week never gets a long run past about 21 km, and the key points to decide (long-run track, week volume, peak cap, ladder, tempo, taper, B-race, warnings) before changing the engine _(decision · open · 2026-11-25)_
+- [Fartlek marathon plan for a low-volume runner: long runs over 30 km need their own track](decisions/fartlek-marathon-long-run-plan.md): Why a marathon plan for a runner with a 35 km proven peak week never gets a long run past about 21 km, and the key points to decide ; decided: three 30+ km runs on a long-run track planned back from the race, 55–60 km weeks with up to 50 % long run, a hard cap at 1.75 × proven peak for a marathon, one 32 km / 3.5 h ceiling _(decision · accepted · 2026-11-25)_
 - [Fartlek's morning notification: today's session and today's form](decisions/fartlek-morning-push.md): A push at a time the runner picks with today's sessions and form score; with Garmin it syncs first and waits up to two hours for last night's HRV or sleep _(decision · accepted · 2026-11-20)_
 - [Fartlek starts the block after a 10 km+ race with recovery weeks gated by days since the race](decisions/fartlek-post-race-recovery.md): After an A or B race of 10 km or longer the next block's first weeks get a new `recovery` role (volume as a share of the pre-race peak, distance and priority decide how many), quality returns by day gates in the order strides, threshold, intervals; the 14-day refusal goes; built 2026-11-24 from the step-by-step build plan _(decision · accepted · 2026-11-24)_
 - [Fartlek plans the weeks up to an A or B race backwards (peak builds, then a two-week taper)](decisions/fartlek-race-blocks.md): Spec for race-mode block planning: from the race date, two taper weeks, up to three build weeks before them, a lighter week ahead of those, and the base engine's guards kept; replaces the "race within 16 weeks refuses" rule _(decision · accepted · 2026-11-24)_
