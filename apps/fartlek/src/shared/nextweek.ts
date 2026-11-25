@@ -57,6 +57,15 @@ export const NEXT = {
   /** A week that falls this many km short of its target on the days it has needs another day. */
   /** A week for someone with no run history. */
   startKm: 15,
+  /**
+   * At low volume a build week may always grow this many km, even when that is more than +10 %
+   * (docs/decisions/fartlek-low-volume-growth.md): 10 % of 20 km is 2 km, which holds a runner at low volume for months.
+   * Injury risk follows single sessions far over the longest run of 30 days more than weekly km (the spike rule stays);
+   * the km-ramp limit (`COACH.rampCap`) still holds.
+   */
+  lowStepKm: 2.5,
+  /** A block's ramp climbs `lowStepKm` a build week only while the load it starts from is under this; above it the ramp's shares rule. */
+  lowVolumeKm: 40,
   /** A lighter week keeps this share of the week before, and of the longest run. */
   /** Lighter variants when even the base week is too hard: shares of the base km. */
   lighter: [0.9, 0.8] as const,
@@ -480,7 +489,8 @@ export function evaluate(seed: WeekSeed, items: SuggestItem[]): WeekEval {
 export function weekCap(kmBefore: number[]): number {
   const s3 = kmBefore.slice(-3).reduce((a, b) => a + b, 0);
   const ramp = (COACH.rampCap * s3) / (4 - COACH.rampCap);
-  return Math.min(growthBase(kmBefore).base * COACH.weekGrowth, ramp);
+  const base = growthBase(kmBefore).base;
+  return Math.min(Math.max(base * COACH.weekGrowth, base + NEXT.lowStepKm), ramp);
 }
 
 export function growthBase(kmBefore: number[]): { base: number; on: "week" | "mean" } {

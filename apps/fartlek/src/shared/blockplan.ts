@@ -453,7 +453,9 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
       // Where this build week sits on the ramp: 0 = first, 1 = last (a lone build week sits in the middle).
       const at = buildWeeks > 1 ? built / (buildWeeks - 1) : 0.5;
       // A marathon's week on the track grows toward the km that carry its long run (and the runs after it), never past the caps below.
-      const aim = Math.max(anchor * (tune().ramp.from + (tune().ramp.to - tune().ramp.from) * at), carry) * scale;
+      // At low volume the ramp's 5–10 % is a km or two: each build week may climb `NEXT.lowStepKm` instead (docs/decisions/fartlek-low-volume-growth.md).
+      const step = anchor < NEXT.lowVolumeKm ? anchor + NEXT.lowStepKm * built : 0;
+      const aim = Math.max(anchor * (tune().ramp.from + (tune().ramp.to - tune().ramp.from) * at), carry, step) * scale;
       // The first week is never bigger than the week button's suggestion: after a jump that one backs off.
       const first = (i === 0 ? Math.min(seed.firstWeekMax ?? Infinity, seed.backKm ?? Infinity) : Infinity);
       // The runner's own cap for the race holds every build week (a lower ceiling, never a higher one).

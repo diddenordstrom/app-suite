@@ -10,7 +10,6 @@ import { createApp } from "./app";
 import { loadConfig } from "./config";
 import { createDb } from "./db";
 import { pinToday } from "./analysis";
-import * as repo from "./repo";
 import { addDays, daysBetween, todayIn, weekday, weekStartOf, type ISODate } from "../shared/dates";
 import { thresholdReps, type SuggestItem } from "../shared/nextweek";
 import type { BlockSuggestion, WeekRole } from "../shared/blockplan";
@@ -57,6 +56,8 @@ export interface SimResult {
   raceForm: number | null; notes: string[];
   /** The race plan's skeleton as first shown (phases and km per week), when the race has one. */
   road: RaceRoad | null;
+  /** Why each block looks as it does: the engine's chosen try, and every try with its km per week and verdict. */
+  blocks: { start: ISODate; chosen: string; tolerance: number; kmBefore: number[]; form: number; tries: string[] }[];
 }
 
 const ORIGIN = "http://localhost:5173";
@@ -141,9 +142,10 @@ export async function simulate(input: SimInput): Promise<SimResult> {
   }
   const end = race ? addDays(weekStartOf(race.date, "monday"), 6) : addDays(start, (Math.min(MAX_WEEKS, input.weeks ?? 12)) * 7 - 1);
 
-  type Sug = { ok: boolean; reason?: string; startWeek: ISODate; suggestion: BlockSuggestion; replaces: { id: number }[]; advice: { free: number[]; doubles?: boolean } | null;
+  type Sug = { ok: boolean; reason?: string; startWeek: ISODate; suggestion: BlockSuggestion; seed: { tolerance: { km: number }; kmBefore: number[]; ctl: number; atl: number }; replaces: { id: number }[]; advice: { free: number[]; doubles?: boolean } | null;
     racePlan: { chunks: { weeks: number; kind: string; blockKind?: string }[]; now: number } | null; racePace: { raceId: number; question: unknown } | null; road: RaceRoad | null };
   const weeks: SimWeek[] = [];
+  const blocks: SimResult["blocks"] = [];
   const notes: string[] = [];
   let road: RaceRoad | null = null;
   let raceForm: number | null = null;
@@ -191,17 +193,18 @@ export async function simulate(input: SimInput): Promise<SimResult> {
       });
     });
     if (s.suggestion.eval.race) raceForm = s.suggestion.eval.race.form;
+    blocks.push({ start: blockStart, chosen: s.suggestion.chosen, tolerance: s.seed.tolerance.km, kmBefore: s.seed.kmBefore, form: r1(s.seed.ctl - s.seed.atl),
+      tries: s.suggestion.tries.map((t) => `${t.id} ${t.state}${t.params.weeks != null ? ` ${t.params.weeks}` : ""}${t.form != null ? ` form ${t.form}` : ""}`) });
 
-    // The runner does every session as planned.
+    // The runner does every session as planned, at the km the planner gave it.
     const last = addDays(blockStart, keep * 7 - 1);
-    for (const w of repo.listWorkouts(db, 1, blockStart, last)) {
-      if (w.status !== "planned") continue;
-      if (w.type === "strength") other(w.date, "strength_training", w.durationMin ?? 60);
-      else if (w.type === "cross") other(w.date, "lap_swimming", w.durationMin ?? 45);
-      else if (w.type === "race") continue;
-      else if (w.distanceKm) {
-        const kind = w.type === "long" ? "long" : w.type === "threshold" || w.type === "intervals" ? "threshold" : "easy";
-        run(w.date, kind, w.distanceKm, w.distanceKm * pace[kind], hr[kind]);
+    for (const it of sw.slice(0, keep).flatMap((w) => w.items)) {
+      if (it.date < blockStart || it.date > last) continue;
+      if (it.type === "strength") other(it.date, "strength_training", it.durationMin ?? 60);
+      else if (it.type === "cross") other(it.date, "lap_swimming", it.durationMin ?? 45);
+      else if (it.km > 0) {
+        const kind = it.type === "long" ? "long" : it.type === "threshold" ? "threshold" : "easy";
+        run(it.date, kind, it.km, it.km * pace[kind], hr[kind]);
       }
     }
     if (race && race.date >= blockStart && race.date <= last) {
@@ -210,11 +213,11 @@ export async function simulate(input: SimInput): Promise<SimResult> {
     }
     blockStart = addDays(last, 1);
   }
-  return { start, race: race && { date: race.date, distanceKm: race.distanceKm }, weeks, raceForm, notes, road };
+  return { start, race: race && { date: race.date, distanceKm: race.distanceKm }, weeks, raceForm, notes, road, blocks };
 }
 
 /** The result as a table for the terminal. */
-export function simText(r: SimResult): string {
+export function simText(r: SimResult, verbose = false): string {
   const pad = (s: string | number, n: number) => String(s).padEnd(n);
   const head = `${pad("week", 11)}${pad("block", 10)}${pad("role", 9)}${pad("phase", 9)}${pad("km", 7)}${pad("long", 6)}${pad("form", 6)}${pad("ctl", 6)}sessions`;
   const lines = r.weeks.map((w) => `${pad(w.weekStart, 11)}${pad(w.block.slice(0, 9), 10)}${pad(w.role, 9)}${pad(w.phase ?? "", 9)}${pad(w.km, 7)}${pad(w.longKm ?? "–", 6)}${pad(`${w.formPct}%`, 6)}${pad(w.ctl, 6)}${w.sessions}`);
@@ -226,6 +229,7 @@ export function simText(r: SimResult): string {
     `${r.weeks.length} weeks · ${total} km · peak week ${peak} km · longest run ${longest} km`,
     "", head, ...lines,
     ...(r.notes.length ? ["", ...r.notes.map((x) => `note: ${x}`)] : []),
+    ...(verbose ? ["", ...r.blocks.flatMap((b) => [`block ${b.start}: ${b.chosen} · tolerance ${b.tolerance} · before ${b.kmBefore.join(" ")} · form ${b.form}`, ...b.tries.map((t) => `  ${t}`)])] : []),
     "", "E easy (s: strides) · L long · T threshold [reps or race-phase blueprint] · G gym · X cross-training · ² double",
   ].join("\n");
 }
@@ -235,5 +239,5 @@ if (process.argv[1]?.endsWith("simulate.ts")) {
   const file = process.argv[2];
   if (!file) { console.error("usage: npm run sim -w apps/fartlek -- <runner.json> [--json]"); process.exit(1); }
   const r = await simulate(JSON.parse(readFileSync(file, "utf8")) as SimInput);
-  console.log(process.argv.includes("--json") ? JSON.stringify(r, null, 2) : simText(r));
+  console.log(process.argv.includes("--json") ? JSON.stringify(r, null, 2) : simText(r, process.argv.includes("--why")));
 }

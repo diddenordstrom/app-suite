@@ -213,7 +213,7 @@ group("planning scenarios", () => {
     const h = r("half in 12").road!;
     expect(h.warnings).not.toContain("longTrackShort");
     expect(h.trackShort).toEqual([]);
-    expect(h.longPeak!.km).toBe(17.5);
-    expect(h.weeks.filter((w) => w.wip >= 3 && w.wip <= 8).map((w) => w.longKm)).toEqual([16, 17, 17.5, 12.5, 17.5, 17.5]);
+    expect(h.longPeak!.km).toBe(18);
+    expect(h.weeks.filter((w) => w.wip >= 3 && w.wip <= 8).map((w) => w.longKm)).toEqual([16, 17.5, 18, 12.5, 18, 18]);
   });
 });

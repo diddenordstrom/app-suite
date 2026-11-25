@@ -249,12 +249,24 @@ describe("block progression", () => {
     const s = suggestBlock(steady());
     const km = kms(s);
     const { from, to } = tune().ramp;
-    // Build weeks sit at 1.0, 1.05 and 1.1 of 30 km (the ramp's defaults, to the half km); the lighter week is 70 % of the one before.
+    // Under NEXT.lowVolumeKm each build week climbs NEXT.lowStepKm (docs/decisions/fartlek-low-volume-growth.md): 30, 32.5, 35,
+    // more than the ramp's 1.0, 1.05 and 1.1; the lighter week is 70 % of the one before.
     expect(km[0]).toBeCloseTo(30 * from, 0);
-    expect(km[1]).toBeCloseTo(30 * (from + to) / 2, 0);
-    expect(km[2]).toBeCloseTo(30 * to, 0);
+    expect(km[1]).toBeCloseTo(Math.max(30 * (from + to) / 2, 30 + NEXT.lowStepKm), 0);
+    expect(km[2]).toBeCloseTo(Math.max(30 * to, 30 + 2 * NEXT.lowStepKm), 0);
     expect(km[3]).toBeCloseTo(km[2] * tune().lighter.volume, 0);
     expect(s.weeks[3].lighter).toBe(true);
+  });
+
+  it("lets a low-volume runner climb a few km a week instead of a few per cent (docs/decisions/fartlek-low-volume-growth.md)", () => {
+    // Months at about 22 km: the ramp's 1.0 → 1.1 alone was 22 → 24 km, and the next block started over at 24.
+    const s = suggestBlock(steady({ kmBefore: [21, 22, 22], tolerance: { km: 22, peakKm: 22, peakWeek: "2026-11-09", weeksAgo: 1 }, ctl: 20, atl: 22, longestKm: 9 }));
+    const km = kms(s);
+    expect(km[1]).toBeGreaterThanOrEqual(24.5);
+    expect(km[2]).toBeGreaterThanOrEqual(27);
+    // The spike rule still holds each long run: never more than 10 % over the longest run before it, planned weeks included.
+    let longest = 9;
+    for (const w of s.weeks) for (const it of w.items.filter((x) => x.type === "long")) { expect(it.km).toBeLessThanOrEqual(spikeMax(longest) + 0.05); longest = Math.max(longest, it.km); }
   });
 
   it("puts a lone build week in the middle of the ramp", () => {

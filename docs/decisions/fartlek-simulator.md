@@ -21,10 +21,11 @@ Asked for by the user on 2026-11-25, to compare the engine with other plans "wit
 
 The runner from `sim/intermediate-marathon-12.json`: about 40 km a week on five days, an 80-minute long run, a marathon 12 weeks out. The free plan it was compared with is time-based (4.5 to 7 hours a week, two quality sessions a week, VO2 hills or intervals and tempo or progression runs, long runs from 1 h 20 to 2 h 30, 2 × 15 min strength).
 
-What the simulator showed for the engine: 28 → 46 km a week with a 3:1 rhythm and a two-week taper, one quality session a week that becomes the marathon phase's race-pace sessions, race-day form about +7, and a **longest run of 18 km**.
+What the simulator showed for the engine (after the [low-volume changes](fartlek-low-volume-growth.md) of the same day): 28 → 50 km a week with a 3:1 rhythm and a two-week taper, one quality session a week that becomes the marathon phase's race-pace sessions, race-day form about +8, and a **longest run of 21 km** (18 km before the changes).
 
 - The engine is more careful with intensity (one quality session a week, lighter weeks that also ease the intensity) and ties the volume to proven load and form, where the plan prescribes the same hours to everyone.
-- The longest run is the clear gap. The long-run ladder (+1 km a week, at most 10 % over the longest run of 30 days) can't take a runner from 13 to 28–32 km in twelve weeks, and the plan's 2 h 30 is about 25 km for this runner. Twelve weeks is short for a marathon in Fartlek's own road too: the race plan wants more weeks before it.
+- The longest run is still the gap. The long-run ladder (+8 % a step, at most 10 % over the longest run of 30 days) can't take a runner from 13 to 28–32 km in twelve weeks, and the plan's 2 h 30 is about 25 km for this runner. Twelve weeks is short for a marathon in Fartlek's own road too: the race plan wants more weeks before it.
+- A bug in the first version of the simulator ran sessions with steps (threshold, strides) as zero km, so the planner saw too little history and shrank the plan; numbers from before the fix are wrong.
 
 ## Open questions
 
