@@ -23,6 +23,8 @@ export function getSettings(db: Db, userId: number): Settings {
     timezone: r.timezone,
     runDays: r.runDays ? r.runDays.split(",").map(Number) : [],
     longRunDay: r.longRunDay,
+    gymDays: r.gymDays ? r.gymDays.split(",").map(Number) : [],
+    crossDays: r.crossDays ? r.crossDays.split(",").map((x) => { const [day, min] = x.split(":").map(Number); return { day, min }; }) : [],
     maxHr: r.maxHr,
     zones: r.zones ? (JSON.parse(r.zones) as ZoneBounds) : null,
     easyLow: r.easyLow,
@@ -31,7 +33,7 @@ export function getSettings(db: Db, userId: number): Settings {
 }
 
 export function saveSettings(db: Db, userId: number, s: Settings) {
-  const row = { ...s, runDays: s.runDays.join(","), zones: s.zones ? JSON.stringify(s.zones) : null };
+  const row = { ...s, runDays: s.runDays.join(","), gymDays: s.gymDays.join(","), crossDays: s.crossDays.map((c) => `${c.day}:${c.min}`).join(","), zones: s.zones ? JSON.stringify(s.zones) : null };
   db.insert(t.userSettings).values({ userId, ...row }).onConflictDoUpdate({ target: t.userSettings.userId, set: row }).run();
 }
 

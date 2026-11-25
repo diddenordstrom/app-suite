@@ -103,6 +103,36 @@ describe("api", () => {
     expect(await g<Sug>("/api/plan/block-suggest?weeks=3")).toMatchObject({ earliest: running, defaultStart: next, startWeek: next });
   });
 
+  it("Skapa block with gym and other-sport days: placed on the days given, no run there, written as sessions", async () => {
+    const a2 = createApp(createDb(":memory:"), config);
+    const g = async <T = Record<string, unknown>>(p: string) => (await a2.request(p)).json() as Promise<T>;
+    const today = todayIn("Europe/Stockholm");
+    const running = weekStartOf(today, "monday"), next = addDays(running, 7);
+    for (let w = 1; w <= 4; w++) for (const d of [1, 2, 4, 6]) await a2.request("/api/workouts", json({ date: addDays(running, -7 * w + d), type: d === 6 ? "long" : "easy", distanceKm: d === 6 ? 12 : 7, status: "done" }));
+    const settings = await g<Record<string, unknown>>("/api/settings");
+    expect(settings).toMatchObject({ gymDays: [], crossDays: [] });
+    // Runs Tue, Wed, Fri, Sun; gym Monday, swimming Thursday; a bad value is refused.
+    expect((await a2.request("/api/settings", json({ ...settings, crossDays: [{ day: 9, min: 30 }] }, "PUT"))).status).toBe(400);
+    const put = await a2.request("/api/settings", json({ ...settings, runDays: [2, 3, 5, 0], gymDays: [1], crossDays: [{ day: 4, min: 45 }] }, "PUT"));
+    expect(await put.json()).toMatchObject({ gymDays: [1], crossDays: [{ day: 4, min: 45 }] });
+    type Item = { date: string; type: string; km: number; durationMin: number | null; steps: unknown };
+    type Sug = { ok: boolean; startWeek: string; seed: { runDays: number[] }; suggestion: { weeks: { items: Item[] }[] }; replaces: { id: number }[] };
+    const s = await g<Sug>(`/api/plan/block-suggest?weeks=3&startWeek=${next}`);
+    expect(s.ok).toBe(true);
+    expect(s.seed.runDays).toEqual([0, 2, 3, 5]);
+    const wd = (d: string) => new Date(`${d}T12:00:00Z`).getUTCDay();
+    for (const w of s.suggestion.weeks) {
+      expect(w.items.filter((it) => wd(it.date) === 1).map((it) => it.type)).toEqual(["strength"]);
+      expect(w.items.filter((it) => wd(it.date) === 4).map((it) => it.type)).toEqual(["cross"]);
+    }
+    const r = await a2.request("/api/plan/block-suggest", json({ startWeek: next, weeks: s.suggestion.weeks.map((w) => w.items), roles: ["build", "build", "lighter"], replace: s.replaces.map((x) => x.id) }));
+    expect(r.status).toBe(200);
+    const planned = await g<{ weeks: { sessions: { workout: { type: string; date: string; distanceKm: number | null; durationMin: number | null } }[] }[] }>(`/api/plan?from=${next}&to=${addDays(next, 20)}`);
+    const gym = planned.weeks.flatMap((w) => w.sessions).map((x) => x.workout).filter((w) => w.type === "strength");
+    expect(gym).toHaveLength(3);
+    expect(gym.every((w) => wd(w.date) === 1 && w.distanceKm == null && w.durationMin === 60)).toBe(true);
+  });
+
   it("races as the answer key: Garmin's race flag asks, yes saves the result and logs the check, no stops asking", async () => {
     const db = createDb(":memory:");
     const a2 = createApp(db, config);

@@ -161,7 +161,19 @@ export function longRun(longestKm: number, lighter: boolean, easyPace: number | 
   return { km: Math.max(NEXT.easyMinKm, km), why, longestKm };
 }
 
-export type SuggestType = "easy" | "long" | "threshold" | "cross";
+export type SuggestType = "easy" | "long" | "threshold" | "cross" | "strength";
+/** Sessions planned in minutes, not km: other sports and gym. They count for no run km. */
+export const isTimed = (type: SuggestType) => type === "cross" || type === "strength";
+/** Minutes a planned gym session gets, for its load (docs/decisions/fartlek-gym-cross-days.md). */
+export const GYM_MIN = 60;
+
+/**
+ * The days the runner gyms and does other sport (docs/decisions/fartlek-gym-cross-days.md), weekdays 0 = Sunday. No run
+ * goes on them, and a quality session is not put on the day after gym when another day will do.
+ */
+export interface ExtraDays { gym: number[]; cross: { day: number; min: number }[] }
+/** The weekdays an `ExtraDays` takes from running. */
+export const extraDaysOf = (x: ExtraDays | null | undefined) => (x ? [...new Set([...x.gym, ...x.cross.map((c) => c.day)])] : []);
 export interface SuggestItem {
   date: ISODate; type: SuggestType; km: number; durationMin: number | null; steps: WorkoutSteps | null;
   /** Race-phase blueprint tag (shared/blueprints.ts), kept through writing, undo and copying. */
@@ -184,6 +196,8 @@ export interface WeekSeed {
   refs: StepRefs;
   /** Minutes a week of other sports already counted (the runner's habit). */
   crossMin: number;
+  /** Gym and other-sport days, placed as sessions (then `crossMin` is 0, so their load is not counted twice). */
+  extra?: ExtraDays | null;
   /** A km target the runner set for the week, used instead of the ramp. */
   targetKm: number | null;
   /** A lighter week: asked for (a target noted "backoff") or form is heavy. A rhythm of build weeks is the block's job, not a reason here. */
@@ -297,16 +311,16 @@ export interface AdviceWeek { weekStart: ISODate; targetKm: number; lighter?: bo
  */
 export interface DaysAdvice { have: number; need: number; why: ("peak" | "fit")[]; peakKm: number; shortKm: number; free: number[] }
 
-const runKmOf = (weeks: AdviceWeek[]) => weeks.reduce((a, w) => a + w.items.filter((it) => it.type !== "cross").reduce((s, it) => s + it.km, 0), 0);
+const runKmOf = (weeks: AdviceWeek[]) => weeks.reduce((a, w) => a + w.items.filter((it) => !isTimed(it.type)).reduce((s, it) => s + it.km, 0), 0);
 /** Run sessions in the biggest build week: what an extra day should raise for the `peak` signal to be worth a question. */
 const peakSessions = (weeks: AdviceWeek[]) => {
   const builds = weeks.filter((w) => !w.lighter);
   const peak = (builds.length ? builds : weeks).reduce((m, w) => (w.targetKm > m.targetKm ? w : m), weeks[0]);
-  return peak.items.filter((it) => it.type !== "cross").length;
+  return peak.items.filter((it) => !isTimed(it.type)).length;
 };
 
 /** Most km a week falls short of its target on the days it has. */
-const shortOf = (weeks: AdviceWeek[]) => r1(Math.max(0, ...weeks.map((w) => w.targetKm - w.items.filter((it) => it.type !== "cross").reduce((s, it) => s + it.km, 0))));
+const shortOf = (weeks: AdviceWeek[]) => r1(Math.max(0, ...weeks.map((w) => w.targetKm - w.items.filter((it) => !isTimed(it.type)).reduce((s, it) => s + it.km, 0))));
 
 /**
  * `trial` plans the same weeks again with a given set of run days. With it, the days the runner has are judged on
@@ -316,7 +330,7 @@ const shortOf = (weeks: AdviceWeek[]) => r1(Math.max(0, ...weeks.map((w) => w.ta
  * short; for `peak`, the peak week gets another session or the plan more run km. `free` lists only those days,
  * so accepting the advice never leads to the same question again, and a day the engine would leave empty is never offered.
  */
-export function daysAdvice(runDays: number[], longRunDay: number, weeks: AdviceWeek[], trial?: (runDays: number[]) => AdviceWeek[]): DaysAdvice | null {
+export function daysAdvice(runDays: number[], longRunDay: number, weeks: AdviceWeek[], trial?: (runDays: number[]) => AdviceWeek[], blocked: number[] = []): DaysAdvice | null {
   const have = new Set(runDays.length ? runDays : [longRunDay]).size;
   if (have >= 7 || !weeks.length) return null;
   if (trial) weeks = trial(runDays);
@@ -337,7 +351,8 @@ export function daysAdvice(runDays: number[], longRunDay: number, weeks: AdviceW
   };
   const taken = new Set(runDays.length ? runDays : [longRunDay]);
   const order = Array.from({ length: 7 }, (_, i) => weekday(addDays(first.weekStart, i)));
-  let free = order.filter((wd) => !taken.has(wd)).sort((a, b) => gap(b) - gap(a) || order.indexOf(a) - order.indexOf(b));
+  // Gym and other-sport days are never offered as run days: the runner said those days are taken.
+  let free = order.filter((wd) => !taken.has(wd) && !blocked.includes(wd)).sort((a, b) => gap(b) - gap(a) || order.indexOf(a) - order.indexOf(b));
   if (trial) {
     const tried = free.map((wd) => { const w = trial([...taken, wd]); return { wd, fits: shortOf(w) <= tune().shortKm, grows: r1(runKmOf(w) - runKmOf(weeks)) >= tune().shortKm || peakSessions(w) > peakSessions(weeks) }; });
     // A shortfall no single day settles is not about days: it is not asked about.
@@ -385,7 +400,7 @@ export function evaluate(seed: WeekSeed, items: SuggestItem[]): WeekEval {
   }
   low = Math.min(low, ctl - atl);
   lowPct = Math.min(lowPct, formPct(ctl - atl, ctl));
-  const runs = items.filter((it) => it.type !== "cross");
+  const runs = items.filter((it) => !isTimed(it.type));
   const km = r1(runs.reduce((s, it) => s + it.km, 0));
   const { base, on } = growthBase(seed.kmBefore);
   const win = [...seed.kmBefore.slice(-3), km];
@@ -501,6 +516,9 @@ export interface Shape {
 }
 export interface PhaseItem { steps: WorkoutSteps; blueprint: string }
 
+/** How many days apart a quality session on the day after gym counts as losing: a soft rule, never a lock. */
+const AFTER_GYM_COST = 1.5;
+
 /** Warm-up and cool-down (min) a threshold session tries, shortest last, to stay under the 30-day rule. */
 const WARM_COOL: [number, number][] = [[THRESHOLD_WARM_COOL_MIN, THRESHOLD_WARM_COOL_MIN], [10, 8], [8, 8], [8, 5], [5, 5]];
 
@@ -519,7 +537,25 @@ function thresholdFor(s: Thr, refs: StepRefs, maxKm: number | null | undefined):
  * the threshold sessions on the run days furthest from the hard days, then easy zone 2 runs share what is
  * left of the week's km (a run too short is dropped; none is longer than the long run).
  */
-export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay" | "refs">, shape: Shape): SuggestItem[] {
+export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay" | "refs" | "extra">, shape: Shape): SuggestItem[] {
+  const items = buildRuns(seed, shape);
+  const { days } = daysOf(seed);
+  if (seed.extra) {
+    // The days the runner gave: gym and other sport go there, beside a run only on the long-run day (it is never moved).
+    for (const d of days) {
+      const wd = weekday(d);
+      if (seed.extra.gym.includes(wd)) items.push({ date: d, type: "strength", km: 0, durationMin: GYM_MIN, steps: null });
+      const c = seed.extra.cross.find((x) => x.day === wd);
+      if (c && c.min > 0) items.push({ date: d, type: "cross", km: 0, durationMin: c.min, steps: null });
+    }
+  } else if (shape.crossMin > 0) {
+    const free = days.find((d) => !items.some((it) => it.date === d));
+    if (free) items.push({ date: free, type: "cross", km: 0, durationMin: shape.crossMin, steps: null });
+  }
+  return items.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+function buildRuns(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay" | "refs" | "extra">, shape: Shape): SuggestItem[] {
   const { days, slots, longDay } = daysOf(seed);
   const items: SuggestItem[] = [];
   const total = half(shape.km);
@@ -542,6 +578,9 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   const apart = (a: ISODate, b: ISODate) => { const g = Math.abs(idx(a) - idx(b)); return Math.min(g, 7 - g); };
   const hardDays: ISODate[] = [longDay];
   const thrDays: ISODate[] = [];
+  // The day after gym takes a quality session only when every other day is worse by more than this many days apart.
+  const gym = seed.extra?.gym ?? [];
+  const afterGym = (d: ISODate) => gym.includes(weekday(addDays(d, -1)));
   for (let k = 0; k < thr.length; k++) {
     // The free run day furthest from every hard day so far; earlier wins a tie.
     let best: ISODate | null = null, gap = -1;
@@ -549,7 +588,7 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
     if (wanted && others.includes(wanted) && !thrDays.includes(wanted)) best = wanted;
     else for (const d of others) {
       if (thrDays.includes(d)) continue;
-      const g = Math.min(...hardDays.map((h) => apart(h, d)));
+      const g = Math.min(...hardDays.map((h) => apart(h, d))) - (afterGym(d) ? AFTER_GYM_COST : 0);
       if (g > gap) { gap = g; best = d; }
     }
     thrDays.push(best!);
@@ -585,11 +624,7 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   // Without a ladder to step from (no run in 30 days), the long run takes what no easy run could.
   if (shape.longKm == null && !easyDays.length && rest > 0) items[0].km = half(items[0].km + rest);
   addStrides(items, seed.refs, shape.strides ?? NEXT.stridesPerWeek);
-  if (shape.crossMin > 0) {
-    const free = days.find((d) => !items.some((it) => it.date === d));
-    if (free) items.push({ date: free, type: "cross", km: 0, durationMin: shape.crossMin, steps: null });
-  }
-  return items.sort((a, b) => a.date.localeCompare(b.date));
+  return items;
 }
 
 /**

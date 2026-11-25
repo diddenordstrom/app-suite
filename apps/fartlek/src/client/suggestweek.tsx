@@ -8,7 +8,7 @@ import { addDays, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { sessionText } from "@/shared/blocktext";
 import { COACH } from "@/shared/coach";
 import { FORM, formPct } from "@/shared/load";
-import { evaluate, growthBase, NEXT, type DaysAdvice, spikeMax, stepsKm, thresholdSteps, type SuggestItem, type SuggestType, type Suggestion, type Try, type WeekEval, type WeekSeed, type Why } from "@/shared/nextweek";
+import { evaluate, GYM_MIN, growthBase, isTimed, NEXT, type DaysAdvice, spikeMax, stepsKm, thresholdSteps, type SuggestItem, type SuggestType, type Suggestion, type Try, type WeekEval, type WeekSeed, type Why } from "@/shared/nextweek";
 import { stepsText, stridesOf, withStrides, type WorkoutSteps } from "@/shared/steps";
 import { StepsPanel } from "./sessionbuilder";
 import { RacePaceCard, RacePaceNote } from "./racepace";
@@ -175,17 +175,18 @@ function LineIcon({ tone }: { tone: Line["tone"] }) {
 
 /* ---------- The editor ---------- */
 
-const TYPES: SuggestType[] = ["easy", "threshold", "long", "cross"];
+const TYPES: SuggestType[] = ["easy", "threshold", "long", "cross", "strength"];
 
 /** Session edits shared by the week and block dialogs: change type, one step shorter or longer, a new easy run. */
 export function editType(x: SuggestItem, type: SuggestType, refs: WeekSeed["refs"]): SuggestItem {
   if (type === x.type) return x;
   if (type === "cross") return { date: x.date, type, km: 0, durationMin: 45, steps: null };
+  if (type === "strength") return { date: x.date, type, km: 0, durationMin: GYM_MIN, steps: null };
   if (type === "threshold") { const r = NEXT.ladder[0], steps = thresholdSteps(r.reps, r.min, r.rest); return { date: x.date, type, km: stepsKm(steps, refs), durationMin: null, steps }; }
-  return { date: x.date, type, km: x.type === "cross" ? 6 : x.km, durationMin: null, steps: null };
+  return { date: x.date, type, km: isTimed(x.type) ? 6 : x.km, durationMin: null, steps: null };
 }
 export function editStep(x: SuggestItem, dir: 1 | -1, refs: WeekSeed["refs"]): SuggestItem {
-  if (x.type === "cross") return { ...x, durationMin: Math.max(15, (x.durationMin ?? 45) + dir * 15) };
+  if (isTimed(x.type)) return { ...x, durationMin: Math.max(15, (x.durationMin ?? 45) + dir * 15) };
   const st = stridesOf(x.steps);
   if (st && st.base.km != null) {
     // An easy run with strides grows at the run, so the strides stay as they are.
@@ -223,7 +224,7 @@ function Editor({ seed, s, replaces, onClose, onApplied }: { seed: WeekSeed; s: 
   const step = (date: ISODate, dir: 1 | -1) => update(date, (x) => editStep(x, dir, seed.refs));
   const add = (date: ISODate) => setItems((xs) => [...xs, newEasy(date)].sort((a, b) => a.date.localeCompare(b.date)));
   const [stepsOf, setStepsOf] = useState<ISODate | null>(null);
-  const editing = stepsOf ? items.find((x) => x.date === stepsOf && x.type !== "cross") ?? null : null;
+  const editing = stepsOf ? items.find((x) => x.date === stepsOf && !isTimed(x.type)) ?? null : null;
 
   const apply = async () => {
     setBusy(true); setErr(null);
@@ -234,7 +235,7 @@ function Editor({ seed, s, replaces, onClose, onApplied }: { seed: WeekSeed; s: 
   };
 
   const drag = useDayDrag((from, to) => swap(from, to));
-  const blockText = items.map((x) => sessionText({ type: x.type, distanceKm: x.type === "cross" ? null : x.km, durationMin: x.durationMin, zone2: false, steps: x.steps }, fmt.units, stepLang)).join(", ");
+  const blockText = items.map((x) => sessionText({ type: x.type, distanceKm: isTimed(x.type) ? null : x.km, durationMin: x.durationMin, zone2: false, steps: x.steps }, fmt.units, stepLang)).join(", ");
 
   return (
     <div className="space-y-4">
@@ -348,7 +349,7 @@ export function DayCell({ date, item, first, last, over, dragged, dayName, refsK
   tall?: boolean;
 }) {
   const color = item ? TYPE_COLOR[item.type] : undefined;
-  const amount = item ? (item.type === "cross" ? `${item.durationMin} min` : refsKm(item.km)) : "";
+  const amount = item ? (isTimed(item.type) ? `${item.durationMin} min` : refsKm(item.km)) : "";
   const strides = stridesOf(item?.steps ?? null);
   const reps = item?.steps && !strides ? item.steps.items.filter((x) => x.kind === "repeat") : [];
   // A long run's faster finish: its last step when that has a pace.
@@ -383,7 +384,7 @@ export function DayCell({ date, item, first, last, over, dragged, dayName, refsK
           {reps.length > 0 && <span className="col-span-2 row-start-2 text-xs text-muted-foreground">{stepsText({ v: 1, items: reps }, stepLang, "metric")}</span>}
           {strides && <span className="col-span-2 row-start-2 text-xs font-medium text-accent-foreground">{t("builder.stridesPlus", { n: strides.reps })}</span>}
           {finish && <span className="col-span-2 row-start-2 text-xs text-muted-foreground">{t("next.fastFinish", { text: finish })}</span>}
-          {onSteps && item.type !== "cross" && (
+          {onSteps && !isTimed(item.type) && (
             <button type="button" onClick={onSteps} onPointerDown={(e) => e.stopPropagation()} aria-expanded={!!stepsOpen}
               className={cn("col-span-2 justify-self-start text-left text-xs font-semibold text-primary hover:underline", stepsOpen && "underline")}>
               {t("builder.stepsLink")}

@@ -709,3 +709,44 @@ describe("blockDaysAdvice", () => {
     expect(blockDaysAdvice(five, running(five))).toBeNull();
   });
 });
+
+describe("gym and other-sport days (docs/decisions/fartlek-gym-cross-days.md)", () => {
+  // The reference week: gym Monday, swimming Thursday, a bike ride Saturday; runs Tuesday, Wednesday, Friday and Sunday.
+  const extra = { gym: [1], cross: [{ day: 4, min: 45 }, { day: 6, min: 60 }] };
+  const runner = seed({ weeks: 4, ctl: 40, atl: 44, kmBefore: [36, 38, 40], tolerance: { km: 42, peakKm: 42, peakWeek: null, weeksAgo: 3 },
+    runDays: [2, 3, 5, 0], longestKm: 16, extra });
+
+  it("puts gym and other sport on their days, never a run there, and the quality session away from the day after gym", () => {
+    const s = suggestBlock(runner);
+    for (const w of s.weeks) {
+      const on = (wd: number) => w.items.filter((it) => weekday(it.date) === wd);
+      expect(on(1).map((it) => it.type)).toEqual(["strength"]);
+      expect(on(4).map((it) => [it.type, it.durationMin])).toEqual([["cross", 45]]);
+      expect(on(6).map((it) => [it.type, it.durationMin])).toEqual([["cross", 60]]);
+      const runs = w.items.filter((it) => it.type !== "strength" && it.type !== "cross");
+      expect(runs.every((it) => [2, 3, 5, 0].includes(weekday(it.date)))).toBe(true);
+      // One quality session: Wednesday or Friday, never Tuesday, the day after gym.
+      const thr = w.items.filter((it) => it.type === "threshold");
+      if (thr.length === 1) expect([3, 5]).toContain(weekday(thr[0].date));
+      // Gym and other sport add no run km.
+      expect(weekKm(w.items)).toBe(weekKm(runs));
+    }
+  });
+
+  it("keeps the quality session off the day after gym without gym days moving anything else", () => {
+    const plain = suggestBlock({ ...runner, extra: null, runDays: [2, 3, 5, 0] });
+    const thrDays = plain.weeks.flatMap((w) => w.items.filter((it) => it.type === "threshold").map((it) => weekday(it.date)));
+    // Gym on Tuesday instead: Wednesday is the day after it, so the session goes to Friday when it was on Wednesday.
+    const gymTue = suggestBlock({ ...runner, extra: { gym: [2], cross: [] }, runDays: [3, 5, 0] });
+    const after = gymTue.weeks.flatMap((w) => w.items.filter((it) => it.type === "threshold" && it.blueprint == null).map((it) => weekday(it.date)));
+    expect(thrDays.length).toBeGreaterThan(0);
+    expect(after.every((d) => d !== 3)).toBe(true);
+  });
+
+  it("never offers a gym or other-sport day as an extra run day", () => {
+    const big = { ...runner, kmBefore: [50, 52, 54], tolerance: { km: 56, peakKm: 56, peakWeek: null, weeksAgo: 1 }, longestKm: 20, runDays: [2, 0] };
+    const a = blockDaysAdvice(big, suggestBlock(big).weeks);
+    expect(a).not.toBeNull();
+    expect(a!.free.some((d) => [1, 4, 6].includes(d))).toBe(false);
+  });
+});

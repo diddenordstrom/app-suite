@@ -11,14 +11,14 @@ import { crossLoadPerDay } from "../../shared/coach";
 import { plannedLoad, pmc } from "../../shared/load";
 import { asWeekSuggestion, suggestWeek, weekAsBlock } from "../../shared/blockplan";
 import { planRange } from "../../shared/planrange";
-import { daysAdvice, formHeavy, NEXT, rungBefore, type BackoffWhy, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
+import { daysAdvice, extraDaysOf, formHeavy, isTimed, NEXT, rungBefore, type BackoffWhy, type ExtraDays, type PastWeek, type SuggestItem, type SuggestType, type WeekSeed } from "../../shared/nextweek";
 import { backOffNow, injuryNow, phaseRaceIn, phaseView, racePaceGate, racePaceView } from "../racephase";
 import { BLUEPRINTS, entryStep, parseBlueprintTag, stepFor } from "../../shared/blueprints";
 import type { PhaseSeed } from "../../shared/racephase";
 import { parseSteps, plannedFromSteps, stepsText, type WorkoutSteps } from "../../shared/steps";
 import { goalPace } from "../../shared/recovery";
 import { thresholdOn } from "../../shared/threshold";
-import { WORKOUT_STATUSES, WORKOUT_TYPES, type Workout } from "../../shared/types";
+import { WORKOUT_STATUSES, WORKOUT_TYPES, type Settings, type Workout } from "../../shared/types";
 import { body, date, num, oneOf, optNum, optStr, router, BadRequest } from "./util";
 
 /*
@@ -30,7 +30,7 @@ import { body, date, num, oneOf, optNum, optStr, router, BadRequest } from "./ut
  */
 
 const PAST_WEEKS = 6;
-const TYPES: readonly SuggestType[] = ["easy", "long", "threshold", "cross"];
+const TYPES: readonly SuggestType[] = ["easy", "long", "threshold", "cross", "strength"];
 
 /** What a suggestion replaces: every session planned in the week (it hasn't started, so none is done). */
 /** The sessions a suggestion for the week replaces; in the running week only from today on, what is behind stays. */
@@ -58,7 +58,9 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
   const thr = thresholdOn(ctx.thresholds, ctx.today);
   const block = blockOn(weekStart, repo.listBlocks(ctx.db, ctx.userId));
   const habit = crossHabit(ctx);
-  const crossMin = block?.crossMin ?? habit;
+  // Gym and other-sport days the runner gave are planned as sessions, so their load is not also counted as a habit.
+  const extra = extraOf(ctx.settings);
+  const crossMin = extra ? 0 : block?.crossMin ?? habit;
   const dayBefore = addDays(weekStart, -1);
 
   // Planned load (and the other-sports habit) from tomorrow up to the week, like the block coach projects it.
@@ -94,12 +96,28 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
   const recovery = rec ? { date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, peakKm: rec.peakKm } : null;
   return {
     weekStart, ctl: seed.ctl, atl: seed.atl, kmBefore: past.slice(-3).map((w) => w.km), past,
-    runDays: ctx.settings.runDays, longRunDay: ctx.settings.longRunDay,
-    threshold: thr, refs: stepRefs(ctx, ctx.today), crossMin,
+    runDays: runDaysOf(ctx.settings), longRunDay: ctx.settings.longRunDay,
+    threshold: thr, refs: stepRefs(ctx, ctx.today), crossMin, extra,
     targetKm: target?.km ?? null, backoff: backoffWhy != null, backoffWhy, hardBefore, toleranceKm,
     ...keySessionSeed(ctx, weekStart, { weeks: o.weeks, toleranceKm }),
     ...(recovery ? { recovery, longestKm: longestRun(ctx, addDays(weekStart, -NEXT.spikeDays), dayBefore, [recovery.date]) } : {}),
   };
+}
+
+/**
+ * The gym and other-sport days (docs/decisions/fartlek-gym-cross-days.md), never the long-run day (it stays a run day);
+ * null when the runner gave none.
+ */
+export function extraOf(s: Settings): ExtraDays | null {
+  const gym = s.gymDays.filter((d) => d !== s.longRunDay);
+  const cross = s.crossDays.filter((c) => c.day !== s.longRunDay && !gym.includes(c.day));
+  return gym.length || cross.length ? { gym, cross } : null;
+}
+/** The run days left when the gym and other-sport days are taken out; all of them when that would leave none. */
+export function runDaysOf(s: Settings): number[] {
+  const taken = extraDaysOf(extraOf(s));
+  const left = s.runDays.filter((d) => !taken.includes(d));
+  return left.length ? left : s.runDays;
 }
 
 /**
@@ -161,7 +179,7 @@ export function parseItems(ctx: Ctx, raw: unknown, weekStart: ISODate, label = "
     const d = date(x.date, `${label}[${i}].date`);
     if (d < weekStart || d > end) throw new BadRequest(`${label}[${i}].date must be in the week`);
     const type = oneOf(x.type, TYPES, `${label}[${i}].type`);
-    if (type === "cross") return { date: d, type, km: 0, durationMin: num(x.durationMin, `${label}[${i}].durationMin`, 5, 600), steps: null };
+    if (type === "cross" || type === "strength") return { date: d, type, km: 0, durationMin: num(x.durationMin, `${label}[${i}].durationMin`, 5, 600), steps: null };
     const steps = x.steps != null ? stepsParam(x.steps, ctx) : null;
     return { date: d, type, km: num(x.km, `${label}[${i}].km`, 0.5, 200), durationMin: null, steps, ...blueprintOf(x.blueprint, `${label}[${i}].blueprint`) };
   });
@@ -170,7 +188,7 @@ export function parseItems(ctx: Ctx, raw: unknown, weekStart: ISODate, label = "
 /** Write suggested sessions as planned workouts; returns their ids. */
 export function insertItems(tx: Tx, ctx: Ctx, items: SuggestItem[]): number[] {
   return items.map((it) => {
-    const amount = it.steps ? plannedFromSteps(it.steps, stepRefs(ctx, it.date)) : { distanceKm: it.type === "cross" ? null : it.km, durationMin: it.durationMin };
+    const amount = it.steps ? plannedFromSteps(it.steps, stepRefs(ctx, it.date)) : { distanceKm: isTimed(it.type) ? null : it.km, durationMin: it.durationMin };
     return tx.insert(t.workouts).values({
       userId: ctx.userId, date: it.date, type: it.type, ...amount, zone2: false, steps: it.steps ? JSON.stringify(it.steps) : null, blueprint: it.blueprint ?? null,
     }).returning().get().id;
@@ -225,7 +243,7 @@ export function nextWeekRoutes(db: Db) {
       // whole week, not the days still ahead.
       const whole = plan.suggestion.weeks[0];
       const advice = daysAdvice(seed.runDays, seed.longRunDay, [{ weekStart, targetKm: whole.targetKm, items: whole.items }],
-        (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; });
+        (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; }, extraDaysOf(seed.extra));
       return { suggestion, advice };
     });
     return c.json({ weekStart, ok: true, seed, suggestion, replaces, advice, racePace: phaseView(ctx, weekStart, 1) });

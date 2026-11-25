@@ -1,6 +1,6 @@
 import { addDays, daysBetween, weekday, type ISODate } from "./dates";
 import { COACH, crossLoadPerDay, itemLoad } from "./coach";
-import { build, daysAdvice, type BackoffWhy, daysOf, type Shape as WeekShape, evaluate, growthBase, longFor, longRun, NEXT, weekCapWith, rung, spikeMax, thresholdReps, whyOf, withinQuality, type PastWeek, type Suggestion, type SuggestItem, type Thr, type Try, type TryId, type WeekEval, type WeekSeed, type WeekState } from "./nextweek";
+import { build, daysAdvice, extraDaysOf, isTimed, type ExtraDays, type BackoffWhy, daysOf, type Shape as WeekShape, evaluate, growthBase, longFor, longRun, NEXT, weekCapWith, rung, spikeMax, thresholdReps, whyOf, withinQuality, type PastWeek, type Suggestion, type SuggestItem, type Thr, type Try, type TryId, type WeekEval, type WeekSeed, type WeekState } from "./nextweek";
 import { stridesOf, type StepRefs } from "./steps";
 import type { Threshold } from "./types";
 import { tune } from "./tuning";
@@ -86,6 +86,8 @@ export interface BlockSeed {
   threshold: Threshold | null;
   refs: StepRefs;
   crossMin: number;
+  /** Gym and other-sport days (docs/decisions/fartlek-gym-cross-days.md); `runDays` already leaves them out. */
+  extra?: ExtraDays | null;
   /** End with a lighter week (blocks of 3+ weeks). */
   lighterLast: boolean;
   /** Km to aim for over these weeks; null = as much as is safe. */
@@ -273,14 +275,14 @@ export interface BlockSuggestion {
 
 const r1 = (n: number) => Math.round(n * 10) / 10;
 const floorHalf = (n: number) => Math.floor(n * 2) / 2 + 0;
-const isRun = (it: SuggestItem) => it.type !== "cross";
+const isRun = (it: SuggestItem) => !isTimed(it.type);
 
 /** The week engine's seed for week `i`, starting from where the weeks before it ended. */
 function weekSeedOf(seed: BlockSeed, i: number, ctl: number, atl: number, kmBefore: number[], hardBefore: boolean, longestKm = seed.longestKm): WeekSeed {
   return {
     weekStart: addDays(seed.startWeek, i * 7), ctl, atl, kmBefore: kmBefore.slice(-3), past: [],
     runDays: seed.runDays, longRunDay: seed.longRunDay, threshold: seed.threshold, refs: seed.refs,
-    crossMin: seed.crossMin, targetKm: null, backoff: false, hardBefore,
+    crossMin: seed.crossMin, extra: seed.extra ?? null, targetKm: null, backoff: false, hardBefore,
     longestKm, rung: seed.rung, tempoPace: seed.tempoPace, toleranceKm: seed.tolerance.km,
     ...(seed.phase ? { phase: seed.phase } : {}),
   };
@@ -618,7 +620,8 @@ function aroundRace(items: SuggestItem[], race: ISODate, weekStart: ISODate): Su
       continue;
     }
     if (it.date > race && daysBetween(race, it.date) < 7) {
-      if (it.type !== "cross") out.push({ date: it.date, type: "easy", km: Math.min(it.km, RACE.afterKm), durationMin: null, steps: null });
+      // Gym and other sport wait for the week after the race.
+      if (!isTimed(it.type)) out.push({ date: it.date, type: "easy", km: Math.min(it.km, RACE.afterKm), durationMin: null, steps: null });
       continue;
     }
     out.push(it);
@@ -839,7 +842,7 @@ export const weekKm = (items: SuggestItem[]) => r1(items.filter(isRun).reduce((s
 export const blockDaysAdvice = (seed: BlockSeed, weeks: PlannedWeek[]) => {
   // Judged on whole weeks: a first week started from today plans only the days ahead, and no added day changes the days that are over.
   const whole = seed.done ? { ...seed, done: null } : seed;
-  return daysAdvice(whole.runDays, whole.longRunDay, weeks, (runDays) => suggestBlock({ ...whole, runDays }).weeks);
+  return daysAdvice(whole.runDays, whole.longRunDay, weeks, (runDays) => suggestBlock({ ...whole, runDays }).weeks, extraDaysOf(whole.extra));
 };
 
 /* ---------- "Föreslå veckan": the same engine with one week ---------- */
@@ -852,6 +855,7 @@ export function weekAsBlock(seed: WeekSeed): BlockSeed {
     startWeek: seed.weekStart, weeks: 1, ctl: seed.ctl, atl: seed.atl, kmBefore: seed.kmBefore, past: seed.past,
     tolerance: { km: tol, peakKm: tol, peakWeek: null, weeksAgo: 0 },
     runDays: seed.runDays, longRunDay: seed.longRunDay, threshold: seed.threshold, refs: seed.refs, crossMin: seed.crossMin,
+    ...(seed.extra ? { extra: seed.extra } : {}),
     lighterLast: false, goalKm: null, lighterFirst: !!seed.backoff, lighterFirstWhy: seed.backoffWhy ?? null, buildWeeksDone: 0, hardBefore: !!seed.hardBefore,
     longestKm: seed.longestKm, rung: seed.rung, tempoPace: seed.tempoPace ?? null, firstWeekMax: null,
     fixedKm: [seed.targetKm ?? null],

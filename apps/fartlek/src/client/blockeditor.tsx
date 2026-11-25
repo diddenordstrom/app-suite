@@ -8,7 +8,7 @@ import { DayCell, editStep, editType, newEasy, signed, signedInt, SpikeInfo, use
 import { addDays, daysBetween, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { BLOCK, doneKmOf, type BlockEval, type BlockSeed, type PlannedWeek, type WeekRole } from "@/shared/blockplan";
 import { withStrides } from "@/shared/steps";
-import type { SuggestItem, SuggestType } from "@/shared/nextweek";
+import { isTimed, type SuggestItem, type SuggestType } from "@/shared/nextweek";
 
 /*
  * The block editor shared by "Skapa block" and "Räkna om resten": the weeks as columns with the days as rows
@@ -24,7 +24,7 @@ const ADDED_GROWTH = 1.08;
 
 const shiftItem = (x: SuggestItem, days: number): SuggestItem => ({ ...x, date: addDays(x.date, days) });
 const scaleRun = (x: SuggestItem, f: number): SuggestItem =>
-  x.type === "cross" || x.type === "threshold" ? x : { ...x, km: Math.max(1, half(x.km * f)), steps: x.steps && f !== 1 ? null : x.steps };
+  isTimed(x.type) || x.type === "threshold" ? x : { ...x, km: Math.max(1, half(x.km * f)), steps: x.steps && f !== 1 ? null : x.steps };
 
 /** The block's weeks as the runner edits them: sessions per week and each week's role (build, lighter, taper, race). */
 export function useBlockWeeks(seed: BlockSeed, start: SuggestItem[][], startRoles: WeekRole[]) {
@@ -221,7 +221,7 @@ export function WeekEditor({ b, ev, plan, canResize, canRetype, fillAdded, locke
     <WeekHead b={b} i={i} ev={ev} plan={plan[i]} deepest={i === deepestAt} editable={canRetype} compact={compact} label={labels?.[i]}
       onRemove={canRemove ? () => { b.removeWeek(i); setCur(Math.max(0, Math.min(i, n - 2))); } : undefined} />
   );
-  const stepsItem = stepsOf ? b.weeks.flat().find((x) => x.date === stepsOf && x.type !== "cross") : undefined;
+  const stepsItem = stepsOf ? b.weeks.flat().find((x) => x.date === stepsOf && !isTimed(x.type)) : undefined;
   const addWeekButton = (cls: string, label: string) => (
     <button type="button" onClick={() => { b.addWeek(fillAdded); setCur(n); }} className={cls}>{label}</button>
   );
