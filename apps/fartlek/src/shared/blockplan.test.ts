@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { addDays, daysBetween, weekday } from "./dates";
 import { COACH } from "./coach";
-import { BLOCK, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
+import { BLOCK, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, projectVolumes, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
 import { COACH as COACH_RACE } from "./coach";
 import { NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
 import { stridesOf, withStrides } from "./steps";
@@ -516,5 +516,33 @@ describe("post-race recovery (docs/decisions/fartlek-post-race-recovery.md)", ()
     expect(gateAfterRace([strides], r, tenk)[0].steps).toBeNull();
     const before: SuggestItem = { date: "2026-10-30", type: "threshold", km: 8, durationMin: null, steps: null };
     expect(gateAfterRace([before], r, half)).toEqual([before]);
+  });
+});
+
+describe("race plan hooks (docs/decisions/fartlek-race-plan-skeleton.md)", () => {
+  it("projects the same km as the engine for a calm seed", () => {
+    const calm = seed({ ctl: 40, atl: 38, kmBefore: [30, 31, 30], tolerance: { km: 31, peakKm: 31, peakWeek: null, weeksAgo: 1 }, runDays: [1, 2, 4, 6, 0] });
+    const s = suggestBlock(calm);
+    expect(projectVolumes({ ...calm, firstWeekMax: s.weeks[0].targetKm }).map((v) => v.km)).toEqual(s.weeks.map((w) => w.targetKm));
+  });
+
+  it("plans an other race's week as a B race week, its days after the race short and easy", () => {
+    const sun = addDays(MONDAY, 13);
+    const s = suggestBlock(seed({ roles: ["build", "race", "build", "lighter"], race: null, otherRaces: [{ date: sun }], runDays: [1, 2, 4, 6, 0] }));
+    expect(s.weeks[1].targetKm).toBe(Math.floor(s.weeks[0].targetKm * tune().taper.bRace * 2) / 2);
+    const sat = addDays(MONDAY, 12);
+    const s2 = suggestBlock(seed({ roles: ["build", "race", "build", "lighter"], race: null, otherRaces: [{ date: sat }], runDays: [1, 2, 4, 6, 0] }));
+    for (const it of s2.weeks[1].items.filter((x) => x.date > sat && x.type !== "cross")) expect(it).toMatchObject({ type: "easy", steps: null });
+    expect(s2.weeks[1].items.some((x) => x.date === sat)).toBe(false);
+  });
+
+  it("holds the long run in the build weeks just before a marathon taper", () => {
+    // Weeks at wip 6–3 of a marathon on the Sunday of week 4 + 2.
+    const race = addDays(MONDAY, 5 * 7 + 6);
+    const phase: PhaseSeed = { race: { date: race, kind: "marathon" }, paces: { mp: 300, hmp: 285 }, paceSource: "goal", steps: {} as PhaseSeed["steps"], backOff: false, injury: true };
+    const s = suggestBlock(seed({ roles: ["build", "lighter", "build", "build"], phase, longestKm: 20, kmBefore: [48, 50, 52], tolerance: { km: 55, peakKm: 55, peakWeek: null, weeksAgo: 1 }, runDays: [1, 2, 4, 6, 0], ctl: 50, atl: 50 }));
+    const long = (i: number) => Math.max(...s.weeks[i].items.filter((it) => it.type === "long").map((it) => it.km));
+    expect(long(2)).toBeLessThanOrEqual(long(0));
+    expect(long(3)).toBeLessThanOrEqual(long(0));
   });
 });

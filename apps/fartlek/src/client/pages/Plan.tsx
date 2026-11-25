@@ -50,10 +50,10 @@ export function Plan() {
   }, [blockApplied]);
   const undoBlock = async () => {
     if (!blockApplied) return;
-    const { id, blockIds, ids, removed, targetsBefore } = blockApplied;
+    const { id, blockIds, ids, removed, targetsBefore, planBefore } = blockApplied;
     setBlockApplied(null);
     try {
-      await api("/plan/block-suggest/undo", { body: { id, blockIds, ids, restore: removed, targetsBefore } });
+      await api("/plan/block-suggest/undo", { body: { id, blockIds, ids, restore: removed, targetsBefore, planBefore } });
     } catch (err) {
       setDragError((err as Error).message);
     }
@@ -198,6 +198,9 @@ function WeekRow({ week, data, compact, month, onOpen, onDrop, onCopy, onTarget,
           <span className="text-xs text-muted-foreground">{fmtDay(week.weekStart, { day: "numeric", month: "short" })}–{fmtDay(addDays(week.weekStart, 6), { day: "numeric", month: "short" })}</span>
           {block ? <Badge>{blockName(block)}</Badge> : data.blocks.length > 0 && <span className="text-xs text-muted-foreground">{t("plan.noBlock")}</span>}
           {week.backoff && <Badge>{t("plan.backoff")}</Badge>}
+          {!week.targetKm && data.skeleton?.[week.weekStart] && (
+            <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">{t("road.weekTarget", { km: fmt.dist(data.skeleton[week.weekStart].km, 0) })}</span>
+          )}
           <StatusBadge status={week.status} />
         </div>
         <div className="flex items-center gap-3 text-xs text-muted-foreground">

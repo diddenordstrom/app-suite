@@ -7,6 +7,7 @@ import {
   type Settings, type Stream, type Threshold, type Wellness, type Workout, type WorkoutStatus, type WorkoutType, type ZoneBounds,
 } from "../shared/types";
 import type { WeekTarget } from "../shared/compliance";
+import type { ISODate } from "../shared/dates";
 import { EMPTY_LOG, type ActivityLog } from "../shared/activitylog";
 import { readSteps } from "../shared/steps";
 import { parseTuning, withTuning, type TuningOverrides } from "../shared/tuning";
@@ -266,7 +267,7 @@ export function saveLog(db: Db, userId: number, activityId: string, log: Activit
 export const TRAINING_TABLES = [
   t.laps, t.streams, t.activityFiles, t.activitySplits, t.activityLogs, t.csTests, t.bestEfforts, t.vo2max, t.activities, t.workouts,
   t.weekTargets, t.races, t.blocks, t.thresholds, t.painEntries, t.checkins, t.wellness, t.sessionTemplates, t.raceChecks,
-  t.gymSets, t.gymSessions,
+  t.gymSets, t.gymSessions, t.racePlanWeeks,
 ];
 
 /** Deletes training data but keeps the account, settings and Garmin connection. */
@@ -284,4 +285,19 @@ export function countActivities(db: Db, userId: number): number {
 
 export function listVo2max(db: Db, userId: number, from: string): { date: string; value: number }[] {
   return db.select({ date: t.vo2max.date, value: t.vo2max.value }).from(t.vo2max).where(and(eq(t.vo2max.userId, userId), gte(t.vo2max.date, from))).orderBy(asc(t.vo2max.date)).all();
+}
+
+/** A stored race plan week (docs/decisions/fartlek-race-plan-skeleton.md). */
+export interface PlanWeekRow { userId: number; weekStart: ISODate; raceId: number; phase: string; role: string; km: number | null; longKm: number | null; computedOn: ISODate }
+
+/** The user's race plan weeks in [from, to], oldest first. */
+export function listPlanWeeks(db: Db, userId: number, from: ISODate, to: ISODate): PlanWeekRow[] {
+  return db.select().from(t.racePlanWeeks).where(and(eq(t.racePlanWeeks.userId, userId), gte(t.racePlanWeeks.weekStart, from), lte(t.racePlanWeeks.weekStart, to)))
+    .orderBy(asc(t.racePlanWeeks.weekStart)).all();
+}
+
+/** Every stored week of the plan for one race, oldest first. */
+export function planWeeksOf(db: Db, userId: number, raceId: number): PlanWeekRow[] {
+  return db.select().from(t.racePlanWeeks).where(and(eq(t.racePlanWeeks.userId, userId), eq(t.racePlanWeeks.raceId, raceId)))
+    .orderBy(asc(t.racePlanWeeks.weekStart)).all();
 }

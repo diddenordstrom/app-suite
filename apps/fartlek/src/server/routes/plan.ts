@@ -37,6 +37,9 @@ export function planRoutes(db: Db) {
       targets: Object.fromEntries(repo.getTargets(db, ctx.userId, weeks[0]?.weekStart ?? from, to)),
       races: repo.listRaces(db, ctx.userId),
       blocks: repo.listBlocks(db, ctx.userId),
+      // The race plan's targets for weeks not in a block yet (docs/decisions/fartlek-race-plan-skeleton.md). Never read as a target.
+      skeleton: Object.fromEntries(repo.listPlanWeeks(db, ctx.userId, weeks[0]?.weekStart ?? from, to).filter((w) => w.km != null)
+        .map((w) => [w.weekStart, { phase: w.phase, km: w.km!, longKm: w.longKm }])),
     });
   });
 
@@ -196,9 +199,15 @@ export function planRoutes(db: Db) {
     afterResult(ctxFor(db, uid(c)), row.id);
     return c.json(repo.listRaces(db, uid(c)));
   });
+  /** A race's plan rows go when the race goes, or when its date, distance or priority changes (a new goal keeps them). */
+  const dropPlan = (userId: number, raceId: number) =>
+    db.delete(t.racePlanWeeks).where(and(eq(t.racePlanWeeks.userId, userId), eq(t.racePlanWeeks.raceId, raceId))).run();
   r.put("/races/:id", async (c) => {
     const id = idParam(c.req.param("id"));
-    db.update(t.races).set(raceFields(await body(c))).where(own(t.races, uid(c), id)).run();
+    const before = repo.listRaces(db, uid(c)).find((x) => x.id === id);
+    const fields = raceFields(await body(c));
+    db.update(t.races).set(fields).where(own(t.races, uid(c), id)).run();
+    if (before && (before.date !== fields.date || before.distanceKm !== fields.distanceKm || before.priority !== fields.priority)) dropPlan(uid(c), id);
     afterResult(ctxFor(db, uid(c)), id);
     return c.json(repo.listRaces(db, uid(c)));
   });
@@ -222,6 +231,7 @@ export function planRoutes(db: Db) {
     const id = idParam(c.req.param("id"));
     db.delete(t.races).where(own(t.races, uid(c), id)).run();
     db.delete(t.raceChecks).where(and(eq(t.raceChecks.userId, uid(c)), eq(t.raceChecks.raceId, id))).run();
+    dropPlan(uid(c), id);
     return c.json(repo.listRaces(db, uid(c)));
   });
   /** Past races' answer key: what Fartlek said the day before against the result, and runs to suggest as results. */

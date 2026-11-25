@@ -55,7 +55,9 @@ export interface HomeData {
   watch: { sent: number[] } | null;
 }
 
-export interface PlanData { today: string; weeks: WeekSummary[]; races: Race[]; blocks: Block[] }
+export interface PlanData { today: string; weeks: WeekSummary[]; races: Race[]; blocks: Block[];
+  /** The race plan's targets for weeks not in a block yet (docs/decisions/fartlek-race-plan-skeleton.md). */
+  skeleton?: Record<string, { phase: string; km: number; longKm: number | null }> }
 
 /** Form (fitness − fatigue) into the block and out of it, or today while it runs; null before it starts. */
 export interface FormPoint { value: number; pct: number }

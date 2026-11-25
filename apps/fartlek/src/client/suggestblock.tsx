@@ -8,6 +8,8 @@ import { Badge, Button, Dialog, ErrorText, Field, Input, Select, Spinner, cn } f
 import { blockName, fmtDay } from "./bits";
 import { MoreDays, PILL, signed, signedInt, SimLines, skipVerdict, type Line, type Tone } from "./suggestweek";
 import { BlockWarnings, useBlockWeeks, WeekEditor } from "./blockeditor";
+import { RaceRoad } from "./raceroad";
+import type { RaceRoad as Road } from "@/shared/raceplan";
 import { addDays, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { sessionText } from "@/shared/blocktext";
 import { BLOCK, evaluateBlock, weekKm, type BlockEval, type BlockSeed, type BlockSuggestion, type BlockTry, type RaceChunk, type WeekRole } from "@/shared/blockplan";
@@ -15,7 +17,7 @@ import { diffPlans, workoutWeeks, type DayChange, type PlanDiff } from "@/shared
 import { COACH } from "@/shared/coach";
 import { FORM, formPct, formState } from "@/shared/load";
 import type { DaysAdvice, SuggestItem } from "@/shared/nextweek";
-import type { Block, Workout } from "@/shared/types";
+import type { Block, BlockKind, Workout } from "@/shared/types";
 
 /*
  * "Skapa block" and "Räkna om resten" (docs/decisions/fartlek-block-goals.md, docs/decisions/fartlek-skapa-block.md).
@@ -28,19 +30,21 @@ import type { Block, Workout } from "@/shared/types";
 type Race = { name: string; date: ISODate };
 type SugBase = { startWeek: ISODate; defaultStart: ISODate; earliest: ISODate; today: ISODate; weeks: number };
 /** A race ahead that decides the weeks (docs/decisions/fartlek-race-blocks.md): its blocks counted back, and how many are planned now. */
-type RacePlan = { race: Race & { priority: "A" | "B" }; weeksToRace: number; chunks: RaceChunk[]; now: number };
+type RacePlan = { race: Race & { priority: "A" | "B" }; weeksToRace: number; chunks: (RaceChunk & { blockKind?: BlockKind })[]; now: number };
 type SugOk = SugBase & { ok: true; seed: BlockSeed; suggestion: BlockSuggestion; replaces: Workout[]; race: Race | null; advice: DaysAdvice | null; racePlan: RacePlan | null;
   /** Days before `today` in a block that starts in the running week are over: locked, with the km run. */
   doneDays: Record<ISODate, number>; racePace: RacePaceView | null;
   /** The race the first weeks recover from (docs/decisions/fartlek-post-race-recovery.md); null without recovery weeks. */
-  recovery: { name: string; date: ISODate; distanceKm: number; priority: "A" | "B"; weeks: number } | null };
+  recovery: { name: string; date: ISODate; distanceKm: number; priority: "A" | "B"; weeks: number } | null;
+  /** The road to an A marathon or half (docs/decisions/fartlek-race-plan-skeleton.md), a break before the block, and a plan race beyond its window. */
+  road: Road | null; back: { days: number; km: number } | null; farRace: { name: string; date: ISODate; weeksToRace: number; planFrom: ISODate } | null };
 type SugRes = SugBase & (
   | { ok: false; reason: "block"; block: Block }
   | { ok: false; reason: "race"; race: Race }
   | Omit<SugOk, keyof SugBase>);
 
 /** What "Använd blocket" wrote and what it replaced, for undo. */
-export interface BlockApplied { id: number; blockIds?: number[]; ids: number[]; removed: Workout[]; targetsBefore: unknown[]; from: ISODate; to: ISODate }
+export interface BlockApplied { id: number; blockIds?: number[]; ids: number[]; removed: Workout[]; targetsBefore: unknown[]; planBefore?: unknown[]; from: ISODate; to: ISODate }
 
 const stepLang = lang === "sv" ? "sv" : "en";
 const growthPct = Math.round((COACH.weekGrowth - 1) * 100);
@@ -77,7 +81,7 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
       <StepDots step={step === "start" ? 1 : 2} />
       <ErrorText>{error}</ErrorText>
       {step === "start" && (
-        <StartStep data={data} loading={loading} rhythm={rhythm} onRhythm={(r) => { setRhythm(r); setExtra(0); }}
+        <StartStep data={data} loading={loading} rhythm={rhythm} onRhythm={(r) => { setRhythm(r); setExtra(0); }} onChanged={() => setRev(rev + 1)}
           name={name} onName={setName} mode={mode} onMode={setMode} picker={picker} onClose={onClose}
           onNext={() => setStep(mode === "suggest" ? "sim" : "edit")} />
       )}
@@ -94,7 +98,7 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
           names={nowChunks.length > 1 ? nowChunks.map((c, i) => (i === 0 ? name.trim() : chunkName(c, rp!))) : null}
           onApply={async (items, roles) => {
             // A race plan saves each of its blocks; else one block of all the weeks.
-            const blocks = nowChunks.length > 0 ? nowChunks.map((c, i) => ({ weeks: c.weeks, kind: c.kind, name: i === 0 ? name.trim() : chunkName(c, rp!) })) : undefined;
+            const blocks = nowChunks.length > 0 ? nowChunks.map((c, i) => ({ weeks: c.weeks, kind: c.blockKind ?? c.kind, name: i === 0 ? name.trim() : chunkName(c, rp!) })) : undefined;
             const r = await api<Omit<BlockApplied, "from" | "to">>("/plan/block-suggest", {
               body: { startWeek: ok.startWeek, weeks: items, roles, blocks, name: name.trim(), replace: ok.replaces.map((w) => w.id) },
             });
@@ -130,8 +134,8 @@ function Tile1({ label, value, sub, tone }: { label: string; value: ReactNode; s
   );
 }
 
-function StartStep({ data, loading, rhythm, onRhythm, name, onName, mode, onMode, picker, onClose, onNext }: {
-  data: SugRes | null | undefined; loading: boolean; rhythm: Rhythm; onRhythm: (r: Rhythm) => void; name: string; onName: (v: string) => void;
+function StartStep({ data, loading, rhythm, onRhythm, onChanged, name, onName, mode, onMode, picker, onClose, onNext }: {
+  data: SugRes | null | undefined; loading: boolean; rhythm: Rhythm; onRhythm: (r: Rhythm) => void; onChanged: () => void; name: string; onName: (v: string) => void;
   mode: Mode; onMode: (m: Mode) => void; picker: ReactNode; onClose: () => void; onNext: () => void;
 }) {
   const fmt = useFmt();
@@ -148,7 +152,7 @@ function StartStep({ data, loading, rhythm, onRhythm, name, onName, mode, onMode
       </div>
     );
   }
-  const { seed, race, racePlan: rp, recovery } = data as SugOk;
+  const { seed, race, racePlan: rp, recovery, road, back, farRace } = data as SugOk;
   const form = seed.ctl - seed.atl;
   // A lighter first week is either heavy form (tired) or asked for (a backoff target, or a lighter start from the check-in).
   const lighter = !!seed.lighterFirst;
@@ -190,7 +194,9 @@ function StartStep({ data, loading, rhythm, onRhythm, name, onName, mode, onMode
         {picker}
       </div>
 
-      {rp ? <RacePlanView rp={rp} start={data.startWeek} /> : recovery && recovery.weeks > 0 ? (
+      {back && <p className="text-sm text-muted-foreground">{t("road.back", { days: back.days, km: fmt.dist(back.km) })}</p>}
+      {farRace && <p className="text-sm text-muted-foreground">{t("road.far", { race: farRace.name, weeks: tn("be.weeksN", farRace.weeksToRace), week: weekNumber(farRace.planFrom) })}</p>}
+      {road ? <RaceRoad road={road} onChanged={onChanged} /> : rp ? <RacePlanView rp={rp} start={data.startWeek} /> : recovery && recovery.weeks > 0 ? (
         <p className="text-sm text-muted-foreground">
           {t("blk.recovery.note", { name: recovery.name, date: fmtDay(recovery.date, { day: "numeric", month: "short" }), weeks: tn("be.weeksN", recovery.weeks) })}
         </p>
@@ -395,6 +401,7 @@ function BlockEditor({ res, own, rhythm, extended, names, onExtend, onUnextend, 
   };
   return (
     <div className="space-y-4">
+      {res.road && <RaceRoad road={res.road} compact />}
       {offerExtend && (
         <div role="status" className="flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/10 px-4 py-3">
           <div className="min-w-0 flex-1 basis-80 space-y-0.5">

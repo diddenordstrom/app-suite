@@ -1,3 +1,4 @@
+import { raceKindOf } from "../shared/raceplan";
 import { and, eq } from "drizzle-orm";
 import * as t from "./db/schema";
 import * as repo from "./repo";
@@ -20,8 +21,7 @@ import type { Race } from "../shared/types";
 
 export interface PhaseRace { race: Race; kind: "marathon" | "half"; /** Weeks in phase: the race week is 1. */ wip: number }
 
-const kindOf = (km: number): "marathon" | "half" | null =>
-  Math.abs(km - MARATHON_M / 1000) <= 1 ? "marathon" : Math.abs(km - HALF_M / 1000) <= 1 ? "half" : null;
+const kindOf = raceKindOf;
 
 /** The next A race on or after the week, when it is a marathon or half and the week is inside its last 8 weeks. */
 export function phaseRace(ctx: Ctx, weekStart: ISODate): PhaseRace | null {

@@ -102,11 +102,15 @@ export function crossHabit(ctx: Ctx): number {
   return Math.round(secs / 60 / COACH.cross.historyWeeks / 5) * 5;
 }
 
+/** Which km count: `planned: false` = only activities up to today (proven load, docs/decisions/fartlek-race-plan-skeleton.md). */
+export interface KmOptions { planned?: boolean }
+
 /** Run km per day: actual up to today, planned (not dropped) after, and today's sessions not run yet. */
-export function kmByDay(ctx: Ctx, from: ISODate, to: ISODate): Map<ISODate, number> {
+export function kmByDay(ctx: Ctx, from: ISODate, to: ISODate, o: KmOptions = {}): Map<ISODate, number> {
   const m = new Map<ISODate, number>();
   const add = (d: ISODate, km: number) => m.set(d, (m.get(d) ?? 0) + km);
   for (const a of repo.listActivities(ctx.db, ctx.userId, { from, to: to < ctx.today ? to : ctx.today })) if (a.isRun) add(a.date, a.distanceM / 1000);
+  if (o.planned === false) return m;
   if (from <= ctx.today && ctx.today <= to) for (const w of openToday(ctx)) if (w.type !== "cross") add(w.date, plannedKmOf(w));
   if (to > ctx.today) {
     for (const w of repo.listWorkouts(ctx.db, ctx.userId, addDays(ctx.today, 1), to)) {
@@ -117,9 +121,9 @@ export function kmByDay(ctx: Ctx, from: ISODate, to: ISODate): Map<ISODate, numb
 }
 
 /** Run km per week for the `weeks` weeks before `weekStart`, oldest first. */
-export function weeksBefore(ctx: Ctx, weekStart: ISODate, weeks: number) {
+export function weeksBefore(ctx: Ctx, weekStart: ISODate, weeks: number, o: KmOptions = {}) {
   const from = addDays(weekStart, -7 * weeks);
-  const km = kmByDay(ctx, from, addDays(weekStart, -1));
+  const km = kmByDay(ctx, from, addDays(weekStart, -1), o);
   return Array.from({ length: weeks }, (_, i) => {
     const ws = addDays(from, i * 7);
     let sum = 0;
@@ -132,10 +136,11 @@ export function weeksBefore(ctx: Ctx, weekStart: ISODate, weeks: number) {
  * The longest single run in [from, to]: runs done, and runs planned from today on (not skipped or dropped).
  * `skip`: days that don't count (a race, so the ladder doesn't step from it; docs/decisions/fartlek-post-race-recovery.md).
  */
-export function longestRun(ctx: Ctx, from: ISODate, to: ISODate, skip: ISODate[] = []): number {
+export function longestRun(ctx: Ctx, from: ISODate, to: ISODate, skip: ISODate[] = [], o: KmOptions = {}): number {
   let best = 0;
   const counts = (d: ISODate) => !skip.includes(d);
   for (const a of repo.listActivities(ctx.db, ctx.userId, { from, to: to < ctx.today ? to : ctx.today })) if (a.isRun && counts(a.date)) best = Math.max(best, a.distanceM / 1000);
+  if (o.planned === false) return Math.round(best * 10) / 10;
   if (from <= ctx.today && ctx.today <= to) for (const w of openToday(ctx)) if (w.type !== "cross" && counts(w.date)) best = Math.max(best, plannedKmOf(w));
   if (to > ctx.today) {
     for (const w of repo.listWorkouts(ctx.db, ctx.userId, addDays(ctx.today, 1), to)) {
@@ -143,6 +148,19 @@ export function longestRun(ctx: Ctx, from: ISODate, to: ISODate, skip: ISODate[]
     }
   }
   return Math.round(best * 10) / 10;
+}
+
+/**
+ * Days in a row without a run activity, ending yesterday (or the day before `startWeek` when that is earlier), looking back at
+ * most 35 days; 0 when the runner ran on that day. A planned session is not a run (docs/decisions/fartlek-race-plan-skeleton.md).
+ */
+export function breakBefore(ctx: Ctx, startWeek: ISODate): number {
+  const yesterday = addDays(ctx.today, -1), before = addDays(startWeek, -1);
+  const end = before < yesterday ? before : yesterday;
+  const ran = new Set(repo.listActivities(ctx.db, ctx.userId, { from: addDays(end, -34), to: end }).filter((a) => a.isRun).map((a) => a.date));
+  let days = 0;
+  while (days < 35 && !ran.has(addDays(end, -days))) days++;
+  return days;
 }
 
 /** The A or B race of 10 km+ whose recovery reaches into the weeks from `startWeek` (docs/decisions/fartlek-post-race-recovery.md). */

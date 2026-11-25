@@ -198,6 +198,21 @@ export const races = sqliteTable("races", {
  * What Fartlek predicted for a race the day before it, against the result (docs/decisions/fartlek-race-results.md):
  * every model's estimate and the inputs, per model version, so the models can be tuned later.
  */
+/**
+ * The race plan's weeks (docs/decisions/fartlek-race-plan-skeleton.md): phase, role and km target of every week from the plan's start to the end
+ * of the race's recovery. `km` null = the week is in a block, whose week_targets row holds its target. Never read as planned load or tolerance.
+ */
+export const racePlanWeeks = sqliteTable("race_plan_weeks", {
+  userId: userRef(),
+  weekStart: text("week_start").notNull(),
+  raceId: integer("race_id").notNull(),
+  phase: text("phase").notNull(),
+  role: text("role").notNull(),
+  km: real("km"),
+  longKm: real("long_km"),
+  computedOn: text("computed_on").notNull(),
+}, (t) => [primaryKey({ columns: [t.userId, t.weekStart] }), index("race_plan_weeks_race").on(t.userId, t.raceId)]);
+
 export const raceChecks = sqliteTable("race_checks", {
   id: integer("id").primaryKey({ autoIncrement: true }),
   userId: userRef(),

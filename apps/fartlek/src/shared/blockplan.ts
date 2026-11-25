@@ -7,6 +7,7 @@ import { tune } from "./tuning";
 import { blueprintById, blueprintTag, compileSlot, phaseWeekFor, type BlueprintId, type PhaseSlot } from "./blueprints";
 import { phaseWarnings, RACE_PHASE, type PhaseSeed, type PhaseWarnings } from "./racephase";
 import { formPct } from "./load";
+import { RACE_PLAN, wipOf } from "./raceplan";
 
 /*
  * "Föreslå block" (docs/decisions/fartlek-block-goals.md): plan a 2–4 week block as a whole, with a km goal,
@@ -116,6 +117,12 @@ export interface BlockSeed {
   taper?: { first: number; race: number };
   /** The race-specific phase, when an A marathon or half is within 8 weeks of one of the weeks. */
   phase?: PhaseSeed;
+  /** Where a race plan's chunk ramps from (docs/decisions/fartlek-race-plan-skeleton.md); default tolerance.km. Never raises a cap. */
+  anchorKm?: number;
+  /** After a break of 8+ days: the first build week is at most this many km (RACE_PLAN.back). */
+  backKm?: number | null;
+  /** Other races in the weeks (B races, A races other than `race`): each week holding one is a B race week. */
+  otherRaces?: { date: ISODate }[];
 }
 
 /**
@@ -360,7 +367,7 @@ function raceDayForm(seed: BlockSeed, weeks: SuggestItem[][], ev: BlockWeekEval[
   return { date: race.date, form: r1(form), formPct: r1(ctl > 0 ? (form / ctl) * 100 : 0) };
 }
 
-interface Volume { km: number; cap: number; reentry: boolean; lighter: boolean; role: WeekRole }
+export interface Volume { km: number; cap: number; reentry: boolean; lighter: boolean; role: WeekRole }
 
 /**
  * Km per week at `scale`. A build week aims at the tolerated km times its place on `TUNE.ramp` (low first, high
@@ -373,7 +380,7 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
   const window = [...seed.kmBefore];
   const noHistory = !window.some((k) => k > 0);
   const buildWeeks = Array.from({ length: seed.weeks }, (_, i) => i).filter((i) => isBuild(seed, i)).length;
-  const anchor = Math.max(seed.tolerance.km, NEXT.startKm);
+  const anchor = Math.max(seed.anchorKm ?? seed.tolerance.km, NEXT.startKm);
   const out: Volume[] = [];
   let built = 0;
   for (let i = 0; i < seed.weeks; i++) {
@@ -384,9 +391,12 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
       // A share of the peak: the biggest build week planned (or run) before it. A B race week keeps a share of a normal week.
       const peak = Math.max(0, ...out.filter((x) => x.role === "build").map((x) => x.km), ...(out.some((x) => x.role === "build") ? [] : window.slice(-3)));
       const prev = out.at(-1)?.km ?? window.at(-1) ?? 0;
+      // A race week is an A race week only when it holds an A `seed.race`; any other race week (a B race, an other race) keeps a share of a normal week.
+      const ws = addDays(seed.startWeek, i * 7);
+      const aWeek = role === "race" && seed.race?.priority === "A" && seed.race.date >= ws && seed.race.date <= addDays(ws, 6);
       const share = role === "taper" ? seed.taper?.first ?? tune().taper.first
-        : seed.race?.priority === "B" ? tune().taper.bRace : seed.taper?.race ?? tune().taper.race;
-      const base = seed.race?.priority === "B" && role === "race" ? prev : peak;
+        : aWeek ? seed.taper?.race ?? tune().taper.race : tune().taper.bRace;
+      const base = role === "race" && !aWeek ? prev : peak;
       v = { km: fixed[i] ?? floorHalf(base * share), cap: base, reentry: false, lighter, role };
     } else if (role === "recovery" && seed.recovery && recoveryRow(seed.recovery)) {
       // A fixed share of the pre-race peak: never fitted, ramped or held to the week cap (docs/decisions/fartlek-post-race-recovery.md).
@@ -405,7 +415,7 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
       const at = buildWeeks > 1 ? built / (buildWeeks - 1) : 0.5;
       const aim = anchor * (tune().ramp.from + (tune().ramp.to - tune().ramp.from) * at) * scale;
       // The first week is never bigger than the week button's suggestion: after a jump that one backs off.
-      const first = i === 0 && seed.firstWeekMax != null ? seed.firstWeekMax : Infinity;
+      const first = i === 0 ? Math.min(seed.firstWeekMax ?? Infinity, seed.backKm ?? Infinity) : Infinity;
       v = { km: fixed[i] ?? floorHalf(Math.min(cap, aim, first)), cap: r1(Math.min(cap, first)), reentry, lighter, role };
       built++;
     }
@@ -414,6 +424,9 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
   }
   return out;
 }
+
+/** The block's km per week without sessions: the race plan's cheap projection (docs/decisions/fartlek-race-plan-skeleton.md). */
+export const projectVolumes = (seed: BlockSeed) => volumes(seed, 1);
 
 /** The scale of the caps that adds up to `goal` (bisection: the total grows with the scale). */
 function scaleFor(seed: BlockSeed, goal: number): number {
@@ -455,8 +468,13 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
     if (recWeek && !recStarted) { longest = 0; any = 0; recStarted = true; }
     const phase = seed.phase && v.role !== "race" && !recWeek ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
     const long = longRun(longest, v.lighter, seed.refs.easyPace, any);
-    const longKm = recWeek ? Math.max(NEXT.easyMinKm, Math.min(RECOVERY.longMaxKm, floorHalf(v.km * RECOVERY.longShare)))
+    let longKm = recWeek ? Math.max(NEXT.easyMinKm, Math.min(RECOVERY.longMaxKm, floorHalf(v.km * RECOVERY.longShare)))
       : long ? longFor(long.km, v.km, longest, v.lighter) : null;
+    // The long-run peak is held, not raised, in the build weeks close to the race (docs/decisions/fartlek-race-plan-skeleton.md).
+    if (seed.phase && v.role === "build" && longKm != null && longest > 0) {
+      const wip = wipOf(ws.weekStart, seed.phase.race.date), h = RACE_PLAN.longPeak[seed.phase.race.kind];
+      if (wip >= h.holdTo && wip <= h.holdFrom) longKm = Math.min(longKm, longest);
+    }
     const maxKm = any > 0 ? spikeMax(any) : null;
     // After the race: until the full threshold gate only the short session, and none before the short gate.
     const afterRace = !!row && v.role !== "race" && dayOf(last) > 0;
@@ -498,7 +516,9 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
     const runDays = restDays.length && seed.runDays.some((x) => !restDays.includes(x)) ? seed.runDays.filter((x) => !restDays.includes(x)) : seed.runDays;
     const built = build(runDays === seed.runDays ? ws : { ...ws, runDays }, { km: v.km, longKm, tempo, thr: withinQuality(thr, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
       maxKm, ...strides, ...(phased && !thrGated ? { phase: phased } : {}) });
-    const items = gateAfterRace(seed.race ? aroundRace(built, seed.race.date, ws.weekStart) : built, rec, row);
+    let items = seed.race ? aroundRace(built, seed.race.date, ws.weekStart) : built;
+    for (const o of seed.otherRaces ?? []) if (o.date >= ws.weekStart && o.date <= last) items = aroundRace(items, o.date, ws.weekStart);
+    items = gateAfterRace(items, rec, row);
     longest = Math.max(longest, ...items.filter((it) => it.type === "long").map((it) => it.km));
     any = Math.max(any, ...items.filter(isRun).map((it) => it.km));
     return { weekStart: ws.weekStart, lighter: v.lighter, role: v.role, reentry: v.reentry, cap: v.cap, targetKm: v.km, items };
