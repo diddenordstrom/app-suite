@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-25 · decision · Fartlek "add a run day" no longer loops in a running week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek long run stops at 30 km, a race can cap the biggest week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek race plan skeleton built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek post-race recovery built ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · decision · Fartlek race plan: a skeleton to an A marathon or half, with a build plan ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek post-race recovery weeks, with a build plan ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek gym: the last finished session is the new template ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · note · Fartlek race phase built ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -33,7 +33,7 @@
 - [Fartlek best efforts, automatic critical speed and race prediction](decisions/fartlek-best-efforts.md): How Fartlek reads best efforts from stored streams, fits critical speed without a test, predicts race times week by week (marathon from published volume, durability and training models), and shows Garmin's VO2max _(decision · accepted · 2026-11-13)_
 - [Fartlek's block editor coaches on form and km ramp before saving](decisions/fartlek-block-coach.md): The block editor projects form (TSB) and the weekly km ramp (ACWR) for the text being typed and suggests changes in a fixed order; other sports count as a weekly habit; quick-add, a list view and a week calendar sit beside the text, which can hold steps inline _(decision · accepted · 2026-11-12)_
 - [Fartlek plans in goal-driven blocks, re-simulated week by week](decisions/fartlek-block-goals.md): Föreslå block" plans a 2–4 week block as a whole with a km goal, capped by proven tolerance instead of a flat +10 %; "Räkna om resten" re-plans the weeks not started toward the goal; no build block near a race or just after one _(decision · accepted · 2026-11-24)_
-- [Fartlek blocks rise through the block and are scaled by bisection, and extra run days are offered only when they change the plan](decisions/fartlek-block-progression.md): Build weeks follow a ramp of the proven load (100 % → 105 % → 110 %) before a lighter week; a too-hard block is scaled down by bisection so it keeps rising; the long run is a share of the week that falls with volume; easy runs are at most half the long run; the tweakable values live in one table and the injury guards stay outside it; "add a run day" is asked only when a trial plan shows a free day helps _(decision · accepted · 2026-11-24)_
+- [Fartlek blocks rise through the block and are scaled by bisection, and extra run days are offered only when they change the plan](decisions/fartlek-block-progression.md): Build weeks follow a ramp of the proven load (100 % → 105 % → 110 %) before a lighter week; a too-hard block is scaled down by bisection so it keeps rising; the long run is a share of the week that falls with volume; easy runs are at most half the long run; the tweakable values live in one table and the injury guards stay outside it; "add a run day" is asked only when a trial plan shows a free day helps _(decision · accepted · 2026-11-25)_
 - [Fartlek judges form as a share of fitness, and as a guard rather than a target](decisions/fartlek-form-relative.md): Form bands (fresh, building, heavy) are judged on (fitness − fatigue) / fitness, as intervals.icu does, instead of Friel's absolute TSB; a week above the build band is "calm" and fine, and the engines no longer add load to reach it _(decision · accepted · 2026-11-13)_
 - [Fartlek "Mål till plan": from a goal to a plan in two minutes, on Garmin history](decisions/fartlek-goal-to-plan.md): Plan for the first screen a new runner meets (race or time goal, date, run days), built on Garmin history: phases with the first block concrete, beside "Skapa block _(decision · accepted · 2026-11-24)_
 - [Fartlek asks which days gym and cross-training go on (plan, not built)](decisions/fartlek-gym-cross-days.md): Plan for the block planner to ask how many gym sessions and which days, and which days and minutes for cross-training, so the engine places them there and keeps the run days apart from them _(note · open · 2026-11-23)_

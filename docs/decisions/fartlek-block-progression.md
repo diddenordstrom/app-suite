@@ -3,7 +3,7 @@ title: Fartlek blocks rise through the block and are scaled by bisection, and ex
 summary: Build weeks follow a ramp of the proven load (100 % → 105 % → 110 %) before a lighter week; a too-hard block is scaled down by bisection so it keeps rising; the long run is a share of the week that falls with volume; easy runs are at most half the long run; the tweakable values live in one table and the injury guards stay outside it; "add a run day" is asked only when a trial plan shows a free day helps
 type: decision
 status: accepted
-updated: 2026-11-24
+updated: 2026-11-25
 ---
 
 # Fartlek blocks rise through the block and are scaled by bisection, and extra run days are offered only when they change the plan
@@ -24,6 +24,7 @@ Settled with the user on 2026-11-14 after a real block came out flat (31.5 km th
 - **Easy runs are at most half the long run** (`TUNE.easy.ofLong`): what the long run and threshold leave is split into as few runs as that takes (`ceil(rest / (0.5 × long))`), on the first run days, never under 3 km. A long run of 15 with 14 km left gives two runs of 7; 20 km left gives three. This replaces the 12 %-of-the-week sizing of [fartlek-run-days](fartlek-run-days.md): the number of runs now follows from the long run, so the number of days it calls for does too.
 - **One table for what can be tweaked** ([`shared/tuning.ts`](../../apps/fartlek/src/shared/tuning.ts), `TUNE` with `TUNE_RANGE`; a test keeps every default in its range, and a settings panel can read the ranges later). In it: the ramp, the lighter-week shares (volume and long run), the long-run share curve and step, the easy-run share of the long run, the run-days-by-volume table and the shortfall that asks for a day. **Not in it, because a bad value can hurt the runner:** the spike rule (10 % over the longest run in 30 days), weekly growth (+10 %) and the km-ramp limits, re-entry growth and tolerance fade, the form bands that call a block too hard or too easy, the threshold share and ladder, the long-run ceiling in km and minutes, and the number of build weeks before a lighter week. Those stay constants in `NEXT`, `COACH` and `BLOCK`.
 - **"Add a run day" is a trial** (`daysAdvice` with a `trial`): the signals (peak km, shortfall) only decide whether to look. The same weeks are then planned again with each free day added; a day is offered only if it adds run km (≥ `NEXT.shortKm`) or sessions in the peak week. A day the engine would leave empty is never offered, and with none left the question is not asked.
+- **The days are judged like with like, and a day must settle the question** (2026-11-25). A block started in the running week is planned from today on, but its first week kept the whole week's target: the days that were over counted as a shortfall ("fit", about 8 km) that no added day could fill, while every trial (whole weeks) gained those km, so each free day looked helpful and the dialog asked until all seven were run days. Now, with a trial, the days the runner has are judged on the same engine's whole weeks (`trial(runDays)`), and the routes pass whole weeks too. For "fit", a day is offered only if the week no longer falls short with it; a shortfall no single day settles is not asked about. For "peak", a day still has to add a session or run km. The long-run ceiling, the spike rule and `daysFor` are unchanged.
 
 ## Passed over
 
