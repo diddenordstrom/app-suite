@@ -15,7 +15,8 @@
     "typecheck": "tsc --noEmit",
     "db:generate": "drizzle-kit generate",
     "check": "npm run typecheck && npm test",
-    "scenarios": "tsx src/server/scenarios.ts"
+    "scenarios": "tsx src/server/scenarios.ts",
+    "sim": "tsx src/server/simulate.ts"
   },
   "dependencies": {
     "@garmin/fitsdk": "^21.222.0",

@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-25 · decision · Fartlek plan simulator: the whole road for a made-up runner ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek doubles after gym, and one week editor for the days ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek Skapa block asks for gym and cross-training days ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · lint · Long-run ceiling page marked partly overtaken ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-25 · decision · Fartlek marathon long runs: five runs, 30 km target, cap follows proven peak ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek marathon long-run plan settled ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · note · Fartlek marathon plan for a low-volume runner: long runs over 30 km ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek: a block from today keeps the running week's build target ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -56,6 +56,7 @@
 - [Fartlek compares the same session over time](decisions/fartlek-same-session.md): Runs of a structured session are grouped by the fingerprint of their quality work (reps × length × target kind, rest ignored) and compared on GAP pace, HR and efficiency, on the activity page and on Trends, from the third run on _(decision · accepted · 2026-11-13)_
 - [Fartlek session builder, strides and own templates](decisions/fartlek-session-builder.md): Sessions are built row by row in one shared builder (workout dialog, week and block suggestions, block editor); strides as a step target and `+ strides` in block text; the week engine puts strides on two easy runs; own templates saved from the builder _(decision · accepted · 2026-11-13)_
 - [Fartlek session library (deferred)](decisions/fartlek-session-library.md): A library of saved sessions was mocked and then put off, because today's plan has too little variety for it to pay; what would make it worth building and the smallest version _(decision · superseded · 2026-11-13)_
+- [Fartlek's plan simulator runs the whole road for a made-up runner](decisions/fartlek-simulator.md): npm run sim" and POST /api/sim put a runner described in JSON into an in-memory database and run Skapa block block after block up to the race through the real app, every session run as planned, to compare the engine with other plans without touching the code; a first comparison with a free 12-week intermediate marathon plan _(decision · accepted · 2026-11-25)_
 - [Fartlek "Skapa block": one entry, two steps, one editor](decisions/fartlek-skapa-block.md): Why the plan has one "Skapa block" button, what step 1 asks, and why the block editor shows the weeks as columns with the numbers beside them _(decision · accepted · 2026-11-25)_
 - [Fartlek takes sleep from Garmin, not from the check-in](decisions/fartlek-sleep-from-garmin.md): Today's form uses Garmin's sleep score (under 60 is poor); the sleep question is gone from the daily check-in; old manual values are only a fallback _(decision · accepted · 2026-11-11)_
 - [Fartlek step detection from the stream](decisions/fartlek-stream-steps.md): When a run's laps don't fit its workout's steps, the step changes are found in the 1 s stream (grade-adjusted, Garmin's GAP when present) and offered as a full set of lap splits; method, thresholds, what the real runs showed, and what's open _(decision · accepted · 2026-11-12)_
