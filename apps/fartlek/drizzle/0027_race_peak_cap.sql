@@ -1,0 +1,1 @@
+ALTER TABLE `races` ADD `peak_km` real;

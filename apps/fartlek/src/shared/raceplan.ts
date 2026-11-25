@@ -3,6 +3,7 @@ import { projectVolumes, raceChunks, RECOVERY, recoveryRoles, recoveryRow, withR
 import { longFor, longRun, NEXT } from "./nextweek";
 import { TAPER_WEEKS } from "./blocks";
 import { RACE_PHASE, wipOf } from "./racephase";
+import { PHASE_SCHEDULE } from "./blueprints";
 import { HALF_M, MARATHON_M } from "./racemodels";
 import type { BlockKind } from "./types";
 import type { StepRefs } from "./steps";
@@ -31,7 +32,20 @@ export const RACE_PLAN = {
   longPeak: { marathon: { by: 6, holdFrom: 5, holdTo: 3 }, half: { by: 4, holdFrom: 3, holdTo: 3 } } as Record<RaceKind, { by: number; holdFrom: number; holdTo: number }>,
   /** Days in a row without a run: up to `absorbDays` nothing changes; more makes the first week back at most `share` of the plan. */
   back: { absorbDays: 7, share: 0.7 },
+  /**
+   * In a marathon plan's build and race-phase weeks the long run may take this share of the week (instead of `longShareAt`'s
+   * about 34 % at 80 km), so 30 km comes at about 75 km a week (docs/decisions/fartlek-long-run-ceiling.md).
+   */
+  marathonLongShare: 0.4,
+  /** Suggested peak-week cap: this many times the proven peak week, rounded to `capRoundKm`. */
+  capSuggest: 1.5, capRoundKm: 5,
 } as const;
+
+/** The suggested cap on a build week: `capSuggest` × the proven peak week, rounded down to `capRoundKm` (a cap errs low); null without a proven week. */
+export const suggestedCap = (provenKm: number) => (provenKm > 0 ? Math.floor((provenKm * RACE_PLAN.capSuggest) / RACE_PLAN.capRoundKm) * RACE_PLAN.capRoundKm : null);
+
+/** A marathon race-phase week whose long run is a key session (a long blueprint): it may pass the plain ceiling up to `longCeiling.keyKm`. */
+export const keyLongWeek = (kind: RaceKind, wip: number) => kind === "marathon" && PHASE_SCHEDULE.marathon[wip]?.long != null;
 
 /** Marathon or half within 1 km; null for any other distance. */
 export const raceKindOf = (km: number): RaceKind | null =>
@@ -120,12 +134,14 @@ export interface SkeletonInput {
   others: OtherRace[];
   /** Days off before the block; > RACE_PLAN.back.absorbDays caps the first projected build week. */
   backDays?: number;
+  /** The runner's cap on a build week's km for this race (`races.peak_km`); null = none. */
+  capKm?: number | null;
 }
 export interface SkeletonWeek { weekStart: ISODate; wip: number; phase: PlanPhase; role: WeekRole; km: number; longKm: number | null; chunk: number }
 export interface Skeleton { lengths: PhaseLengths; weeks: SkeletonWeek[]; peakKm: number; longPeak: { weekStart: ISODate; km: number; wip: number } | null }
 
 /** A seed with only what `volumes()` reads; the rest zero or default. */
-function chunkSeed(o: Pick<BlockSeed, "startWeek" | "weeks" | "kmBefore" | "tolerance" | "roles" | "anchorKm" | "race" | "recovery" | "backKm" | "otherRaces" | "longestKm">): BlockSeed {
+function chunkSeed(o: Pick<BlockSeed, "startWeek" | "weeks" | "kmBefore" | "tolerance" | "roles" | "anchorKm" | "race" | "recovery" | "backKm" | "otherRaces" | "longestKm"> & { capKm?: number | null }): BlockSeed {
   return {
     ...o, ctl: 0, atl: 0, past: [], runDays: [], longRunDay: 0, threshold: null, refs: {} as StepRefs, crossMin: 0,
     lighterLast: false, goalKm: null, buildWeeksDone: 0, hardBefore: false, rung: 0, tempoPace: null, firstWeekMax: null,
@@ -147,12 +163,15 @@ export function projectSkeleton(input: SkeletonInput): Skeleton {
   const weeks: SkeletonWeek[] = [];
   const hold = RACE_PLAN.longPeak[kind];
 
-  const longOf = (role: WeekRole, km: number, wip: number): number | null => {
+  const longOf = (role: WeekRole, km: number, wip: number, phase: PlanPhase): number | null => {
     if (role === "race") return null;
     if (role === "recovery") return recoveryLong(km);
     const lighter = role !== "build";
-    const lp = longRun(longest, lighter, input.easyPace);
-    let long = lp ? longFor(lp.km, km, longest, lighter) : floorHalf(km * NEXT.longShare);
+    // A marathon's build and race-phase weeks may give the long run more of the week; only its key sessions pass 30 km.
+    const share = !lighter && kind === "marathon" && (phase === "build" || phase === "specific") ? RACE_PLAN.marathonLongShare : 0;
+    const ceiling = !lighter && keyLongWeek(kind, wip) ? NEXT.longCeiling.keyKm : NEXT.longCeiling.km;
+    const lp = longRun(longest, lighter, input.easyPace, longest, ceiling);
+    let long = lp ? longFor(lp.km, km, longest, lighter, share) : floorHalf(km * NEXT.longShare);
     if (role === "build" && wip >= hold.holdTo && wip <= hold.holdFrom && longest > 0) long = Math.min(long, longest);
     return long;
   };
@@ -184,7 +203,7 @@ export function projectSkeleton(input: SkeletonInput): Skeleton {
       const holdsPlanRace = race.date >= cs && race.date <= end;
       const recovery: RecoveryRace | null = rec ? { date: rec.o.date, distanceKm: rec.o.distanceKm, priority: "B", peakKm: peak > 0 ? peak : null } : null;
       const seed = chunkSeed({
-        startWeek: cs, weeks: c.weeks, kmBefore: win.slice(-3), tolerance: input.tolerance, roles, anchorKm: anchor, longestKm: longest,
+        startWeek: cs, weeks: c.weeks, kmBefore: win.slice(-3), tolerance: input.tolerance, roles, anchorKm: anchor, longestKm: longest, capKm: input.capKm ?? null,
         race: holdsPlanRace ? { date: race.date, priority: "A" } : null, recovery,
         backKm: ci === 0 && (input.backDays ?? 0) > RACE_PLAN.back.absorbDays ? floorHalf(RACE_PLAN.back.share * anchor) : null,
         otherRaces: inChunk.map((o) => ({ date: o.date })),
@@ -193,7 +212,7 @@ export function projectSkeleton(input: SkeletonInput): Skeleton {
       vols.forEach((v, i) => {
         const ws = addDays(cs, i * 7);
         const wip = wipOf(ws, race.date);
-        const longKm = longOf(v.role, v.km, wip);
+        const longKm = longOf(v.role, v.km, wip, phaseAt(ws));
         if (longKm != null && v.role !== "recovery") longest = Math.max(longest, longKm);
         weeks.push({ weekStart: ws, wip, phase: phaseAt(ws), role: v.role, km: v.km, longKm, chunk: ci });
         win.push(v.km);
@@ -256,6 +275,8 @@ export interface RaceRoad {
   /** Under RACE_PLAN.phases[kind].minWeeks at the plan's start; `suggestedSeconds` = today's prediction, rounded up to the minute, when slower than the goal (or no goal). */
   short: { minWeeks: number; goalSeconds: number | null; suggestedSeconds: number | null } | null;
   warnings: "longShort"[];
+  /** The peak-week cap: the runner's (`races.peak_km`), the suggestion (RACE_PLAN.capSuggest × the proven peak week) and that peak. */
+  cap: { km: number | null; suggestedKm: number | null; provenKm: number };
   /** Every other race in the plan (all are honoured); `close` = inside the plan race's peak block or taper, shown with `rp.otherClose`. */
   others: { name: string; date: ISODate; close: boolean }[];
   stored: boolean; computedOn: ISODate | null;

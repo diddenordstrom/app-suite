@@ -144,6 +144,8 @@ export interface Race {
   hmpSec: number | null;
   paceSource: string | null;
   paceLockedOn: ISODate | null;
+  /** The runner's cap on a build week's km on the way to this race; null = none (docs/decisions/fartlek-long-run-ceiling.md). */
+  peakKm: number | null;
 }
 
 export const BLOCK_KINDS = ["base", "build", "specific", "taper", "recovery"] as const;

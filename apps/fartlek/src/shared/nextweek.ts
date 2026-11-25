@@ -35,8 +35,12 @@ export const NEXT = {
    */
   spike: 0.1,
   spikeDays: 30,
-  /** The long run never goes past this many km, or this many minutes at easy pace, whichever comes first. */
-  longCeiling: { km: 32, min: 180 },
+  /**
+   * The long run never goes past this many km, or this many minutes at easy pace, whichever comes first. `keyKm`: a marathon's
+   * key long runs in the race phase (a long blueprint in a build week) may go this far; a plain long run stops at `km`
+   * (docs/decisions/fartlek-long-run-ceiling.md).
+   */
+  longCeiling: { km: 30, keyKm: 32, min: 180 },
   /**
    * Time at threshold (the reps, not warm-up and jogs) a week: at most this share of the week's run km, but
    * never less than the ladder's first rung (3 × 8). So the threshold session stays on 3 × 8 while the
@@ -126,10 +130,11 @@ export function rungBefore(date: ISODate, sessions: SessionView[], pace: number 
 /**
  * The long run a week of `weekKm` can carry: the ladder's km, but not past the week's share (`longShareAt`)
  * unless the runner has already run that far (the ladder holds at the longest run instead of stepping further).
- * A lighter week has no such floor, so its long run shrinks with the week.
+ * A lighter week has no such floor, so its long run shrinks with the week. `minShare`: the share the week may give the long run
+ * at least (a marathon plan's build and race-phase weeks, RACE_PLAN.marathonLongShare).
  */
-export const longFor = (ladderKm: number, weekKm: number, longestKm: number, lighter: boolean) =>
-  Math.min(ladderKm, Math.max(half(weekKm * longShareAt(weekKm)), lighter ? 0 : longestKm));
+export const longFor = (ladderKm: number, weekKm: number, longestKm: number, lighter: boolean, minShare = 0) =>
+  Math.min(ladderKm, Math.max(half(weekKm * Math.max(longShareAt(weekKm), minShare)), lighter ? 0 : longestKm));
 
 export type LongWhy = "step" | "spike" | "ceiling" | "lighter";
 export interface LongPlan { km: number; why: LongWhy; longestKm: number }
@@ -142,7 +147,7 @@ export const spikeMax = (longestKm: number, limit: number = NEXT.spike) => half(
  * ceiling; 70 % of it in a lighter week. A missed long run leaves the longest as it was, so the step repeats.
  * Null without a run in the window (the long run is then a share of the week).
  */
-export function longRun(longestKm: number, lighter: boolean, easyPace: number | null, anyKm = longestKm): LongPlan | null {
+export function longRun(longestKm: number, lighter: boolean, easyPace: number | null, anyKm = longestKm, ceilingKm: number = NEXT.longCeiling.km): LongPlan | null {
   if (longestKm <= 0) return null;
   let km: number, why: LongWhy;
   if (lighter) { km = half(longestKm * tune().lighter.long); why = "lighter"; }
@@ -151,7 +156,7 @@ export function longRun(longestKm: number, lighter: boolean, easyPace: number | 
     const step = longestKm + Math.max(tune().long.stepMinKm, longestKm * tune().long.stepShare), spike = Math.max(longestKm, anyKm) * (1 + NEXT.spike);
     km = half(Math.min(step, spike)); why = step <= spike ? "step" : "spike";
   }
-  const ceiling = Math.min(NEXT.longCeiling.km, easyPace ? (NEXT.longCeiling.min * 60) / easyPace : Infinity);
+  const ceiling = Math.min(ceilingKm, easyPace ? (NEXT.longCeiling.min * 60) / easyPace : Infinity);
   if (km > ceiling) { km = floorHalf(ceiling); why = "ceiling"; }
   return { km: Math.max(NEXT.easyMinKm, km), why, longestKm };
 }

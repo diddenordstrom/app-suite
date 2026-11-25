@@ -123,6 +123,10 @@ export interface BlockSeed {
   backKm?: number | null;
   /** Other races in the weeks (B races, A races other than `race`): each week holding one is a B race week. */
   otherRaces?: { date: ISODate }[];
+  /** A marathon plan's build phase starts this week: build weeks from it may give the long run RACE_PLAN.marathonLongShare. */
+  longShareFrom?: ISODate | null;
+  /** The runner's cap on a build week's km for the race the weeks lead to (docs/decisions/fartlek-long-run-ceiling.md). */
+  capKm?: number | null;
 }
 
 /**
@@ -415,8 +419,10 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
       const at = buildWeeks > 1 ? built / (buildWeeks - 1) : 0.5;
       const aim = anchor * (tune().ramp.from + (tune().ramp.to - tune().ramp.from) * at) * scale;
       // The first week is never bigger than the week button's suggestion: after a jump that one backs off.
-      const first = i === 0 ? Math.min(seed.firstWeekMax ?? Infinity, seed.backKm ?? Infinity) : Infinity;
-      v = { km: fixed[i] ?? floorHalf(Math.min(cap, aim, first)), cap: r1(Math.min(cap, first)), reentry, lighter, role };
+      const first = (i === 0 ? Math.min(seed.firstWeekMax ?? Infinity, seed.backKm ?? Infinity) : Infinity);
+      // The runner's own cap for the race holds every build week (a lower ceiling, never a higher one).
+      const top = Math.min(first, seed.capKm ?? Infinity);
+      v = { km: fixed[i] ?? floorHalf(Math.min(cap, aim, top)), cap: r1(Math.min(cap, top)), reentry, lighter, role };
       built++;
     }
     out.push(v);
@@ -467,9 +473,14 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
     // The weeks after recovery step up from what recovery planned, not from the race or the long runs before it.
     if (recWeek && !recStarted) { longest = 0; any = 0; recStarted = true; }
     const phase = seed.phase && v.role !== "race" && !recWeek ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
-    const long = longRun(longest, v.lighter, seed.refs.easyPace, any);
+    // A marathon plan's build and race-phase weeks may give the long run more of the week; only a key long run (a long
+    // blueprint of the marathon phase) passes the plain ceiling (docs/decisions/fartlek-long-run-ceiling.md).
+    const marathon = seed.phase?.race.kind === "marathon";
+    const share = v.role === "build" && (marathon || (seed.longShareFrom != null && ws.weekStart >= seed.longShareFrom)) ? RACE_PLAN.marathonLongShare : 0;
+    const key = marathon && v.role === "build" && !!phase?.long;
+    const long = longRun(longest, v.lighter, seed.refs.easyPace, any, key ? NEXT.longCeiling.keyKm : NEXT.longCeiling.km);
     let longKm = recWeek ? Math.max(NEXT.easyMinKm, Math.min(RECOVERY.longMaxKm, floorHalf(v.km * RECOVERY.longShare)))
-      : long ? longFor(long.km, v.km, longest, v.lighter) : null;
+      : long ? longFor(long.km, v.km, longest, v.lighter, share) : null;
     // The long-run peak is held, not raised, in the build weeks close to the race (docs/decisions/fartlek-race-plan-skeleton.md).
     if (seed.phase && v.role === "build" && longKm != null && longest > 0) {
       const wip = wipOf(ws.weekStart, seed.phase.race.date), h = RACE_PLAN.longPeak[seed.phase.race.kind];

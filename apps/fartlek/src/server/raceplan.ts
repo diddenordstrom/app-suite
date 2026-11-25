@@ -10,7 +10,7 @@ import { BLOCK, tolerance, withRecovery, recoveryRoles, recoveryRow, RECOVERY, t
 import { NEXT } from "../shared/nextweek";
 import { RACE_PHASE } from "../shared/racephase";
 import {
-  bandsOf, otherRacesIn, phaseLengths, phaseOfWeeks, RACE_PLAN, raceKindOf, racePaceFromOf, wipOf,
+  bandsOf, otherRacesIn, phaseLengths, phaseOfWeeks, projectSkeleton, RACE_PLAN, raceKindOf, racePaceFromOf, suggestedCap, wipOf,
   type OtherRace, type PlanPhase, type RaceKind, type RaceRoad, type RoadWeek, type Skeleton, type SkeletonInput,
 } from "../shared/raceplan";
 import type { Race } from "../shared/types";
@@ -85,7 +85,37 @@ export function skeletonInputs(ctx: Ctx, pr: { race: Race; kind: RaceKind }, fir
     peakKm: Math.max(0, ...builds, ...sinceStart),
     longestKm, easyPace: stepRefs(ctx, ctx.today).easyPace, others: honoured,
     backDays: breakBefore(ctx, blockWeeks[0]?.weekStart ?? firstWeek),
+    capKm: pr.race.peakKm,
   };
+}
+
+/** The first week of a marathon plan's build phase (RACE_PLAN.marathonLongShare applies from it); null for a half. */
+export function buildPhaseFrom(ctx: Ctx, pr: { race: Race; kind: RaceKind }, fallback: ISODate): ISODate | null {
+  if (pr.kind !== "marathon") return null;
+  const planStart = planStartOf(ctx, pr, fallback);
+  return addDays(planStart, phaseLengths(Math.max(1, wipOf(planStart, pr.race.date)), pr.kind).base * 7);
+}
+
+/**
+ * The stored skeleton after the race's last block week, projected again (the cap changed): the block weeks stay, their targets
+ * are the block's. Nothing to do without stored rows or with no skeleton week left.
+ */
+export function refreshSkeleton(ctx: Ctx, raceId: number): void {
+  const race = repo.listRaces(ctx.db, ctx.userId).find((r) => r.id === raceId);
+  const kind = race?.priority === "A" ? raceKindOf(race.distanceKm) : null;
+  const rows = storedPlan(ctx, raceId);
+  if (!race || !kind || !rows.length) return;
+  const pr = { race, kind };
+  const nextWeek = weekStartOf(addDays(ctx.today, 7), ctx.settings.weekStart);
+  const blockRows = rows.filter((r) => r.km == null);
+  const after = blockRows.length ? addDays(blockRows.at(-1)!.weekStart, 7) : rows[0].weekStart;
+  const firstWeek = after > nextWeek ? after : nextWeek;
+  if (firstWeek > rows.at(-1)!.weekStart) return;
+  const targets = repo.getTargets(ctx.db, ctx.userId, rows[0].weekStart, rows.at(-1)!.weekStart);
+  const blockWeeks: BlockWeek[] = blockRows.map((r) => ({ weekStart: r.weekStart, km: targets.get(r.weekStart)?.km ?? 0, role: r.role as WeekRole, longKm: null }));
+  const sk = projectSkeleton(skeletonInputs(ctx, pr, firstWeek, blockWeeks));
+  ctx.db.transaction((tx) => writePlan(tx, ctx.userId, firstWeek,
+    sk.weeks.map((w) => ({ weekStart: w.weekStart, raceId, phase: w.phase, role: w.role, km: w.km, longKm: w.longKm })), ctx.today));
 }
 
 /** The phases of the plan from its start, so a week's phase can be looked up by date. */
@@ -152,6 +182,7 @@ export function roadFor(ctx: Ctx, pr: { race: Race; kind: RaceKind }, o: { planS
     short = { minWeeks, goalSeconds: pr.race.goalSeconds, suggestedSeconds: up != null && (pr.race.goalSeconds == null || up > pr.race.goalSeconds) ? up : null };
   }
   const { close } = otherRacesIn(o.others, pr.race.date, [o.planStart]);
+  const provenKm = tolerance(weeksBefore(ctx, addDays(running, 7), BLOCK.tolerance.lookbackWeeks, { planned: false })).peakKm;
   const computed = rows.map((r) => r.computedOn).sort().at(-1) ?? null;
   return {
     race: { id: pr.race.id, name: pr.race.name, date: pr.race.date, distanceKm: pr.race.distanceKm, kind: pr.kind, goalSeconds: pr.race.goalSeconds },
@@ -159,6 +190,7 @@ export function roadFor(ctx: Ctx, pr: { race: Race; kind: RaceKind }, o: { planS
     racePaceFrom: racePaceFromOf(weeks), longPeak, short,
     warnings: pr.kind === "marathon" && longPeak && longPeak.km < RACE_PHASE.warn.longKm ? ["longShort"] : [],
     others: o.others.map((x) => ({ name: x.name, date: x.date, close: close.includes(x) })),
+    cap: { km: pr.race.peakKm, suggestedKm: suggestedCap(provenKm), provenKm },
     stored: o.stored, computedOn: o.stored ? computed : null,
   };
 }

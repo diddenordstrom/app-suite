@@ -546,3 +546,38 @@ describe("race plan hooks (docs/decisions/fartlek-race-plan-skeleton.md)", () =>
     expect(long(3)).toBeLessThanOrEqual(long(0));
   });
 });
+
+describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-run-ceiling.md)", () => {
+  const big = { kmBefore: [74, 78, 56], tolerance: { km: 80, peakKm: 80, peakWeek: null, weeksAgo: 2 }, runDays: [1, 2, 3, 4, 6, 0], ctl: 60, atl: 62, rung: 3 };
+  const longOf = (items: { type: string; km: number }[]) => Math.max(...items.filter((it) => it.type === "long").map((it) => it.km));
+
+  it("stops a plain long run at 30 km", () => {
+    const s = suggestBlock(seed({ ...big, weeks: 1, fixedKm: [95], longestKm: 29.5 }));
+    expect(longOf(s.weeks[0].items)).toBeLessThanOrEqual(30);
+  });
+
+  it("gives a marathon plan's build weeks up to 40 % of the week for the long run", () => {
+    const plain = suggestBlock(seed({ ...big, weeks: 1, fixedKm: [76], longestKm: 28 }));
+    const plan = suggestBlock(seed({ ...big, weeks: 1, fixedKm: [76], longestKm: 28, longShareFrom: MONDAY }));
+    expect(longOf(plain.weeks[0].items)).toBeLessThan(30);
+    expect(longOf(plan.weeks[0].items)).toBe(30);
+  });
+
+  it("lets only a marathon key long run (a long blueprint) reach 32 km", () => {
+    // The week is wip 6 of a marathon: fast-finish long, the "first 30–32 km chance".
+    const race = addDays(MONDAY, 5 * 7 + 6);
+    const phase: PhaseSeed = { race: { date: race, kind: "marathon" }, paces: { mp: 300, hmp: 285 }, paceSource: "goal", steps: {} as PhaseSeed["steps"], backOff: false, injury: false };
+    const s = suggestBlock(seed({ ...big, weeks: 1, fixedKm: [85], longestKm: 30, roles: ["build"], race: { date: race, priority: "A" }, phase }));
+    const long = s.weeks[0].items.find((it) => it.type === "long")!;
+    expect(long.blueprint).toBeTruthy();
+    expect(long.km).toBeGreaterThan(30);
+    expect(long.km).toBeLessThanOrEqual(32);
+  });
+
+  it("holds every build week under the runner's cap", () => {
+    const s = suggestBlock(seed({ ...big, longestKm: 24, capKm: 70 }));
+    for (const w of s.weeks.filter((x) => x.role === "build")) expect(w.targetKm).toBeLessThanOrEqual(70);
+    const free = suggestBlock(seed({ ...big, longestKm: 24 }));
+    expect(Math.max(...free.weeks.map((w) => w.targetKm))).toBeGreaterThan(70);
+  });
+});

@@ -500,6 +500,29 @@ describe("api", () => {
     await app.request(`/api/blocks/${again.id}?workouts=1`, { method: "DELETE", headers: { origin: ORIGIN } });
   });
 
+  it("caps the road's build weeks at the race's peakKm and re-projects the stored skeleton (docs/decisions/fartlek-long-run-ceiling.md)", async () => {
+    const db = createDb(":memory:"), a = createApp(db, config);
+    const g = async <T>(p: string) => (await a.request(p)).json() as Promise<T>;
+    await a.request("/api/settings");
+    const S = addDays(weekStartOf(todayIn("Europe/Stockholm"), "monday"), 7);
+    const fields = { name: "Vårmaran", date: addDays(S, 15 * 7 + 6), distanceKm: 42.195, priority: "A" };
+    const [race] = await (await a.request("/api/races", json(fields))).json() as { id: number }[];
+    type S2 = { road: { cap: { km: number | null; suggestedKm: number | null } }; racePlan: { chunks: { weeks: number; kind: string; blockKind?: string }[]; now: number };
+      suggestion: { weeks: { role: string; items: unknown[] }[] }; replaces: { id: number }[] };
+    const s = await g<S2>(`/api/plan/block-suggest?startWeek=${S}`);
+    expect(s.road.cap).toMatchObject({ km: null, suggestedKm: null }); // no proven week yet
+    const blocks = s.racePlan.chunks.slice(0, s.racePlan.now).map((c) => ({ weeks: c.weeks, kind: c.blockKind ?? c.kind }));
+    await a.request("/api/plan/block-suggest", json({ startWeek: S, weeks: s.suggestion.weeks.map((w) => w.items), roles: s.suggestion.weeks.map((w) => w.role), blocks, replace: [] }));
+    const builds = () => repo.planWeeksOf(db, 1, race.id).filter((r) => r.km != null && r.role === "build").map((r) => r.km!);
+    expect(Math.max(...builds())).toBeGreaterThan(12);
+    await a.request(`/api/races/${race.id}`, json({ ...fields, peakKm: 12 }, "PUT"));
+    expect(Math.max(...builds())).toBeLessThanOrEqual(12);
+    expect((await g<S2>(`/api/plan/block-suggest?startWeek=${addDays(S, 28)}`)).road.cap.km).toBe(12);
+    // An edit that doesn't send the cap keeps it.
+    await a.request(`/api/races/${race.id}`, json({ ...fields, goalSeconds: 3 * 3600 }, "PUT"));
+    expect(repo.listRaces(db, 1)[0].peakKm).toBe(12);
+  });
+
   it("plans the road to an A marathon as a skeleton: shown, stored with the block, undone, dropped with the race (docs/decisions/fartlek-race-plan-skeleton.md)", async () => {
     const fresh = () => { const db = createDb(":memory:"); return { db, app: createApp(db, config) }; };
     const g = async <T>(a: ReturnType<typeof createApp>, p: string) => (await a.request(p)).json() as Promise<T>;
@@ -548,7 +571,10 @@ describe("api", () => {
     expect(repo.getTargets(db, 1, w2, w2).get(w2)).toMatchObject({ km: 99, note: "old" });
 
     // A skeleton row is never planned load: tolerance and the weeks before stay.
-    const seedOf = async () => (await g<{ seed: { kmBefore: number[]; tolerance: unknown } }>(a, `/api/plan/block-suggest?startWeek=${addDays(S, 28)}`)).seed;
+    const seedOf = async () => {
+      const { kmBefore, tolerance } = (await g<{ seed: { kmBefore: number[]; tolerance: unknown } }>(a, `/api/plan/block-suggest?startWeek=${addDays(S, 28)}`)).seed;
+      return { kmBefore, tolerance };
+    };
     const before = await seedOf();
     db.$client.prepare("insert into race_plan_weeks (user_id, week_start, race_id, phase, role, km, long_km, computed_on) values (1, ?, ?, 'base', 'build', 80, 20, ?)").run(addDays(S, 21), race.id, today);
     expect(await seedOf()).toEqual(before);

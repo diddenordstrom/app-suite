@@ -103,6 +103,7 @@ function RaceForm({ race, today, onDone, onCancel }: { race: Race | null; today:
   const [goal, setGoal] = useState(race?.goalSeconds ? fmtClock(race.goalSeconds) : "");
   const [priority, setPriority] = useState<Race["priority"]>(race?.priority ?? "A");
   const [result, setResult] = useState(race?.resultSeconds ? fmtClock(race.resultSeconds) : "");
+  const [cap, setCap] = useState(race?.peakKm != null ? String(fmt.distNum(race.peakKm)) : "");
   // A race that has been run (or is run today) can have its official time corrected or cleared here.
   const hasResult = !!date && date <= today;
   const save = useAction(async () => {
@@ -112,10 +113,13 @@ function RaceForm({ race, today, onDone, onCancel }: { race: Race | null; today:
     if (hasResult && result && resultSeconds == null) throw new Error(t("rr.timeFormat"));
     const raw = Number(dist.replace(",", "."));
     const distanceKm = PRESETS.find((p) => Math.abs(fmt.distNum(p.km) - raw) < 0.01)?.km ?? fmt.fromUser(raw);
-    const body = { name, date, distanceKm, goalSeconds, priority, ...(hasResult || race?.resultSeconds != null ? { resultSeconds } : {}) };
+    const capRaw = cap ? Number(cap.replace(",", ".")) : null;
+    if (capRaw != null && !(capRaw > 0)) throw new Error(t("races.peakCapFormat"));
+    const peakKm = capRaw != null ? Math.round(fmt.fromUser(capRaw) * 10) / 10 : null;
+    const body = { name, date, distanceKm, goalSeconds, priority, peakKm: priority === "A" ? peakKm : null, ...(hasResult || race?.resultSeconds != null ? { resultSeconds } : {}) };
     if (race) await api(`/races/${race.id}`, { method: "PUT", body });
     else await api("/races", { body });
-    if (!race) { setName(""); setDate(""); setGoal(""); setResult(""); }
+    if (!race) { setName(""); setDate(""); setGoal(""); setResult(""); setCap(""); }
   }, onDone);
   return (
     <div className="space-y-3">
@@ -136,6 +140,11 @@ function RaceForm({ race, today, onDone, onCancel }: { race: Race | null; today:
             </Select>
           </Field>
         </div>
+        {priority === "A" && (
+          <Field label={t("races.peakCap", { unit: fmt.unit })} hint={t("races.peakCapHint")}>
+            <Input inputMode="decimal" value={cap} onChange={(e) => setCap(e.target.value)} placeholder={t("common.optional").toLowerCase()} />
+          </Field>
+        )}
         {hasResult && (
           <Field label={t("rr.time")} hint="1:38:12"><Input value={result} onChange={(e) => setResult(e.target.value)} placeholder={t("common.optional").toLowerCase()} className="tabular-nums" /></Field>
         )}

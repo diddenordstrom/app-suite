@@ -195,7 +195,7 @@ export function listThresholds(db: Db, userId: number): Threshold[] {
 export function listRaces(db: Db, userId: number): Race[] {
   return db.select().from(t.races).where(eq(t.races.userId, userId)).orderBy(asc(t.races.date)).all()
     .map((r) => ({ id: r.id, name: r.name, date: r.date, distanceKm: r.distanceKm, goalSeconds: r.goalSeconds, priority: r.priority as Race["priority"], resultSeconds: r.resultSeconds, activityId: r.activityId,
-      mpSec: r.mpSec, hmpSec: r.hmpSec, paceSource: r.paceSource, paceLockedOn: r.paceLockedOn }));
+      mpSec: r.mpSec, hmpSec: r.hmpSec, paceSource: r.paceSource, paceLockedOn: r.paceLockedOn, peakKm: r.peakKm }));
 }
 
 export function listBlocks(db: Db, userId: number): Block[] {
