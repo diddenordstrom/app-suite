@@ -15,14 +15,14 @@ Raised by the user on 2026-11-18, after [gym became its own session type](fartle
 "Skapa block" with "Låt coachen föreslå" now has three steps:
 
 1. **Utgångsläge**: where the runner stands and the rhythm (1:1, 2:1, 3:1), as before ([fartlek-skapa-block.md](fartlek-skapa-block.md)).
-2. **Gym och alternativträning**: "Do you go to the gym? At least one strength session a week is recommended…, which days?" as day chips ("Ingen" is a valid answer), then which days of cross-training (swimming, cycling) and minutes per day. The long-run day can't be picked, a day is either gym or cross-training, and the run days left are shown. A gym day right before the long run gets a note, not a block.
+2. **Din vecka**: every weekday gets one role: rest, run, long run, gym or cross-training (with minutes), with the recommendation of at least one strength session a week. There is always exactly one long-run day: picking it on another day makes the old one a run day. A gym day right before the long run gets a note, not a block. The same editor replaces the run-day chips and the long-run-day select on the settings page, so the week is one setting in two places.
 3. **Planera veckorna**: the simulation (with a line for the gym and cross-training days), the run-day question if needed, then the editor with gym and cross-training as sessions in every week.
 
 "Bygg själv" skips step 2: the weeks start empty.
 
 ## Rules
 
-- **Stored in the settings** (`gymDays`, `crossDays` as weekday + minutes), not per block. The question is asked every time a block is created and prefilled with the last answer, which covers a winter with two gym days and a race season with one without a field per block. "Räkna om resten" and "Föreslå veckan" use the same days. *Passed over:* per-block columns, as the first plan suggested: more data and migrations for something the question already covers.
+- **Stored in the settings** (`runDays`, `longRunDay`, `gymDays`, `crossDays` as weekday + minutes), not per block. The question is asked every time a block is created and prefilled with the last answer, which covers a winter with two gym days and a race season with one without a field per block. "Räkna om resten" and "Föreslå veckan" use the same days. *Passed over:* per-block columns, as the first plan suggested: more data and migrations for something the question already covers.
 - **No run on those days.** The engine's run days are the settings' run days less the gym and cross-training days (all of them if that would leave none). The long-run day is never taken.
 - **Placed as sessions.** Gym as a 60-minute `strength` session, cross-training as a `cross` session of the minutes given, in every week (lighter weeks too). Their load comes from the sessions, so the other-sports habit (`crossMin`) is 0 while any days are set and isn't counted twice. Around a race: nothing on race day or the day before, and neither gym nor cross-training later in the race week; gym waits for the rest days after a long race like running does.
 - **Quality session not the day after gym, as a soft rule.** A day after gym counts as 1.5 days closer to the hard days when the threshold or race-phase session is placed, so it goes there only when every other day is worse. With only one free day it still goes there: the rule never makes a week unsolvable.

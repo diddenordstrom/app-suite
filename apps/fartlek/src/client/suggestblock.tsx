@@ -2,7 +2,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { PhaseWarningsNote, RacePaceCard, RacePaceNote } from "./racepace";
 import { phaseWarnings, type RacePaceView } from "@/shared/racephase";
 import { api, useApi } from "./http";
-import { lang, t, tn, WEEKDAY_LONG, WEEKDAY_SHORT } from "./i18n";
+import { lang, t, tn, WEEKDAY_LONG } from "./i18n";
 import { useFmt, useSettings } from "./prefs";
 import { Badge, Button, Dialog, ErrorText, Field, Input, Select, Spinner, cn } from "./ui";
 import { blockName, fmtDay } from "./bits";
@@ -18,7 +18,8 @@ import { diffPlans, workoutWeeks, type DayChange, type PlanDiff } from "@/shared
 import { COACH } from "@/shared/coach";
 import { FORM, formPct, formState } from "@/shared/load";
 import type { DaysAdvice, SuggestItem } from "@/shared/nextweek";
-import type { Block, BlockKind, CrossDay, Settings, Workout } from "@/shared/types";
+import type { Block, BlockKind, Settings, Workout } from "@/shared/types";
+import { gymBeforeLong, WeekDaysEditor, weekDaysValid, type WeekDays } from "./weekdays";
 
 /*
  * "Skapa block" and "Räkna om resten" (docs/decisions/fartlek-block-goals.md, docs/decisions/fartlek-skapa-block.md).
@@ -92,7 +93,7 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
           name={name} onName={setName} mode={mode} onMode={setMode} picker={picker} onClose={onClose}
           onNext={() => setStep(mode === "suggest" ? "extra" : "edit")} />
       )}
-      {step === "extra" && <ExtraStep onBack={() => setStep("start")} onNext={(changed) => { if (changed) setRev(rev + 1); setStep("sim"); }} />}
+      {step === "extra" && <DaysStep onBack={() => setStep("start")} onNext={(changed) => { if (changed) setRev(rev + 1); setStep("sim"); }} />}
       {step !== "start" && step !== "extra" && (!data || loading) && <Spinner className="text-muted-foreground" />}
       {ok && !loading && step !== "start" && step !== "extra" && ok.racePace?.question && <RacePaceCard view={ok.racePace} onAnswered={() => setRev(rev + 1)} />}
       {ok && !loading && step !== "start" && step !== "extra" && !ok.racePace?.question && ok.racePace && step !== "sim" && <RacePaceNote view={ok.racePace} />}
@@ -130,93 +131,47 @@ function StepDots({ labels, at }: { labels: string[]; at: number }) {
   );
 }
 
-/* ---------- Step 2: gym and cross-training days ---------- */
+/* ---------- Step 2: the week's days ---------- */
 
-/** The weekdays in the runner's week order, 0 = Sunday. */
-const weekOrder = (start: Settings["weekStart"]) => (start === "sunday" ? [0, 1, 2, 3, 4, 5, 6] : [1, 2, 3, 4, 5, 6, 0]);
 const dayList = (days: number[]) => days.map((d) => WEEKDAY_LONG[d].toLowerCase()).join(", ");
 
 /**
- * Which days the runner gyms and does other sport. The answer is kept in the settings as the default for the next block; no
- * run goes on those days, and the engine keeps the quality session off the day after gym (docs/decisions/fartlek-gym-cross-days.md).
+ * The runner's week: which days are run days, the long run, gym and cross-training (with minutes). The answer is the
+ * settings' days, so the next block starts from it; no run goes on a gym or cross-training day, and the engine keeps the
+ * quality session off the day after gym (docs/decisions/fartlek-gym-cross-days.md).
  */
-function ExtraStep({ onBack, onNext }: { onBack: () => void; onNext: (changed: boolean) => void }) {
+function DaysStep({ onBack, onNext }: { onBack: () => void; onNext: (changed: boolean) => void }) {
   const { settings, setSettings } = useSettings();
-  const [gym, setGym] = useState<number[]>(settings.gymDays);
-  const [cross, setCross] = useState<CrossDay[]>(settings.crossDays);
+  const [days, setDays] = useState<WeekDays>({ runDays: settings.runDays, longRunDay: settings.longRunDay, gymDays: settings.gymDays, crossDays: settings.crossDays });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const order = weekOrder(settings.weekStart);
-  const long = settings.longRunDay;
-  const toggleGym = (d: number) => setGym(gym.includes(d) ? gym.filter((x) => x !== d) : [...gym, d].sort());
-  const toggleCross = (d: number) => setCross(cross.some((c) => c.day === d) ? cross.filter((c) => c.day !== d) : [...cross, { day: d, min: 45 }].sort((a, b) => a.day - b.day));
-  const setMin = (d: number, min: number) => setCross(cross.map((c) => (c.day === d ? { ...c, min } : c)));
-  const taken = new Set([...gym, ...cross.map((c) => c.day)]);
-  const left = settings.runDays.filter((d) => !taken.has(d));
-  const runLeft = order.filter((d) => (left.length ? left : settings.runDays).includes(d));
-  const beforeLong = gym.find((d) => (d + 1) % 7 === long);
-  const valid = cross.every((c) => Number.isInteger(c.min) && c.min >= 5 && c.min <= 600);
+  const before = gymBeforeLong(days);
   const next = async () => {
-    const changed = JSON.stringify(gym) !== JSON.stringify(settings.gymDays) || JSON.stringify(cross) !== JSON.stringify(settings.crossDays);
+    const changed = (["runDays", "longRunDay", "gymDays", "crossDays"] as const).some((k) => JSON.stringify(days[k]) !== JSON.stringify(settings[k]));
     if (!changed) { onNext(false); return; }
     setBusy(true); setErr(null);
     try {
-      setSettings(await api<Settings>("/settings", { method: "PUT", body: { ...settings, gymDays: gym, crossDays: cross } }));
+      setSettings(await api<Settings>("/settings", { method: "PUT", body: { ...settings, ...days } }));
       onNext(true);
     } catch (e) { setErr((e as Error).message); setBusy(false); }
   };
-  const chip = (d: number, on: boolean, disabled: boolean, onClick: () => void) => (
-    <button key={d} type="button" aria-pressed={on} disabled={disabled} onClick={onClick}
-      className={cn("inline-flex h-10 min-w-14 flex-col items-center justify-center rounded-lg border px-3 text-sm leading-tight",
-        on ? "border-primary bg-primary text-primary-foreground" : "border-border bg-card hover:bg-accent", disabled && "cursor-not-allowed opacity-50 hover:bg-card")}>
-      <span className="font-semibold">{WEEKDAY_SHORT[d]}</span>
-      {d === long && <span className="text-[10px]">{t("bx.longDay")}</span>}
-    </button>
-  );
   return (
-    <div className="space-y-5">
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">{t("bx.gym")}</legend>
-        <div className="flex flex-wrap gap-2">
-          {order.map((d) => chip(d, gym.includes(d), d === long || cross.some((c) => c.day === d), () => toggleGym(d)))}
-          <button type="button" aria-pressed={!gym.length} onClick={() => setGym([])}
-            className={cn("h-10 rounded-lg border px-3 text-sm", !gym.length ? "border-primary ring-1 ring-primary" : "border-border bg-card hover:bg-accent")}>{t("bx.none")}</button>
-        </div>
-        <p className="text-xs text-muted-foreground">{t("bx.gymNote")}</p>
-        {beforeLong != null && <p className="text-xs text-warning">{t("bx.beforeLong", { day: WEEKDAY_LONG[beforeLong] })}</p>}
-      </fieldset>
-
-      <fieldset className="space-y-2">
-        <legend className="text-sm font-medium">{t("bx.cross")}</legend>
-        <div className="flex flex-wrap gap-2">
-          {order.map((d) => chip(d, cross.some((c) => c.day === d), d === long || gym.includes(d), () => toggleCross(d)))}
-          <button type="button" aria-pressed={!cross.length} onClick={() => setCross([])}
-            className={cn("h-10 rounded-lg border px-3 text-sm", !cross.length ? "border-primary ring-1 ring-primary" : "border-border bg-card hover:bg-accent")}>{t("bx.none")}</button>
-        </div>
-        {cross.length > 0 && (
-          <div className="flex flex-wrap gap-3">
-            {order.filter((d) => cross.some((c) => c.day === d)).map((d) => {
-              const c = cross.find((x) => x.day === d)!;
-              return (
-                <Field key={d} label={t("bx.min", { day: WEEKDAY_LONG[d].toLowerCase() })} className="w-36">
-                  <Input type="number" inputMode="numeric" min={5} max={600} step={15} value={Number.isFinite(c.min) ? c.min : ""}
-                    onChange={(e) => setMin(d, e.target.value === "" ? NaN : Math.round(Number(e.target.value)))} />
-                </Field>
-              );
-            })}
-          </div>
-        )}
-      </fieldset>
-
-      <div className="space-y-1 rounded-lg bg-accent px-4 py-3 text-sm text-accent-foreground">
-        <div className="font-semibold">{t("bx.runDays", { days: dayList(runLeft) })}</div>
-        <p className="text-xs">{t("bx.saved")}</p>
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{t("bx.intro")}</p>
+        <p className="text-sm text-muted-foreground">{t("bx.gym")}</p>
       </div>
-
+      <WeekDaysEditor value={days} onChange={setDays} weekStart={settings.weekStart} />
+      <ul className="space-y-1 text-xs text-muted-foreground">
+        <li>{t("bx.gymNote")}</li>
+        {!days.gymDays.length && <li>{t("bx.noGym")}</li>}
+        {before != null && <li className="text-warning">{t("bx.beforeLong", { day: WEEKDAY_LONG[before] })}</li>}
+        <li>{t("bx.saved")}</li>
+      </ul>
       <ErrorText>{err}</ErrorText>
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onBack} disabled={busy}>← {t("be.back")}</Button>
-        <Button onClick={() => void next()} disabled={busy || !valid}>{busy ? <Spinner /> : t("blk.button")}</Button>
+        <Button onClick={() => void next()} disabled={busy || !weekDaysValid(days)}>{busy ? <Spinner /> : t("blk.button")}</Button>
       </div>
     </div>
   );
