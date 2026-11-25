@@ -36,11 +36,11 @@ export const NEXT = {
   spike: 0.1,
   spikeDays: 30,
   /**
-   * The long run never goes past this many km, or this many minutes at easy pace, whichever comes first. `keyKm`: a marathon's
-   * key long runs in the race phase (a long blueprint in a build week) may go this far; a plain long run stops at `km`
-   * (docs/decisions/fartlek-long-run-ceiling.md).
+   * The long run never goes past this many km, or this many minutes at easy pace, whichever comes first: one ceiling for plain and
+   * key long runs alike, and 3.5 hours (`marathonMin`) instead of 3 in a marathon plan. A ceiling, not a target: the marathon's
+   * long-run track aims at 30 km (docs/decisions/fartlek-marathon-long-run-plan.md).
    */
-  longCeiling: { km: 30, keyKm: 32, min: 180 },
+  longCeiling: { km: 32, min: 180, marathonMin: 210 },
   /**
    * Time at threshold (the reps, not warm-up and jogs) a week: at most this share of the week's run km, but
    * never less than the ladder's first rung (3 × 8). So the threshold session stays on 3 × 8 while the
@@ -144,10 +144,10 @@ export const spikeMax = (longestKm: number, limit: number = NEXT.spike) => half(
 
 /**
  * The long run on its ladder: the longest run of the last 30 days + 1 km, no more than 10 % over it, under the
- * ceiling; 70 % of it in a lighter week. A missed long run leaves the longest as it was, so the step repeats.
+ * ceiling (`marathon`: the longer time limit of a marathon plan); 70 % of it in a lighter week. A missed long run leaves the longest as it was, so the step repeats.
  * Null without a run in the window (the long run is then a share of the week).
  */
-export function longRun(longestKm: number, lighter: boolean, easyPace: number | null, anyKm = longestKm, ceilingKm: number = NEXT.longCeiling.km): LongPlan | null {
+export function longRun(longestKm: number, lighter: boolean, easyPace: number | null, anyKm = longestKm, marathon = false): LongPlan | null {
   if (longestKm <= 0) return null;
   let km: number, why: LongWhy;
   if (lighter) { km = half(longestKm * tune().lighter.long); why = "lighter"; }
@@ -156,7 +156,7 @@ export function longRun(longestKm: number, lighter: boolean, easyPace: number | 
     const step = longestKm + Math.max(tune().long.stepMinKm, longestKm * tune().long.stepShare), spike = Math.max(longestKm, anyKm) * (1 + NEXT.spike);
     km = half(Math.min(step, spike)); why = step <= spike ? "step" : "spike";
   }
-  const ceiling = Math.min(ceilingKm, easyPace ? (NEXT.longCeiling.min * 60) / easyPace : Infinity);
+  const ceiling = Math.min(NEXT.longCeiling.km, easyPace ? ((marathon ? NEXT.longCeiling.marathonMin : NEXT.longCeiling.min) * 60) / easyPace : Infinity);
   if (km > ceiling) { km = floorHalf(ceiling); why = "ceiling"; }
   return { km: Math.max(NEXT.easyMinKm, km), why, longestKm };
 }

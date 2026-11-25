@@ -25,7 +25,7 @@ export interface Scenario {
   threshold?: { pace: number; hr: number };
   maxHr?: number;
   /** A race this many weeks from the block's start (1 = its first week), on Saturday: "Skapa block" plans toward it. */
-  race?: { inWeeks: number; priority: "A" | "B"; /** Default 21.1 (a half). */ distanceKm?: number; goalSeconds?: number };
+  race?: { inWeeks: number; priority: "A" | "B"; /** Default 21.1 (a half). */ distanceKm?: number; goalSeconds?: number; /** The runner's cap on a build week (`races.peak_km`); none by default. */ capKm?: number };
   /** A race run this many days before the block's start (a race-list row and a run that day): the block starts with recovery weeks. */
   raceAgo?: { days: number; priority: "A" | "B"; distanceKm: number };
   /** "Skapa block" from today, in the running week (its days before today are over), instead of from next week. */
@@ -157,6 +157,23 @@ export const SCENARIOS: Scenario[] = [
     weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 45],
     runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, race: { inWeeks: 10, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 },
   },
+  // The marathon's long-run track (docs/decisions/fartlek-marathon-long-run-plan.md): a low-volume and a mid-volume runner, a long road and a short one.
+  ...([38, 28, 20] as const).flatMap((inWeeks) => [
+    {
+      name: `marathon in ${inWeeks} from 35`,
+      note: `a steady 35 km runner (proven peak 35 km) with an A marathon ${inWeeks} weeks out and a 60 km cap: long runs of 30 km on their own track`,
+      weeks: [34, 35, 35, 34, 35, 35, 36, 35, 35, 34, 35, 35],
+      runDays: [2, 4, 6, 0], longRunDay: 0, threshold: { pace: 280, hr: 170 }, maxHr: 190,
+      race: { inWeeks, priority: "A" as const, distanceKm: 42.195, goalSeconds: 4 * 3600 + 30 * 60, capKm: 60 },
+    },
+    {
+      name: `marathon in ${inWeeks} from 55`,
+      note: `a steady 55 km runner with an A marathon ${inWeeks} weeks out and a 70 km cap`,
+      weeks: [54, 55, 55, 56, 55, 54, 55, 55, 56, 55, 54, 55],
+      runDays: [1, 2, 3, 4, 6, 0], longRunDay: 0, threshold: { pace: 250, hr: 172 }, maxHr: 190,
+      race: { inWeeks, priority: "A" as const, distanceKm: 42.195, goalSeconds: 3 * 3600 + 40 * 60, capKm: 70 },
+    },
+  ] satisfies Scenario[]),
   // A block started in the running week, from today (docs/decisions/fartlek-skapa-block.md): the days that are over are the easing.
   {
     name: "from today, heavy",
@@ -263,7 +280,7 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
   if (sc.race || sc.raceAgo) {
     if (sc.race) {
       const date = addDays(blockStart, (sc.race.inWeeks - 1) * 7 + 5);
-      await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}) }));
+      await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}), ...(sc.race.capKm ? { peakKm: sc.race.capKm } : {}) }));
     }
     const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; seed?: { ctl: number; atl: number; lighterFirst?: boolean; lighterFirstWhy?: string | null }; doneDays?: Record<ISODate, number>; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string; road?: RaceRoad | null }>(`/api/plan/block-suggest?startWeek=${blockStart}`);
     const road = b.road ?? null;

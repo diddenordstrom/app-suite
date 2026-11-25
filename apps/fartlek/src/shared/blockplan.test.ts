@@ -552,9 +552,10 @@ describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-ru
   const big = { kmBefore: [74, 78, 56], tolerance: { km: 80, peakKm: 80, peakWeek: null, weeksAgo: 2 }, runDays: [1, 2, 3, 4, 6, 0], ctl: 60, atl: 62, rung: 3 };
   const longOf = (items: { type: string; km: number }[]) => Math.max(...items.filter((it) => it.type === "long").map((it) => it.km));
 
-  it("stops a plain long run at 30 km", () => {
-    const s = suggestBlock(seed({ ...big, weeks: 1, fixedKm: [95], longestKm: 29.5 }));
-    expect(longOf(s.weeks[0].items)).toBeLessThanOrEqual(30);
+  it("stops a long run at 32 km, plain or key (a ceiling, not a target)", () => {
+    const s = suggestBlock(seed({ ...big, weeks: 1, fixedKm: [95], longestKm: 31.5 }));
+    expect(longOf(s.weeks[0].items)).toBeLessThanOrEqual(32);
+    expect(longOf(s.weeks[0].items)).toBeGreaterThan(30);
   });
 
   it("gives a marathon plan's build weeks up to 40 % of the week for the long run", () => {
@@ -564,7 +565,7 @@ describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-ru
     expect(longOf(plan.weeks[0].items)).toBe(30);
   });
 
-  it("lets only a marathon key long run (a long blueprint) reach 32 km", () => {
+  it("lets a marathon long blueprint week reach 32 km", () => {
     // The week is wip 6 of a marathon: fast-finish long, the "first 30–32 km chance".
     const race = addDays(MONDAY, 5 * 7 + 6);
     const phase: PhaseSeed = { race: { date: race, kind: "marathon" }, paces: { mp: 300, hmp: 285 }, paceSource: "goal", steps: {} as PhaseSeed["steps"], backOff: false, injury: false };
@@ -573,6 +574,50 @@ describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-ru
     expect(long.blueprint).toBeTruthy();
     expect(long.km).toBeGreaterThan(30);
     expect(long.km).toBeLessThanOrEqual(32);
+  });
+
+  describe("the marathon's long-run track (docs/decisions/fartlek-marathon-long-run-plan.md)", () => {
+    // A single build week at `wip` weeks to a marathon (the race week is 1), of `km`, from a longest run of `longest`.
+    const week = (wip: number, km: number, longest: number, others: { date: string; distanceKm: number }[] = []) => {
+      const raceWeek = addDays(MONDAY, (wip - 1) * 7), raceDate = addDays(raceWeek, 6);
+      return longOf(suggestBlock(seed({ ...big, weeks: 1, roles: ["build"], fixedKm: [km], longestKm: longest, track: { raceDate, others } })).weeks[0].items);
+    };
+
+    it("aims a week at its target and gives the long run up to half of the week", () => {
+      expect(week(10, 60, 28)).toBe(30);
+      // A week that can not carry 30 km gives the run half of it, and the target is not reached.
+      expect(week(10, 52, 28)).toBe(26);
+      // The ladder leads when the run is not that far: +8 % on 24 km, not 30.
+      expect(week(10, 60, 24)).toBe(26);
+    });
+
+    it("reaches 32 km only in a week that carries it at half, at the two stretch targets", () => {
+      expect(week(6, 64, 30)).toBe(32);
+      expect(week(6, 60, 30)).toBe(30);
+      expect(week(10, 70, 30)).toBe(30);
+    });
+
+    it("keeps the MP long run three weeks out to about 27 km", () => {
+      expect(week(3, 70, 30)).toBe(27);
+    });
+
+    it("keeps a run off 30 km within two weeks of a B race", () => {
+      // The week is wip 6 and the B race wip 8 (two weeks before it): 28 km at most there.
+      const near = { date: addDays(MONDAY, -7 * 2), distanceKm: 21.1 };
+      expect(week(6, 70, 28, [near])).toBeLessThanOrEqual(28);
+      expect(week(6, 70, 28, [])).toBeGreaterThan(28);
+    });
+
+    it("sizes the weeks to carry the run, never past the runner's cap", () => {
+      const raceDate = addDays(MONDAY, 11 * 7 + 6);
+      const planned = suggestBlock(seed({ ...big, weeks: 4, roles: ["build", "build", "build", "lighter"], kmBefore: [35, 35, 35], tolerance: { km: 35, peakKm: 35, peakWeek: null, weeksAgo: 1 },
+        longestKm: 20, capKm: 60, track: { raceDate, others: [] } }));
+      const noTrack = suggestBlock(seed({ ...big, weeks: 4, roles: ["build", "build", "build", "lighter"], kmBefore: [35, 35, 35], tolerance: { km: 35, peakKm: 35, peakWeek: null, weeksAgo: 1 },
+        longestKm: 20, capKm: 60 }));
+      const top = (b: typeof planned) => Math.max(...b.weeks.map((w) => w.targetKm));
+      expect(top(planned)).toBeGreaterThanOrEqual(top(noTrack));
+      expect(top(planned)).toBeLessThanOrEqual(60);
+    });
   });
 
   it("holds every build week under the runner's cap", () => {

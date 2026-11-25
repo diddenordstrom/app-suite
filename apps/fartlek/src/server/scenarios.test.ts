@@ -162,4 +162,58 @@ group("planning scenarios", () => {
     expect(out).toBeGreaterThanOrEqual(9);
     expect(out).toBeLessThanOrEqual(13);
   });
+
+  // The marathon's long-run track (docs/decisions/fartlek-marathon-long-run-plan.md), through the real app: the road is the block
+  // planned now (the real engine) and the skeleton after it, the same track in both.
+  const track = (name: string) => {
+    const x = r(name), weeks = x.road!.weeks;
+    // Runs in the weeks to the taper (the taper's own and the race week's runs are not counted).
+    const longs = weeks.filter((w) => w.wip >= 3 && w.role === "build" && w.longKm != null);
+    const km = (min: number) => longs.filter((w) => w.longKm! >= min);
+    return { x, weeks, longs, km, peak: Math.max(...weeks.filter((w) => w.role === "build").map((w) => w.km ?? 0)) };
+  };
+
+  it("gets a marathon from a proven 35 km to three runs of 30 km and two more of 26 km, in 38 and 28 weeks", () => {
+    for (const name of ["marathon in 38 from 35", "marathon in 28 from 35"]) {
+      const t = track(name);
+      expect(t.km(30).length, describe(t.x)).toBeGreaterThanOrEqual(3);
+      expect(t.km(26).length, describe(t.x)).toBeGreaterThanOrEqual(5);
+      // The cap holds, no run passes 32 km, and no run on the track takes more than half of its week.
+      expect(t.peak, describe(t.x)).toBeLessThanOrEqual(60);
+      expect(Math.max(...t.longs.map((w) => w.longKm!)), describe(t.x)).toBeLessThanOrEqual(32);
+      for (const w of t.longs.filter((x) => x.wip <= 12)) expect(w.longKm!, `${w.weekStart} ${describe(t.x)}`).toBeLessThanOrEqual(w.km! * 0.5);
+      expect(t.x.road!.warnings, describe(t.x)).not.toContain("longTrackShort");
+      // The 30 km runs sit at 10, 6 and 4 weeks out; 27 km three weeks out.
+      for (const wip of [10, 6, 4]) expect(t.weeks.find((w) => w.wip === wip)!.longKm, describe(t.x)).toBeGreaterThanOrEqual(30);
+      expect(t.weeks.find((w) => w.wip === 3)!.longKm!, describe(t.x)).toBeLessThanOrEqual(28);
+    }
+  });
+
+  it("says so when 20 weeks from 35 km are too few to reach the runs safely", () => {
+    const t = track("marathon in 20 from 35");
+    const reached = t.km(30).length >= 3 && t.km(26).length >= 5;
+    expect(reached || t.x.road!.warnings.includes("longTrackShort"), describe(t.x)).toBe(true);
+    expect(t.peak, describe(t.x)).toBeLessThanOrEqual(60);
+    expect(Math.max(...t.longs.map((w) => w.longKm!)), describe(t.x)).toBeLessThanOrEqual(32);
+    for (const w of t.longs.filter((x) => x.wip <= 12)) expect(w.longKm!, `${w.weekStart} ${describe(t.x)}`).toBeLessThanOrEqual(w.km! * 0.5);
+  });
+
+  it("plans the same runs from a proven 55 km, with 32 km only in a week of 64 km or more", () => {
+    for (const name of ["marathon in 38 from 55", "marathon in 28 from 55", "marathon in 20 from 55"]) {
+      const t = track(name);
+      expect(t.km(30).length, describe(t.x)).toBeGreaterThanOrEqual(3);
+      expect(t.km(26).length, describe(t.x)).toBeGreaterThanOrEqual(5);
+      expect(t.peak, describe(t.x)).toBeLessThanOrEqual(70);
+      for (const w of t.longs.filter((x) => x.wip <= 12)) expect(w.longKm!, `${w.weekStart} ${describe(t.x)}`).toBeLessThanOrEqual(w.km! * 0.5);
+      for (const w of t.longs.filter((x) => x.longKm! > 30)) expect(w.km!, describe(t.x)).toBeGreaterThanOrEqual(64);
+    }
+  });
+
+  it("leaves a half marathon's road as it was: the long run stays short of the marathon track", () => {
+    const h = r("half in 12").road!;
+    expect(h.warnings).not.toContain("longTrackShort");
+    expect(h.trackShort).toEqual([]);
+    expect(h.longPeak!.km).toBe(17.5);
+    expect(h.weeks.filter((w) => w.wip >= 3 && w.wip <= 8).map((w) => w.longKm)).toEqual([16, 17, 17.5, 12.5, 17.5, 17.5]);
+  });
 });

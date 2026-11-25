@@ -595,10 +595,10 @@ describe("api", () => {
     // Further out than the window: when the plan starts, no road. A 10K A race: no road (only marathon and half).
     const far = fresh();
     await far.app.request("/api/settings");
-    await far.app.request("/api/races", json({ name: "Höstmaran", date: raceOn(34), distanceKm: 42.195, priority: "A" }));
+    await far.app.request("/api/races", json({ name: "Höstmaran", date: raceOn(44), distanceKm: 42.195, priority: "A" }));
     const f = await g<S2>(far.app, `/api/plan/block-suggest?startWeek=${S}`);
     expect(f.road).toBeNull();
-    expect(f.farRace!.planFrom).toBe(addDays(S, (34 - 30) * 7));
+    expect(f.farRace!.planFrom).toBe(addDays(S, (44 - 40) * 7));
     const ten = fresh();
     await ten.app.request("/api/settings");
     await ten.app.request("/api/races", json({ name: "Milen", date: raceOn(20), distanceKm: 10, priority: "A" }));

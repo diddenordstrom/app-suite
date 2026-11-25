@@ -4,7 +4,7 @@ import * as t from "../db/schema";
 import * as repo from "../repo";
 import { ctxFor, type Ctx } from "../analysis";
 import { breakBefore, kmByDay, longestRun, recoveryRaceFor, weeksBefore } from "./blocks";
-import { activePlanRace, buildPhaseFrom, farRaceFor, otherRacesInBlock, phaseAtFor, planRaceFor, planRows, planStartOf, roadFor, roadOthers, skeletonInputs, writePlan, type BlockWeek, type PlanRace } from "../raceplan";
+import { activePlanRace, buildPhaseFrom, farRaceFor, otherRacesInBlock, phaseAtFor, planRaceFor, planRows, planStartOf, roadFor, roadOthers, skeletonInputs, trackSeedFor, writePlan, type BlockWeek, type PlanRace } from "../raceplan";
 import { chunkKind, PLAN_PHASES, projectSkeleton, RACE_PLAN, type RaceRoad } from "../../shared/raceplan";
 import { hardOn, insertItems, parseItems, restoreRows, runUndo, seedFor } from "./nextweek";
 import { phaseView, racePaceGate } from "../racephase";
@@ -99,7 +99,7 @@ function raceInOpenWeeks(ctx: Ctx, from: ISODate, end: ISODate) {
 /** The block engine's seed for `weeks` weeks from `startWeek` (a week that hasn't started). */
 function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: number | null; buildWeeksDone: number; lighterLast: boolean; light?: boolean; lighterWeeks?: boolean[]; roles?: WeekRole[] | null; race?: BlockSeed["race"]; recovery?: RecoveryRace | null;
   /** Other races in the weeks (docs/decisions/fartlek-race-plan-skeleton.md), and the first build week's cap after a break. */
-  otherRaces?: { date: ISODate }[]; backKm?: number | null;
+  otherRaces?: { date: ISODate; distanceKm?: number }[]; backKm?: number | null;
   /** A marathon plan (docs/decisions/fartlek-long-run-ceiling.md): where its build phase starts, and the runner's cap on a build week. */
   plan?: PlanRace | null;
   /** A block started from today in the running week: the days that are over and what was run on them (see `doneOf`). */
@@ -120,7 +120,7 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
     ...(o.race ? { race: o.race } : {}),
     ...(o.otherRaces?.length ? { otherRaces: o.otherRaces } : {}),
     ...(o.backKm != null ? { backKm: o.backKm } : {}),
-    ...(o.plan ? { longShareFrom: buildPhaseFrom(ctx, o.plan, startWeek), capKm: o.plan.race.peakKm } : {}),
+    ...(o.plan ? { longShareFrom: buildPhaseFrom(ctx, o.plan, startWeek), capKm: o.plan.race.peakKm, track: trackSeedFor(ctx, o.plan, startWeek) } : {}),
     ...(o.done ? { done: o.done } : {}),
   };
   // After a race of 10 km+ (docs/decisions/fartlek-post-race-recovery.md): the race is not the long run the ladder and the spike rule step from.

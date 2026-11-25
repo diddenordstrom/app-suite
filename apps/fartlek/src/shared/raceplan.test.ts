@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addDays } from "./dates";
 import { blockWeekCap, raceChunks, RECOVERY } from "./blockplan";
 import { tune } from "./tuning";
-import { chunkKind, keyLongWeek, otherRacesIn, phaseLengths, phaseOfWeeks, projectSkeleton, raceKindOf, suggestedCap, wipOf, type PlanPhase, type RaceKind, type SkeletonInput } from "./raceplan";
+import { chunkKind, longTrack, otherRacesIn, phaseLengths, phaseOfWeeks, projectSkeleton, raceKindOf, suggestedCap, trackShortOf, wipOf, type PlanPhase, type RaceKind, type SkeletonInput } from "./raceplan";
 
 // docs/decisions/fartlek-race-plan-skeleton.md
 const floorHalf = (n: number) => Math.floor(n * 2) / 2;
@@ -96,21 +96,24 @@ describe("projectSkeleton", () => {
     const sk = projectSkeleton(golden());
     const got = sk.weeks.map((w) => `${w.wip > 0 ? w.wip : "rec"} ${w.role === "build" ? "b" : w.role === "lighter" ? "l" : w.role} ${w.km} ${w.longKm}`);
     expect(got).toEqual([
-      // From the build phase (wip 12) the long run may take 40 % of the week, so the ladder (+8 %) leads instead of the week's share.
-      "16 b 45 18.5", "15 b 47 19", "14 b 49.5 19.5", "13 l 34.5 13.5", "12 b 48 19.5", "11 b 51.5 20.5", "10 b 54 21.5", "9 l 37.5 15",
-      "8 b 52 21.5", "7 b 56.5 22.5", "6 b 59 23.5", "5 l 41 16.5", "4 b 57 23.5", "3 b 62.5 23.5", "2 taper 43.5 16.5", "1 race 31 null",
-      "rec recovery 9 3", "rec recovery 28 8", "rec recovery 40.5 12", "rec recovery 50 15",
+      // The long run follows the marathon's track (docs/decisions/fartlek-marathon-long-run-plan.md): 27 km at wip 12, the rung
+      // before 30 at wip 11 and 30+ at 10, 6 and 4 (32 where the week carries it at half), 27 at wip 3, 40 % of the week between.
+      "16 b 45 19.5", "15 b 49.5 21", "14 b 54 22.5", "13 l 37.5 15.5", "12 b 54 24.5", "11 b 57.5 26.5", "10 b 60 28.5", "9 l 42 17.5",
+      "8 b 58 23", "7 b 63 25", "6 b 66 31", "5 l 46 18.5", "4 b 66 31", "3 b 72.5 27", "2 taper 50.5 20", "1 race 36 null",
+      "rec recovery 10.5 3", "rec recovery 32.5 9.5", "rec recovery 47 14", "rec recovery 58 16",
     ]);
     expect(sk.weeks.map((w) => w.phase)).toEqual([...Array(4).fill("base"), ...Array(6).fill("build"), ...Array(4).fill("specific"), "taper", "race", ...Array(4).fill("recovery")]);
-    expect(sk.peakKm).toBe(62.5);
-    expect(sk.longPeak).toEqual({ weekStart: "2027-02-08", km: 23.5, wip: 6 });
+    expect(sk.peakKm).toBe(72.5);
+    expect(sk.longPeak).toEqual({ weekStart: "2027-02-08", km: 31, wip: 6 });
   });
 
   it("holds the long run in the weeks before the taper", () => {
     const sk = projectSkeleton(golden());
     const at = (wip: number) => sk.weeks.find((w) => w.wip === wip)!.longKm!;
     expect(at(4)).toBe(at(6));
-    expect(at(3)).toBe(at(6));
+    // The MP long run three weeks out stays at about 27 km so the form peak is not spent.
+    expect(at(3)).toBeGreaterThanOrEqual(26);
+    expect(at(3)).toBeLessThanOrEqual(28);
   });
 
   it("takes every cap from the actual tolerance, whatever the anchor", () => {
@@ -123,7 +126,9 @@ describe("projectSkeleton", () => {
     expect(high.weeks[0].km).toBeLessThanOrEqual(blockWeekCap([40, 44, 38], 45).cap);
     const win = [40, 44, 38];
     for (const w of high.weeks) {
-      if (w.role === "build") expect(w.km).toBeLessThanOrEqual(blockWeekCap(win.slice(-3), 45).cap + 0.01);
+      // A week at a long-run target straight after a lighter week may go back to the level before it, no further.
+      const back = [12, 4].includes(w.wip) ? win.at(-2)! : 0;
+      if (w.role === "build") expect(w.km).toBeLessThanOrEqual(Math.max(blockWeekCap(win.slice(-3), 45).cap, back) + 0.01);
       win.push(w.km);
     }
   });
@@ -188,17 +193,71 @@ describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-ru
     expect(sk.weeks.find((w) => w.role === "taper")!.km).toBeLessThan(projectSkeleton(golden()).weeks.find((w) => w.role === "taper")!.km);
   });
 
-  it("suggests 1.5 × the proven peak week, to 5 km", () => {
-    expect(suggestedCap(55)).toBe(80);
-    expect(suggestedCap(44)).toBe(65);
+  it("suggests 1.75 × the proven peak week for a marathon and 1.5 × for a half, to 5 km", () => {
+    expect(suggestedCap(35)).toBe(60);
+    expect(suggestedCap(55)).toBe(95);
+    expect(suggestedCap(55, "half")).toBe(80);
+    expect(suggestedCap(44, "half")).toBe(65);
     expect(suggestedCap(0)).toBeNull();
   });
 
-  it("lets a marathon road's long run reach 30 km at about 75 km a week, and no further outside the key weeks", () => {
+  it("keeps a marathon road's long run to one ceiling of 32 km, reached only where the week carries it at half", () => {
     const big = projectSkeleton(golden({ window: [70, 74, 72], tolerance: { km: 75, peakKm: 75, peakWeek: null, weeksAgo: 1 }, anchorKm: 75, longestKm: 26, capKm: 78 }));
     const longs = big.weeks.filter((w) => w.role === "build").map((w) => ({ wip: w.wip, long: w.longKm!, km: w.km }));
     expect(Math.max(...longs.map((l) => l.long))).toBeGreaterThanOrEqual(30);
-    for (const l of longs) if (!keyLongWeek("marathon", l.wip)) expect(l.long).toBeLessThanOrEqual(30);
     for (const l of longs) expect(l.long).toBeLessThanOrEqual(32);
+    for (const l of longs.filter((x) => x.long > 30)) expect(l.km).toBeGreaterThanOrEqual(2 * l.long);
+  });
+});
+
+describe("the marathon's long-run track (docs/decisions/fartlek-marathon-long-run-plan.md)", () => {
+  const RACE_WEEK = "2027-03-15";
+
+  it("has targets 12, 10, 6, 4 and 3 weeks out, 32 km a stretch only at 6 and 4", () => {
+    const t = longTrack(RACE_WEEK, []);
+    expect([12, 10, 6, 4, 3].map((w) => t.at(w)?.km)).toEqual([27, 30, 30, 30, 27]);
+    expect([12, 10, 6, 4, 3].map((w) => t.at(w)?.stretchKm ?? null)).toEqual([null, null, 32, 32, null]);
+    expect([11, 9, 8, 7, 5].map((w) => t.at(w))).toEqual([null, null, null, null, null]);
+  });
+
+  it("counts the rungs back with the long run's growth rule, skipping lighter weeks", () => {
+    const t = longTrack(RACE_WEEK, []);
+    // 30 km needs 28 the week before it (+8 %), 28 needs 26, and so on down to the floor of the rungs; wip 13 is a lighter week.
+    expect(t.stepNeed(11)).toBe(28);
+    expect(t.stepNeed(14)).toBe(25);
+    expect(t.stepNeed(13)).toBe(0);
+    expect(t.stepNeed(15)).toBe(23);
+    // Weeks far out have no rung: the base's own ladder serves.
+    expect(t.stepNeed(30)).toBe(0);
+  });
+
+  it("carries a target's run at half of the week, and grows toward it", () => {
+    const t = longTrack(RACE_WEEK, []);
+    expect(t.carryKm(10)).toBe(60);
+    expect(t.carryKm(14)).toBeLessThan(t.carryKm(12));
+    expect(t.carryKm(30)).toBeLessThan(t.carryKm(14));
+  });
+
+  it("keeps a target under 30 km within two weeks of a B race, and drops it in the race's own week", () => {
+    // The B half is in wip 10's week (the week of 2027-01-11): no target there.
+    expect(longTrack(RACE_WEEK, [{ date: "2027-01-12", distanceKm: 21.1 }]).at(10)).toBeNull();
+    const two = longTrack(RACE_WEEK, [{ date: "2027-01-26", distanceKm: 21.1 }]);
+    // wip 8: wip 10 is two weeks before it, so 30 becomes 28; wip 6 is two weeks after, so 28 as well.
+    expect(two.at(10)?.km).toBe(28);
+    expect(two.at(6)?.km).toBe(28);
+    expect(two.at(4)?.km).toBe(30);
+  });
+
+  it("reports the targets a road falls short of", () => {
+    const weeks = (long6: number) => [
+      { weekStart: "2027-02-08", wip: 6, role: "build", source: "skeleton", longKm: long6 },
+      { weekStart: "2027-02-22", wip: 4, role: "build", source: "now", longKm: 30 },
+      { weekStart: "2027-03-08", wip: 2, role: "taper", source: "skeleton", longKm: 18 },
+      { weekStart: RACE_WEEK, wip: 1, role: "race", source: "skeleton", longKm: null },
+    ];
+    expect(trackShortOf(weeks(30), [])).toEqual([]);
+    expect(trackShortOf(weeks(26), [])).toEqual([{ wip: 6, target: 30, reached: 26 }]);
+    // A week already run is not judged.
+    expect(trackShortOf(weeks(26).map((w) => ({ ...w, source: "done" })), [])).toEqual([]);
   });
 });
