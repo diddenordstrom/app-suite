@@ -3,7 +3,7 @@ title: Fartlek "Skapa block": one entry, two steps, one editor
 summary: Why the plan has one "Skapa block" button, what step 1 asks, and why the block editor shows the weeks as columns with the numbers beside them
 type: decision
 status: accepted
-updated: 2026-11-16
+updated: 2026-11-25
 ---
 
 ## Decision
@@ -17,7 +17,17 @@ The plan page's header had six actions (Vecka/Månad/Block, Föreslå block, Nyt
 
 **The editor's length and lighter weeks are the runner's.** Weeks can be added (a build week before the closing lighter week, a copy of the build week before it at +8 % in a suggested block, empty in one built by hand), removed (down to `BLOCK.minWeeks`) and switched between build and lighter (runs scale to 70 % and back). The edited weeks are evaluated with `lighterWeeks` set from the editor. Suggestions still default to at most `BLOCK.maxWeeks` (4); a block shaped in the editor may be up to `BLOCK.maxEditWeeks` (6).
 
-**A block can start this week, from today (2026-11-16).** The user, on a Monday with nothing planned, couldn't start a block before next week. The running week is now a start week while no block holds it and at least `BLOCK.minDaysLeft` (4) days are left, Monday to Thursday; the picker shows it as "från idag". It is the default when nothing is planned in what is left of it, else the next free week stays the default. The engine plans the whole week and clips it to today on (the same as re-planning a running block); the days before are locked in the editor with what was run, and the POST refuses a session on a day that is over. As in re-planning, the load run earlier in that week is not in the seed, a small inaccuracy. "Föreslå veckan" also shows on the running week now (the route already took it).
+**A block can start this week, from today (2026-11-16).** The user, on a Monday with nothing planned, couldn't start a block before next week. The running week is now a start week while no block holds it and at least `BLOCK.minDaysLeft` (4) days are left, Monday to Thursday; the picker shows it as "från idag". It is the default when nothing is planned in what is left of it, else the next free week stays the default. The engine plans the whole week and clips it to today on (the same as re-planning a running block); the days before are locked in the editor with what was run, and the POST refuses a session on a day that is over. "Föreslå veckan" also shows on the running week now (the route already took it). How that first week is sized was settled on 2026-11-25 (below).
+
+**A block from today: the days that are over are the running week's easing (2026-11-25).** A runner with heavy form (about −27 %) and an A marathon half a year out started a three-week in-phase block on a Wednesday with nothing run on Monday and Tuesday. Heavy form made the first week lighter (70 % of the week before), and clipping it to today then dropped what Monday and Tuesday held, so the week landed near half of the week before: two light weeks out of three, fitness falling and the deepest week calm. The user decided that the lost days are the easing, so the week is not made lighter as well:
+
+- When the block starts in the running week with days already over, heavy form no longer makes that week lighter (`lighterFirst` is not set for form; a lighter start asked for still is). The week keeps its role and its whole-week target.
+- The days ahead get the sessions the whole-week plan puts on them; what was planned on the days that are over is not made up. What was run on those days counts: when run + planned would pass the week's target, the days ahead get the target less what was run (`BlockSeed.done`). So a runner who ran Monday and Tuesday as planned lands at about the target, one who ran nothing gets the build week less two days, and one who ran more gets less ahead.
+- The runs already done count in the form and fitness of the block (the old "small inaccuracy"), in the week target and block goal that are written, in the road of a race plan, and in the caps of the weeks after: those grow from what the first week comes to, not from its target, so a short week doesn't raise the next as if it had been run in full.
+- A block on a week not begun is unchanged, heavy form still starts it lighter. `COACH.floor`, the ramp caps, `rampRisk`, the spike rule and the re-entry and tolerance caps are unchanged; "add a run day" still judges whole weeks.
+- The editor's first week shows the km run before today and the km planned.
+
+In a test runner of this kind the first week went from 19.5 km planned (lighter, clipped) to 34 (the build week less Monday and Tuesday), or 33 more after 13 km run; fitness over the block 42 → 35.7 before, 42 → 36.9 or 38.8 after. A re-plan from the running week ("Ändra block", "Räkna om resten") still leaves the runs of that week out of its seed.
 
 **A tired start asks once, in the editor.** When `lighterFirst` makes week 1 lighter, the rhythm no longer ends lighter within its length. The editor offers "Förläng till N veckor" (the engine plans one more week, so the block ends lighter) or keeps the length. It is asked in step 2, not step 1, because the runner sees what it does to the weeks and the charts.
 

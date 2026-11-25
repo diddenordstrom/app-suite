@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-25 · decision · Fartlek: a block from today keeps the running week's build target ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek "add a run day" no longer loops in a running week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek long run stops at 30 km, a race can cap the biggest week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · note · Fartlek race plan skeleton built ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-24 · decision · Fartlek race plan honours every race the runner entered ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek race plan: a skeleton to an A marathon or half, with a build plan ([log/2026-11.md](log/2026-11.md))
 - 2026-11-24 · decision · Fartlek post-race recovery weeks, with a build plan ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · decision · Fartlek gym: the last finished session is the new template ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -51,11 +51,11 @@
 - [Fartlek gets a race-specific phase for the marathon and half, built from blueprints that scale per runner](decisions/fartlek-race-specific-phase.md): The last 8 weeks before an A-race marathon or half replace generic quality with race-pace sessions from a catalogue of blueprints in the repo, scaled to the runner; MP comes from today's prediction and is locked for the phase; the last build weeks may aim deep in the existing form band; real injury stops progression; no guard is loosened _(decision · accepted · 2026-11-24)_
 - [Fartlek's today's form is 10 minus a list of deductions](decisions/fartlek-readiness.md): Dagsform is built from sliding, weighted deductions (HRV, soreness, km ACWR, resting HR, pain, form, sleep); the verdict follows the score; pain 8+ vetoes for 3 days; mood and Body Battery are out _(decision · accepted · 2026-11-11)_
 - [Fartlek roadmap: progress graphs for data nerds, today first](decisions/fartlek-roadmap.md): Who Fartlek is for (self-coached, data-loving marathon runners), what it won't try to be, and the build order from late 2026 to the 2028 triathlon _(decision · accepted · 2026-11-24)_
-- [Fartlek's engine sizes easy runs from the week and asks for another run day](decisions/fartlek-run-days.md): Easy runs are a share of the week's km (so fewer, longer ones as volume grows), and a suggested week or new block that needs more run days than the runner has asks which day to add, then simulates again; nothing is locked _(decision · accepted · 2026-11-14)_
+- [Fartlek's engine sizes easy runs from the week and asks for another run day](decisions/fartlek-run-days.md): Easy runs are a share of the week's km (so fewer, longer ones as volume grows), and a suggested week or new block that needs more run days than the runner has asks which day to add, then simulates again; nothing is locked _(decision · accepted · 2026-11-25)_
 - [Fartlek compares the same session over time](decisions/fartlek-same-session.md): Runs of a structured session are grouped by the fingerprint of their quality work (reps × length × target kind, rest ignored) and compared on GAP pace, HR and efficiency, on the activity page and on Trends, from the third run on _(decision · accepted · 2026-11-13)_
 - [Fartlek session builder, strides and own templates](decisions/fartlek-session-builder.md): Sessions are built row by row in one shared builder (workout dialog, week and block suggestions, block editor); strides as a step target and `+ strides` in block text; the week engine puts strides on two easy runs; own templates saved from the builder _(decision · accepted · 2026-11-13)_
 - [Fartlek session library (deferred)](decisions/fartlek-session-library.md): A library of saved sessions was mocked and then put off, because today's plan has too little variety for it to pay; what would make it worth building and the smallest version _(decision · superseded · 2026-11-13)_
-- [Fartlek "Skapa block": one entry, two steps, one editor](decisions/fartlek-skapa-block.md): Why the plan has one "Skapa block" button, what step 1 asks, and why the block editor shows the weeks as columns with the numbers beside them _(decision · accepted · 2026-11-16)_
+- [Fartlek "Skapa block": one entry, two steps, one editor](decisions/fartlek-skapa-block.md): Why the plan has one "Skapa block" button, what step 1 asks, and why the block editor shows the weeks as columns with the numbers beside them _(decision · accepted · 2026-11-25)_
 - [Fartlek takes sleep from Garmin, not from the check-in](decisions/fartlek-sleep-from-garmin.md): Today's form uses Garmin's sleep score (under 60 is poor); the sleep question is gone from the daily check-in; old manual values are only a fallback _(decision · accepted · 2026-11-11)_
 - [Fartlek step detection from the stream](decisions/fartlek-stream-steps.md): When a run's laps don't fit its workout's steps, the step changes are found in the 1 s stream (grade-adjusted, Garmin's GAP when present) and offered as a full set of lap splits; method, thresholds, what the real runs showed, and what's open _(decision · accepted · 2026-11-12)_
 - [Fartlek structured workouts and planned vs actual](decisions/fartlek-structured-workouts.md): Planned sessions get optional steps with pace/HR targets; laps are matched to the steps and each step is judged in target / near / off, with a lap split for forgotten presses and step changes found in the stream (built); the session library put off _(decision · accepted · 2026-11-24)_
