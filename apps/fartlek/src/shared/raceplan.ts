@@ -3,7 +3,6 @@ import { projectVolumes, raceChunks, RECOVERY, recoveryRoles, recoveryRow, withR
 import { longFor, longRun, NEXT } from "./nextweek";
 import { TAPER_WEEKS } from "./blocks";
 import { RACE_PHASE, wipOf } from "./racephase";
-import { PHASE_SCHEDULE } from "./blueprints";
 import { HALF_M, MARATHON_M } from "./racemodels";
 import type { BlockKind } from "./types";
 import type { StepRefs } from "./steps";
@@ -21,7 +20,7 @@ export const PLAN_PHASES: readonly PlanPhase[] = ["base", "build", "specific", "
 /** The race plan. Not in TUNE: the window and minimums are structure, the long-run hold an injury guard. */
 export const RACE_PLAN = {
   /** An A race of this kind this many weeks away (race week included) or closer gets a plan. */
-  windowWeeks: { marathon: 30, half: 20 } as Record<RaceKind, number>,
+  windowWeeks: { marathon: 40, half: 20 } as Record<RaceKind, number>,
   /** The taper week and the race week. */
   taperWeeks: TAPER_WEEKS,
   phases: {
@@ -37,15 +36,28 @@ export const RACE_PLAN = {
    * about 34 % at 80 km), so 30 km comes at about 75 km a week (docs/decisions/fartlek-long-run-ceiling.md).
    */
   marathonLongShare: 0.4,
-  /** Suggested peak-week cap: this many times the proven peak week, rounded to `capRoundKm`. */
-  capSuggest: 1.5, capRoundKm: 5,
+  /** Suggested peak-week cap: this many times the proven peak week (a marathon needs room for its long runs), rounded to `capRoundKm`. */
+  capSuggest: { marathon: 1.75, half: 1.5 } as Record<RaceKind, number>, capRoundKm: 5,
+  /**
+   * The marathon's long-run track (docs/decisions/fartlek-marathon-long-run-plan.md), planned back from the race (`wip`: weeks to the
+   * race, the race week being 1): the long runs that get a target of their own (`min`: under it the target counts as missed). A target with `stretch` may be `stretchKm` when
+   * the week carries it at `share`. `share`: the most of a week a track week's long run may take. `chainFloorKm`: the rungs before a
+   * target are counted back (the growth rule of `longRun`) down to this; under it the base's own ladder serves. `bNear`/`bNearKm`: no
+   * 30 km+ run within `bNear` weeks of a B race, so a target there is `bNearKm` at most. `carryGrowth`: how fast a week is planned
+   * to grow toward the km that carry a later run (a little under the +10 % a careful week may grow, for a lighter week on the way).
+   */
+  track: {
+    targets: [
+      { wip: 12, km: 27, min: 26, stretch: false }, { wip: 10, km: 30, min: 30, stretch: false }, { wip: 6, km: 30, min: 30, stretch: true },
+      { wip: 4, km: 30, min: 30, stretch: true }, { wip: 3, km: 27, min: 26, stretch: false },
+    ] as readonly { wip: number; km: number; min: number; stretch: boolean }[],
+    share: 0.5, stretchKm: 32, chainFloorKm: 20, windowWeeks: 4, bNear: 2, bNearKm: 28, carryGrowth: 1.035,
+  },
 } as const;
 
 /** The suggested cap on a build week: `capSuggest` × the proven peak week, rounded down to `capRoundKm` (a cap errs low); null without a proven week. */
-export const suggestedCap = (provenKm: number) => (provenKm > 0 ? Math.floor((provenKm * RACE_PLAN.capSuggest) / RACE_PLAN.capRoundKm) * RACE_PLAN.capRoundKm : null);
-
-/** A marathon race-phase week whose long run is a key session (a long blueprint): it may pass the plain ceiling up to `longCeiling.keyKm`. */
-export const keyLongWeek = (kind: RaceKind, wip: number) => kind === "marathon" && PHASE_SCHEDULE.marathon[wip]?.long != null;
+export const suggestedCap = (provenKm: number, kind: RaceKind = "marathon") =>
+  provenKm > 0 ? Math.floor((provenKm * RACE_PLAN.capSuggest[kind]) / RACE_PLAN.capRoundKm + 1e-9) * RACE_PLAN.capRoundKm : null;
 
 /** Marathon or half within 1 km; null for any other distance. */
 export const raceKindOf = (km: number): RaceKind | null =>
@@ -56,6 +68,116 @@ export { wipOf };
 
 const floorHalf = (n: number) => Math.floor(n * 2) / 2 + 0;
 const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+
+/* ---------- The marathon's long-run track (docs/decisions/fartlek-marathon-long-run-plan.md) ---------- */
+
+export interface TrackWeek {
+  /** The target run of the week. */
+  km: number;
+  /** Under this the target counts as missed. */
+  minKm: number;
+  /** The most the run may be when the week carries it at `RACE_PLAN.track.share`; null = `km` is the most. */
+  stretchKm: number | null;
+}
+/** Another race on the road and how far it is (a B race counts as a run of that distance). */
+export interface OtherRun { date: ISODate; distanceKm: number }
+export interface LongTrack {
+  /** The week's target by weeks to the race (the race week is 1); null when the week has none. */
+  at(wip: number): TrackWeek | null;
+  /**
+   * The run the week must reach to keep the next target within the growth rule: the rung counted back from it, 0 when no step is
+   * needed (a lighter week, a week under the rungs' floor, or none after it). Not needed when the longest of 30 days already is that far.
+   */
+  stepNeed(wip: number): number;
+  /** Km a week should have to carry the track's runs from it on (its own at `share`, the later ones grown back); 0 = none. */
+  carryKm(wip: number): number;
+  /** The earliest target's week: from it to the taper a build week off a target has no hold on the longest run. */
+  spanFrom: number;
+}
+
+/** A marathon plan's lighter week by weeks to the race: every fourth from the fifth. */
+export const lighterWip = (w: number) => w >= 5 && w % 4 === 1;
+
+/**
+ * The long-run track of a marathon, from the week the race is in (`raceWeek`) and the other races on the road: the targets of
+ * `RACE_PLAN.track`, and before each the rungs counted back with the long run's growth rule (+8 %, at least 1 km, never 10 %
+ * over the longest of 30 days), skipping lighter weeks and the weeks of a B race and its recovery, down to `chainFloorKm`.
+ * No 30 km+ run within `bNear` weeks of a B race (a B race counts as a run of its distance, which `longestKm` carries).
+ * Pure and cheap: the engine asks for it per block and per skeleton.
+ */
+export function longTrack(raceWeek: ISODate, others: OtherRun[]): LongTrack {
+  const T = RACE_PLAN.track;
+  const wipOfDate = (d: ISODate) => (d >= raceWeek ? 1 : 1 + Math.ceil(daysBetween(d, raceWeek) / 7));
+  const bs = others.map((o) => ({ wip: wipOfDate(o.date), rec: recoveryRow({ distanceKm: o.distanceKm, priority: "B" })?.weeks ?? 0 }));
+  const skipped = (w: number) => w < 3 || lighterWip(w) || bs.some((b) => w <= b.wip && w >= b.wip - b.rec);
+  const targets = new Map<number, TrackWeek>();
+  for (const t of T.targets) {
+    if (skipped(t.wip)) continue;
+    const near = bs.some((b) => Math.abs(b.wip - t.wip) <= T.bNear);
+    const km = near ? Math.min(t.km, T.bNearKm) : t.km;
+    targets.set(t.wip, { km, minKm: Math.min(t.min, km), stretchKm: t.stretch && !near ? T.stretchKm : null });
+  }
+  // The smallest run that steps up to `k` on the ladder.
+  const back = (k: number) => {
+    let l = k;
+    while (l - 0.5 >= NEXT.easyMinKm && (longRun(l - 0.5, false, null)?.km ?? 0) >= k) l -= 0.5;
+    return l;
+  };
+  // From the race backwards: each build week's run (a target, or the rung before the next week's), and what the week before must reach.
+  const rung = new Map<number, number>(), need = new Map<number, number>(), carry = new Map<number, number>();
+  let next = 0, nextCarry = 0;
+  for (let w = 3; w <= 80; w++) {
+    if (skipped(w)) continue;
+    const n = next > 0 ? back(next) : 0;
+    need.set(w, n >= T.chainFloorKm ? n : 0);
+    const own = Math.max(targets.get(w)?.km ?? 0, need.get(w)!);
+    rung.set(w, own);
+    next = own;
+    nextCarry = Math.max(own / T.share, nextCarry / T.carryGrowth);
+    carry.set(w, nextCarry);
+  }
+  return { at: (wip) => targets.get(wip) ?? null, stepNeed: (wip) => need.get(wip) ?? 0, carryKm: (wip) => carry.get(wip) ?? 0, spanFrom: Math.max(0, ...T.targets.map((t) => t.wip)) };
+}
+
+/**
+ * The long run of a week at a target: what the ladder allows, but no more than the target (`stretchKm` when the week carries
+ * it) and no more than `share` of the week. A week not big enough gets the share, and the target is not reached.
+ */
+export function trackLong(t: TrackWeek, ladderKm: number, weekKm: number): number {
+  const carry = floorHalf(weekKm * RACE_PLAN.track.share);
+  const goal = t.stretchKm != null && carry >= t.stretchKm ? t.stretchKm : t.km;
+  return Math.max(NEXT.easyMinKm, Math.min(ladderKm, carry, goal));
+}
+
+/**
+ * The long run of a marathon build week that is not at a target: its usual run (`baseKm`), but at least the rung the next target
+ * needs of it when the longest of the last 30 days is not that far yet; the rung never takes more than `share` of the week and
+ * never more than the ladder allows. A week inside the track's span has no hold on the longest run (see `offTrackBase`).
+ */
+export function railLong(baseKm: number, ladderKm: number, weekKm: number, longestKm: number, needKm: number): number {
+  const required = needKm > 0 && longestKm < needKm ? Math.min(needKm, floorHalf(weekKm * RACE_PLAN.track.share)) : 0;
+  return Math.min(ladderKm, Math.max(baseKm, required));
+}
+
+/** A marathon build week inside the track's span but not at a target: the usual share of the week, no hold on the longest run, never over `share`. */
+export const offTrackBase = (ladderKm: number, weekKm: number, longestKm: number) =>
+  Math.min(longFor(ladderKm, weekKm, longestKm, true, RACE_PLAN.marathonLongShare), floorHalf(weekKm * RACE_PLAN.track.share));
+
+/** Whether a marathon plan's week is in the track's span: from the earliest target to the week before the taper. */
+export const inTrackSpan = (track: LongTrack, wip: number) => wip >= 3 && wip <= track.spanFrom;
+
+/** Targets the road's weeks fall short of: a build week, not done, at a target's place with a long run under its `minKm`. */
+export function trackShortOf(weeks: { weekStart: ISODate; wip: number; role: string; source: string; longKm: number | null }[], others: OtherRun[]): { wip: number; target: number; reached: number }[] {
+  const any = weeks.find((w) => w.wip >= 1);
+  if (!any) return [];
+  const track = longTrack(addDays(any.weekStart, (any.wip - 1) * 7), others);
+  const out: { wip: number; target: number; reached: number }[] = [];
+  for (const t of RACE_PLAN.track.targets) {
+    const e = track.at(t.wip), w = weeks.find((x) => x.wip === t.wip);
+    if (e && w && w.source !== "done" && w.role === "build" && w.longKm != null && w.longKm < e.minKm) out.push({ wip: t.wip, target: e.km, reached: w.longKm });
+  }
+  return out;
+}
 
 export interface PhaseLengths { base: number; build: number; specific: number; taper: number }
 
@@ -141,7 +263,7 @@ export interface SkeletonWeek { weekStart: ISODate; wip: number; phase: PlanPhas
 export interface Skeleton { lengths: PhaseLengths; weeks: SkeletonWeek[]; peakKm: number; longPeak: { weekStart: ISODate; km: number; wip: number } | null }
 
 /** A seed with only what `volumes()` reads; the rest zero or default. */
-function chunkSeed(o: Pick<BlockSeed, "startWeek" | "weeks" | "kmBefore" | "tolerance" | "roles" | "anchorKm" | "race" | "recovery" | "backKm" | "otherRaces" | "longestKm"> & { capKm?: number | null }): BlockSeed {
+function chunkSeed(o: Pick<BlockSeed, "startWeek" | "weeks" | "kmBefore" | "tolerance" | "roles" | "anchorKm" | "race" | "recovery" | "backKm" | "otherRaces" | "longestKm"> & { capKm?: number | null; track?: BlockSeed["track"] }): BlockSeed {
   return {
     ...o, ctl: 0, atl: 0, past: [], runDays: [], longRunDay: 0, threshold: null, refs: {} as StepRefs, crossMin: 0,
     lighterLast: false, goalKm: null, buildWeeksDone: 0, hardBefore: false, rung: 0, tempoPace: null, firstWeekMax: null,
@@ -162,17 +284,33 @@ export function projectSkeleton(input: SkeletonInput): Skeleton {
   let anchor = input.anchorKm, peak = input.peakKm, longest = input.longestKm;
   const weeks: SkeletonWeek[] = [];
   const hold = RACE_PLAN.longPeak[kind];
+  const marathon = kind === "marathon";
+  // A marathon's track (RACE_PLAN.track) and its 30-day window on the longest run: what was run (planned) falls out of the window.
+  const track = marathon ? longTrack(raceWeek, input.others) : null;
+  const trackSeed = marathon ? { raceDate: race.date, others: input.others.map((o) => ({ date: o.date, distanceKm: o.distanceKm })) } : undefined;
+  const runs: { ws: ISODate; km: number }[] = [];
+  const longestAt = (ws: ISODate) => {
+    if (!marathon) return longest;
+    const win30 = (from: ISODate, days: number) => daysBetween(from, ws) >= 0 && daysBetween(from, ws) <= days;
+    return Math.max(win30(input.firstWeek, 21) ? input.longestKm : 0, ...runs.filter((r) => win30(r.ws, RACE_PLAN.track.windowWeeks * 7)).map((r) => r.km));
+  };
 
-  const longOf = (role: WeekRole, km: number, wip: number, phase: PlanPhase): number | null => {
+  const longOf = (role: WeekRole, km: number, wip: number, phase: PlanPhase, ws: ISODate): number | null => {
     if (role === "race") return null;
     if (role === "recovery") return recoveryLong(km);
     const lighter = role !== "build";
-    // A marathon's build and race-phase weeks may give the long run more of the week; only its key sessions pass 30 km.
-    const share = !lighter && kind === "marathon" && (phase === "build" || phase === "specific") ? RACE_PLAN.marathonLongShare : 0;
-    const ceiling = !lighter && keyLongWeek(kind, wip) ? NEXT.longCeiling.keyKm : NEXT.longCeiling.km;
-    const lp = longRun(longest, lighter, input.easyPace, longest, ceiling);
-    let long = lp ? longFor(lp.km, km, longest, lighter, share) : floorHalf(km * NEXT.longShare);
-    if (role === "build" && wip >= hold.holdTo && wip <= hold.holdFrom && longest > 0) long = Math.min(long, longest);
+    const longestNow = longestAt(ws);
+    // A marathon's build and race-phase weeks may give the long run more of the week.
+    const share = !lighter && marathon && (phase === "build" || phase === "specific") ? RACE_PLAN.marathonLongShare : 0;
+    const lp = longRun(longestNow, lighter, input.easyPace, longestNow, marathon);
+    const entry = !lighter && track ? track.at(wip) : null;
+    let long: number;
+    if (lp && entry) long = trackLong(entry, lp.km, km);
+    else if (lp && !lighter && track) {
+      const inSpan = inTrackSpan(track, wip) && (phase === "build" || phase === "specific");
+      long = railLong(inSpan ? offTrackBase(lp.km, km, longestNow) : longFor(lp.km, km, longestNow, lighter, share), lp.km, km, longestNow, track.stepNeed(wip));
+    } else long = lp ? longFor(lp.km, km, longestNow, lighter, share) : floorHalf(km * NEXT.longShare);
+    if (role === "build" && wip >= hold.holdTo && wip <= hold.holdFrom && longestNow > 0) long = Math.min(long, longestNow);
     return long;
   };
 
@@ -206,14 +344,16 @@ export function projectSkeleton(input: SkeletonInput): Skeleton {
         startWeek: cs, weeks: c.weeks, kmBefore: win.slice(-3), tolerance: input.tolerance, roles, anchorKm: anchor, longestKm: longest, capKm: input.capKm ?? null,
         race: holdsPlanRace ? { date: race.date, priority: "A" } : null, recovery,
         backKm: ci === 0 && (input.backDays ?? 0) > RACE_PLAN.back.absorbDays ? floorHalf(RACE_PLAN.back.share * anchor) : null,
-        otherRaces: inChunk.map((o) => ({ date: o.date })),
+        otherRaces: inChunk.map((o) => ({ date: o.date, distanceKm: o.distanceKm })), track: trackSeed,
       });
       const vols = projectVolumes(seed);
       vols.forEach((v, i) => {
         const ws = addDays(cs, i * 7);
         const wip = wipOf(ws, race.date);
-        const longKm = longOf(v.role, v.km, wip, phaseAt(ws));
-        if (longKm != null && v.role !== "recovery") longest = Math.max(longest, longKm);
+        const longKm = longOf(v.role, v.km, wip, phaseAt(ws), ws);
+        if (longKm != null && v.role !== "recovery") { longest = Math.max(longest, longKm); runs.push({ ws, km: longKm }); }
+        // Another race of the week is a run of its distance: a half on the way counts as a long run done.
+        if (marathon) for (const o of inChunk) if (o.date >= ws && o.date <= addDays(ws, 6)) { longest = Math.max(longest, o.distanceKm); runs.push({ ws, km: o.distanceKm }); }
         weeks.push({ weekStart: ws, wip, phase: phaseAt(ws), role: v.role, km: v.km, longKm, chunk: ci });
         win.push(v.km);
       });
@@ -274,9 +414,11 @@ export interface RaceRoad {
   longPeak: { weekStart: ISODate; km: number; wip: number } | null;
   /** Under RACE_PLAN.phases[kind].minWeeks at the plan's start; `suggestedSeconds` = today's prediction, rounded up to the minute, when slower than the goal (or no goal). */
   short: { minWeeks: number; goalSeconds: number | null; suggestedSeconds: number | null } | null;
-  warnings: "longShort"[];
-  /** The peak-week cap: the runner's (`races.peak_km`), the suggestion (RACE_PLAN.capSuggest × the proven peak week) and that peak. */
-  cap: { km: number | null; suggestedKm: number | null; provenKm: number };
+  warnings: ("longShort" | "longTrackShort")[];
+  /** A marathon's long-run track (RACE_PLAN.track): the targets the road's long runs fall short of, the biggest target first; empty when it reaches them. */
+  trackShort: { wip: number; target: number; reached: number }[];
+  /** The peak-week cap: the runner's (`races.peak_km`), the suggestion (RACE_PLAN.capSuggest[kind] × the proven peak week) and that peak. */
+  cap: { km: number | null; suggestedKm: number | null; provenKm: number; factor: number };
   /** Every other race in the plan (all are honoured); `close` = inside the plan race's peak block or taper, shown with `rp.otherClose`. */
   others: { name: string; date: ISODate; close: boolean }[];
   stored: boolean; computedOn: ISODate | null;

@@ -18,8 +18,8 @@ Settled with the user on 2026-11-24, as a spec for a build session. It decides i
 4. **The taper stays 2 weeks for now.** Marathon tapers in the books are often 3 weeks (Pfitzinger 3, Higdon 3, Hansons about 10 days); see [open](#open).
 5. **Too little time warns and lowers the goal, never refuses.** Under 12 weeks for a marathon or 8 for a half the plan says so, offers today's prediction as the goal time, and compresses: base first, then build; the specific phase keeps its minimum (marathon 4, half 2) while the weeks allow it, the taper always.
 6. **Falling behind:** the race date is fixed. A miss of up to about a week is absorbed: the plan continues as written and runs are never made up. A break of 8 days or more makes the next block's first week at most 70 % of what the skeleton had for it. The skeleton is recomputed from **actual** training each time a block is generated, and planned weeks (skeleton or block) never count as proven tolerance in that computation.
-7. **No invented tune-up races.** The engine knows only races the runner entered. B races (and other A races) inside the plan are honoured: a race week (mini-taper) and the B recovery rows from [post-race recovery](fartlek-post-race-recovery.md). The key long runs (towards 32 km for the marathon) are placed so the long-run peak is reached 8 to 5 weeks before the race and then held, never raised, in the weeks after.
-8. **Race window: 30 weeks for a marathon, 20 for a half.** Other distances and B races keep `BLOCK.raceWindowWeeks` (16). Further out, ordinary blocks; the dialog says when the plan starts.
+7. **No invented tune-up races.** The engine knows only races the runner entered. B races (and other A races) inside the plan are honoured: a race week (mini-taper) and the B recovery rows from [post-race recovery](fartlek-post-race-recovery.md). The key long runs (towards 32 km for the marathon) are placed so the long-run peak is reached 8 to 5 weeks before the race and then held, never raised, in the weeks after. *(For a marathon, overtaken 2026-11-25 by the long-run track in [the marathon long-run plan](fartlek-marathon-long-run-plan.md): fixed targets at 12, 10, 6, 4 and 3 weeks out.)*
+8. **Race window: 30 weeks for a marathon, 20 for a half.** *(Marathon raised to 40 weeks on 2026-11-25, extra weeks to the base; see [the marathon long-run plan](fartlek-marathon-long-run-plan.md).)* Other distances and B races keep `BLOCK.raceWindowWeeks` (16). Further out, ordinary blocks; the dialog says when the plan starts.
 9. **Recovery at the end reuses the `recovery` role** and `RECOVERY` table of [post-race recovery](fartlek-post-race-recovery.md); the plan ends after it, then normal blocks.
 
 ## Why
@@ -104,7 +104,7 @@ export type PlanPhase = "base" | "build" | "specific" | "taper" | "race" | "reco
 /** The race plan (docs/decisions/fartlek-race-plan-skeleton.md). Not in TUNE: the window and minimums are structure, the long-run hold an injury guard. */
 export const RACE_PLAN = {
   /** An A race of this kind this many weeks away (race week included) or closer gets a plan. */
-  windowWeeks: { marathon: 30, half: 20 } as Record<RaceKind, number>,
+  windowWeeks: { marathon: 30, half: 20 } as Record<RaceKind, number>, // marathon now 40
   taperWeeks: TAPER_WEEKS, // 2: the taper week and the race week
   phases: {
     marathon: { anchor: 20, specific: [4, 6], build: [6, 8], baseMin: 2, minWeeks: 12, ideal: [16, 18] },

@@ -7,7 +7,7 @@ import { tune } from "./tuning";
 import { blueprintById, blueprintTag, compileSlot, phaseWeekFor, type BlueprintId, type PhaseSlot } from "./blueprints";
 import { phaseWarnings, RACE_PHASE, type PhaseSeed, type PhaseWarnings } from "./racephase";
 import { formPct } from "./load";
-import { RACE_PLAN, wipOf } from "./raceplan";
+import { inTrackSpan, lighterWip, longTrack, offTrackBase, railLong, RACE_PLAN, trackLong, wipOf, type LongTrack, type OtherRun } from "./raceplan";
 
 /*
  * "Föreslå block" (docs/decisions/fartlek-block-goals.md): plan a 2–4 week block as a whole, with a km goal,
@@ -122,7 +122,12 @@ export interface BlockSeed {
   /** After a break of 8+ days: the first build week is at most this many km (RACE_PLAN.back). */
   backKm?: number | null;
   /** Other races in the weeks (B races, A races other than `race`): each week holding one is a B race week. */
-  otherRaces?: { date: ISODate }[];
+  otherRaces?: { date: ISODate; distanceKm?: number }[];
+  /**
+   * A marathon plan's long-run track (RACE_PLAN.track): the race and the other races on its road, so each week knows whether it
+   * is on the track, what its long run is aimed at and how many km carry it. Absent: no track (a half, a block outside a plan).
+   */
+  track?: { raceDate: ISODate; others: OtherRun[] } | null;
   /** A marathon plan's build phase starts this week: build weeks from it may give the long run RACE_PLAN.marathonLongShare. */
   longShareFrom?: ISODate | null;
   /** The runner's cap on a build week's km for the race the weeks lead to (docs/decisions/fartlek-long-run-ceiling.md). */
@@ -388,6 +393,10 @@ function raceDayForm(seed: BlockSeed, weeks: SuggestItem[][], ev: BlockWeekEval[
   return { date: race.date, form: r1(form), formPct: r1(ctl > 0 ? (form / ctl) * 100 : 0) };
 }
 
+/** The marathon long-run track of the seed's weeks (RACE_PLAN.track); null without one. */
+const trackOf = (seed: Pick<BlockSeed, "track" | "startWeek">): LongTrack | null =>
+  seed.track ? longTrack(addDays(seed.startWeek, (wipOf(seed.startWeek, seed.track.raceDate) - 1) * 7), seed.track.others) : null;
+
 export interface Volume { km: number; cap: number; reentry: boolean; lighter: boolean; role: WeekRole }
 
 /**
@@ -403,6 +412,7 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
   const buildWeeks = Array.from({ length: seed.weeks }, (_, i) => i).filter((i) => isBuild(seed, i)).length;
   const anchor = Math.max(seed.anchorKm ?? seed.tolerance.km, NEXT.startKm);
   const out: Volume[] = [];
+  const track = trackOf(seed);
   let built = 0;
   for (let i = 0; i < seed.weeks; i++) {
     const role = roleOf(seed, i);
@@ -431,10 +441,17 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
       const prev = out.at(-1)?.km ?? window.at(-1) ?? 0;
       v = { km: fixed[i] ?? floorHalf(prev * tune().lighter.volume), cap: prev, reentry: false, lighter, role };
     } else {
-      const { cap, reentry } = noHistory && !out.length ? { cap: NEXT.startKm, reentry: false } : blockWeekCap(window, seed.tolerance.km);
+      const grown = noHistory && !out.length ? { cap: NEXT.startKm, reentry: false } : blockWeekCap(window, seed.tolerance.km);
+      // A marathon's week at a long-run target may go back to the level it had before a lighter week (no more than that): the mean of
+      // the three weeks would otherwise keep it a little under, and the long run it carries a little short of its target.
+      const wip = seed.track ? wipOf(addDays(seed.startWeek, i * 7), seed.track.raceDate) : 0;
+      const carry = track ? track.carryKm(wip) : 0;
+      const back = track?.at(wip) && lighterWip(wip + 1) ? window.at(-2) ?? 0 : 0;
+      const { cap, reentry } = back > grown.cap ? { cap: back, reentry: grown.reentry } : grown;
       // Where this build week sits on the ramp: 0 = first, 1 = last (a lone build week sits in the middle).
       const at = buildWeeks > 1 ? built / (buildWeeks - 1) : 0.5;
-      const aim = anchor * (tune().ramp.from + (tune().ramp.to - tune().ramp.from) * at) * scale;
+      // A marathon's week on the track grows toward the km that carry its long run (and the runs after it), never past the caps below.
+      const aim = Math.max(anchor * (tune().ramp.from + (tune().ramp.to - tune().ramp.from) * at), carry) * scale;
       // The first week is never bigger than the week button's suggestion: after a jump that one backs off.
       const first = (i === 0 ? Math.min(seed.firstWeekMax ?? Infinity, seed.backKm ?? Infinity) : Infinity);
       // The runner's own cap for the race holds every build week (a lower ceiling, never a higher one).
@@ -482,6 +499,7 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
   // Post-race recovery (docs/decisions/fartlek-post-race-recovery.md): the days after a race of 10 km+ are gated by days since it.
   const rec = seed.recovery ?? null;
   const row = rec ? recoveryRow(rec) : null;
+  const track = trackOf(seed);
   const dayOf = (d: ISODate) => (rec ? daysBetween(rec.date, d) : -1);
   let recStarted = false;
   return vols.map((v, i) => {
@@ -491,18 +509,22 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
     // The weeks after recovery step up from what recovery planned, not from the race or the long runs before it.
     if (recWeek && !recStarted) { longest = 0; any = 0; recStarted = true; }
     const phase = seed.phase && v.role !== "race" && !recWeek ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
-    // A marathon plan's build and race-phase weeks may give the long run more of the week; only a key long run (a long
-    // blueprint of the marathon phase) passes the plain ceiling (docs/decisions/fartlek-long-run-ceiling.md).
-    const marathon = seed.phase?.race.kind === "marathon";
+    // A marathon plan's build and race-phase weeks may give the long run more of the week (docs/decisions/fartlek-long-run-ceiling.md);
+    // a week on its long-run track takes the track's run, up to half of the week (docs/decisions/fartlek-marathon-long-run-plan.md).
+    const marathon = seed.phase?.race.kind === "marathon" || !!seed.track;
     const share = v.role === "build" && (marathon || (seed.longShareFrom != null && ws.weekStart >= seed.longShareFrom)) ? RACE_PLAN.marathonLongShare : 0;
-    const key = marathon && v.role === "build" && !!phase?.long;
-    const long = longRun(longest, v.lighter, seed.refs.easyPace, any, key ? NEXT.longCeiling.keyKm : NEXT.longCeiling.km);
+    const long = longRun(longest, v.lighter, seed.refs.easyPace, any, marathon);
+    const wip = seed.track ? wipOf(ws.weekStart, seed.track.raceDate) : seed.phase ? wipOf(ws.weekStart, seed.phase.race.date) : null;
+    const entry = track && wip != null && v.role === "build" ? track.at(wip) : null;
+    const onRail = track && wip != null && v.role === "build" && !entry;
     let longKm = recWeek ? Math.max(NEXT.easyMinKm, Math.min(RECOVERY.longMaxKm, floorHalf(v.km * RECOVERY.longShare)))
+      : long && entry ? trackLong(entry, long.km, v.km)
+      : long && onRail ? railLong(inTrackSpan(track, wip!) ? offTrackBase(long.km, v.km, longest) : longFor(long.km, v.km, longest, v.lighter, share), long.km, v.km, longest, track.stepNeed(wip!))
       : long ? longFor(long.km, v.km, longest, v.lighter, share) : null;
     // The long-run peak is held, not raised, in the build weeks close to the race (docs/decisions/fartlek-race-plan-skeleton.md).
     if (seed.phase && v.role === "build" && longKm != null && longest > 0) {
-      const wip = wipOf(ws.weekStart, seed.phase.race.date), h = RACE_PLAN.longPeak[seed.phase.race.kind];
-      if (wip >= h.holdTo && wip <= h.holdFrom) longKm = Math.min(longKm, longest);
+      const w = wipOf(ws.weekStart, seed.phase.race.date), h = RACE_PLAN.longPeak[seed.phase.race.kind];
+      if (w >= h.holdTo && w <= h.holdFrom) longKm = Math.min(longKm, longest);
     }
     const maxKm = any > 0 ? spikeMax(any) : null;
     // After the race: until the full threshold gate only the short session, and none before the short gate.
@@ -568,6 +590,8 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
     items = gateAfterRace(items, rec, row);
     longest = Math.max(longest, ...items.filter((it) => it.type === "long").map((it) => it.km));
     any = Math.max(any, ...items.filter(isRun).map((it) => it.km));
+    // A marathon plan's other race is a run of its distance: a half on the way counts as a long run done.
+    if (track) for (const o of seed.otherRaces ?? []) if (o.distanceKm != null && o.date >= ws.weekStart && o.date <= last) { longest = Math.max(longest, o.distanceKm); any = Math.max(any, o.distanceKm); }
     return { weekStart: ws.weekStart, lighter: v.lighter, role: v.role, reentry: v.reentry, cap: v.cap, targetKm: v.km, items };
   });
 }

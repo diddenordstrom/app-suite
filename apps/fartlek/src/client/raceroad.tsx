@@ -1,11 +1,11 @@
 import { useLayoutEffect, useRef, useState } from "react";
 import { api } from "./http";
-import { t, tn } from "./i18n";
+import { locale, t, tn } from "./i18n";
 import { useFmt } from "./prefs";
 import { Button, Input, cn } from "./ui";
 import { fmtDay } from "./bits";
 import { weekNumber } from "@/shared/dates";
-import { fmtClock } from "@/shared/format";
+import { fmtClock, fmtNum } from "@/shared/format";
 import type { WeekRole } from "@/shared/blockplan";
 import type { PlanPhase, RaceRoad as Road, RoadWeek } from "@/shared/raceplan";
 
@@ -62,6 +62,9 @@ export function RaceRoad({ road, compact, onChanged }: { road: Road; compact?: b
             </p>
           ))}
           {road.warnings.includes("longShort") && road.longPeak && <p className="text-warning">{t("road.longShort", { km: fmt.dist(road.longPeak.km) })}</p>}
+          {road.warnings.includes("longTrackShort") && road.trackShort[0] && (
+            <p className="text-warning">{t("road.longTrackShort", { km: fmt.dist(Math.min(...road.trackShort.map((x) => x.reached))), target: fmt.dist(Math.max(...road.trackShort.map((x) => x.target)), 0) })}</p>
+          )}
         </div>
       )}
       {!compact && (
@@ -151,7 +154,7 @@ async function putRace(id: number, patch: Record<string, unknown>) {
 /** The cap on a build week (docs/decisions/fartlek-long-run-ceiling.md): set in km, a suggestion from the proven peak week. */
 function CapRow({ road, onChanged }: { road: Road; onChanged?: () => void }) {
   const fmt = useFmt();
-  const { km, suggestedKm, provenKm } = road.cap;
+  const { km, suggestedKm, provenKm, factor } = road.cap;
   const [value, setValue] = useState(km != null ? String(fmt.distNum(km)) : "");
   const [busy, setBusy] = useState(false);
   const save = async (next: number | null) => {
@@ -172,7 +175,7 @@ function CapRow({ road, onChanged }: { road: Road; onChanged?: () => void }) {
         )}
         {km != null && <Button variant="ghost" className="h-8" disabled={busy} onClick={() => save(null)}>{t("road.cap.clear")}</Button>}
       </div>
-      {suggestedKm != null && <p className="text-xs text-muted-foreground">{t("road.cap.suggest", { km: fmt.dist(suggestedKm, 0), peak: fmt.dist(provenKm, 0) })}</p>}
+      {suggestedKm != null && <p className="text-xs text-muted-foreground">{t("road.cap.suggest", { km: fmt.dist(suggestedKm, 0), factor: fmtNum(factor, 0, 2, locale), peak: fmt.dist(provenKm, 0) })}</p>}
     </div>
   );
 }

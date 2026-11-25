@@ -117,12 +117,13 @@ describe("the long run's ladder", () => {
     expect(longRun(0, false, 330)).toBeNull();
   });
 
-  it("is 70 % in a lighter week, and stops at 30 km (a marathon key long run 32) or 3 hours", () => {
+  it("is 70 % in a lighter week, and stops at 32 km for every long run, or 3 hours (3.5 in a marathon plan)", () => {
     expect(longRun(10, true, 330)).toMatchObject({ km: 7, why: "lighter" });
-    expect(longRun(29.5, false, 330)).toMatchObject({ km: 30, why: "ceiling" });
-    expect(longRun(31.5, false, 330, 31.5, NEXT.longCeiling.keyKm)).toMatchObject({ km: 32, why: "ceiling" });
-    // 3 hours at 6:40/km is 27 km.
+    expect(longRun(29.5, false, 330)).toMatchObject({ km: 32, why: "step" });
+    expect(longRun(31.5, false, 330)).toMatchObject({ km: 32, why: "ceiling" });
+    // 3 hours at 6:40/km is 27 km, 3.5 hours 31.5.
     expect(longRun(30, false, 400)).toMatchObject({ km: 27, why: "ceiling" });
+    expect(longRun(30, false, 400, 30, true)).toMatchObject({ km: 31.5, why: "ceiling" });
   });
 });
 
