@@ -12,7 +12,7 @@ import { addDays, daysBetween, weekStartOf, type ISODate } from "../../shared/da
 import { blockEnd, checkEdges } from "../../shared/blocks";
 import { diffPlans, planRange, rangeWeeks, workoutWeeks } from "../../shared/planrange";
 import { COACH } from "../../shared/coach";
-import { BLOCK, blockDaysAdvice, raceChunks, raceRoles, RECOVERY, recoveryRoles, recoveryRow, tolerance, weekKm, withRecovery, type BlockSeed, type RaceChunk, type RecoveryRace, type WeekRole } from "../../shared/blockplan";
+import { BLOCK, blockDaysAdvice, doneKmOf, raceChunks, raceRoles, RECOVERY, recoveryRoles, recoveryRow, tolerance, weekKm, withRecovery, type BlockSeed, type RaceChunk, type RecoveryRace, type WeekRole } from "../../shared/blockplan";
 import { NEXT, type SuggestItem } from "../../shared/nextweek";
 import type { PlanPhase } from "../../shared/raceplan";
 import { BLOCK_KINDS, type Block, type Race, type Workout } from "../../shared/types";
@@ -101,16 +101,19 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
   /** Other races in the weeks (docs/decisions/fartlek-race-plan-skeleton.md), and the first build week's cap after a break. */
   otherRaces?: { date: ISODate }[]; backKm?: number | null;
   /** A marathon plan (docs/decisions/fartlek-long-run-ceiling.md): where its build phase starts, and the runner's cap on a build week. */
-  plan?: PlanRace | null }): BlockSeed {
+  plan?: PlanRace | null;
+  /** A block started from today in the running week: the days that are over and what was run on them (see `doneOf`). */
+  done?: BlockSeed["done"] }): BlockSeed {
   const w = seedFor(ctx, startWeek, { formOverTarget: true, weeks });
   const seed: BlockSeed = {
     startWeek, weeks, ctl: w.ctl, atl: w.atl, kmBefore: w.kmBefore, past: w.past,
     tolerance: tolerance(weeksBefore(ctx, startWeek, BLOCK.tolerance.lookbackWeeks)),
     runDays: w.runDays, longRunDay: w.longRunDay, threshold: w.threshold, refs: w.refs, crossMin: w.crossMin,
     lighterLast: o.lighterLast, goalKm: o.goalKm, buildWeeksDone: o.buildWeeksDone, hardBefore: hardOn(ctx, addDays(startWeek, -1)),
-    // The same rule as "Föreslå veckan": a lighter week due before the block makes its first week lighter.
-    lighterFirst: !!o.light || (o.buildWeeksDone === 0 && w.backoff),
-    lighterFirstWhy: o.light ? "light" : o.buildWeeksDone === 0 && w.backoff ? w.backoffWhy ?? "form" : null,
+    // The same rule as "Föreslå veckan": a lighter week due before the block makes its first week lighter. Not when the block
+    // starts from today in the running week: the days already over are the easing, so that week keeps its role (docs/decisions/fartlek-skapa-block.md).
+    lighterFirst: !!o.light || (o.buildWeeksDone === 0 && w.backoff && !o.done),
+    lighterFirstWhy: o.light ? "light" : o.buildWeeksDone === 0 && w.backoff && !o.done ? w.backoffWhy ?? "form" : null,
     longestKm: w.longestKm, rung: w.rung, tempoPace: w.tempoPace,
     ...(w.phase ? { phase: w.phase } : {}),
     ...(o.lighterWeeks ? { lighterWeeks: o.lighterWeeks } : {}),
@@ -118,6 +121,7 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
     ...(o.otherRaces?.length ? { otherRaces: o.otherRaces } : {}),
     ...(o.backKm != null ? { backKm: o.backKm } : {}),
     ...(o.plan ? { longShareFrom: buildPhaseFrom(ctx, o.plan, startWeek), capKm: o.plan.race.peakKm } : {}),
+    ...(o.done ? { done: o.done } : {}),
   };
   // After a race of 10 km+ (docs/decisions/fartlek-post-race-recovery.md): the race is not the long run the ladder and the spike rule step from.
   if (o.recovery) {
@@ -133,6 +137,16 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
   }
   return seed;
 }
+
+/** The days of the running week before `from` (today) and the km run on them, as easy runs: null for a week not started. */
+function doneOf(ctx: Ctx, startWeek: ISODate, from: ISODate): NonNullable<BlockSeed["done"]> | null {
+  if (from <= startWeek) return null;
+  const items = [...kmByDay(ctx, startWeek, addDays(from, -1))].filter(([, km]) => km > 0)
+    .map(([date, km]): SuggestItem => ({ date, type: "easy", km: r1(km), durationMin: null, steps: null }));
+  return { before: from, items };
+}
+/** The posted or suggested weeks for the race plan, the first one with the km already run in it (a block from today). */
+const withDoneKm = (weeks: BlockWeek[], doneKm: number) => (doneKm > 0 && weeks.length ? [{ ...weeks[0], km: r1(weeks[0].km + doneKm) }, ...weeks.slice(1)] : weeks);
 
 /**
  * The running week can start a block from today when no block holds it and at least `BLOCK.minDaysLeft` days of it
@@ -212,13 +226,14 @@ function blockParts(raw: unknown, n: number, name: string | null, allRecovery = 
 
 type Tx = Parameters<Parameters<Db["transaction"]>[0]>[0];
 /** Weekly targets for the weeks written: their km, and a note on the lighter and taper weeks (a re-plan reads `backoff`). */
-function writeTargets(tx: Tx, userId: number, startWeek: ISODate, weeks: SuggestItem[][], roles: (WeekRole | boolean)[]) {
+function writeTargets(tx: Tx, userId: number, startWeek: ISODate, weeks: SuggestItem[][], roles: (WeekRole | boolean)[], doneKm = 0) {
   // The block's weeks hold exactly the block's targets: one that went stale never stays (docs/decisions/fartlek-race-plan-skeleton.md).
   tx.delete(t.weekTargets).where(and(eq(t.weekTargets.userId, userId), gte(t.weekTargets.weekStart, startWeek), lte(t.weekTargets.weekStart, addDays(startWeek, (weeks.length - 1) * 7)))).run();
   weeks.forEach((items, i) => {
     const ws = addDays(startWeek, i * 7);
     const role = roles[i] === true ? "lighter" : roles[i] === false ? "build" : roles[i];
-    const target = { km: weekKm(items), minutes: null, note: role === "lighter" ? BACKOFF_NOTE : role === "taper" || role === "race" ? TAPER_NOTE : role === "recovery" ? RECOVERY_NOTE : null };
+    // The first week of a block from today counts the whole week: what was run before today and the sessions ahead.
+    const target = { km: r1(weekKm(items) + (i === 0 ? doneKm : 0)), minutes: null, note: role === "lighter" ? BACKOFF_NOTE : role === "taper" || role === "race" ? TAPER_NOTE : role === "recovery" ? RECOVERY_NOTE : null };
     tx.insert(t.weekTargets).values({ userId, weekStart: ws, ...target })
       .onConflictDoUpdate({ target: [t.weekTargets.userId, t.weekTargets.weekStart], set: target }).run();
   });
@@ -325,7 +340,7 @@ export function blockPlanRoutes(db: Db) {
       const recovery = rec ? { date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, peakKm: rec.peakKm } : inside;
       const ob = pr ? otherRacesInBlock(ctx, pr, rw.startWeek, rw.weeks, withRecovery(rp?.roles ?? null, recRoles)) : null;
       const seed = blockSeedFor(ctx, rw.startWeek, rw.weeks, { goalKm: null, buildWeeksDone: 0, lighterLast: true, lighterWeeks, roles: ob ? ob.roles : withRecovery(rp?.roles ?? null, recRoles), race: raceIn,
-        recovery: recovery ?? ob?.recovery ?? null, otherRaces: ob?.otherRaces, backKm: back?.km ?? null, plan: pr });
+        recovery: recovery ?? ob?.recovery ?? null, otherRaces: ob?.otherRaces, backKm: back?.km ?? null, plan: pr, done: doneOf(ctx, rw.startWeek, from) });
       const plan = planRange(seed, { from, to: end });
       const suggestion = from > startWeek ? { ...plan.suggestion, eval: plan.eval, weeks: plan.suggestion.weeks.map((w, i) => ({ ...w, items: plan.items[i] })) } : plan.suggestion;
       // Not enough run days for the block: the dialog offers another one. Judged on whole weeks, never on the running
@@ -337,7 +352,7 @@ export function blockPlanRoutes(db: Db) {
     const doneDays = from > startWeek ? Object.fromEntries(kmByDay(ctx, startWeek, addDays(from, -1))) : {};
     return c.json({ startWeek, defaultStart: firstStart, earliest, weeks, ok: true, seed, suggestion, replaces, advice, race: next && { name: next.name, date: next.date }, racePlan: rp?.plan ?? null, today: ctx.today, doneDays, racePace: phaseView(ctx, startWeek, weeks),
       recovery: rec && hasRecovery ? { name: rec.name, date: rec.date, distanceKm: rec.distanceKm, priority: rec.priority, weeks: recRoles.filter(Boolean).length } : null,
-      road: pr ? roadAfter(ctx, pr, blockWeeksOf(suggestion.weeks), addDays(startWeek, weeks * 7)) : null, back,
+      road: pr ? roadAfter(ctx, pr, withDoneKm(blockWeeksOf(suggestion.weeks), doneKmOf(seed)), addDays(startWeek, weeks * 7)) : null, back,
       farRace: pr ? null : farOf(ctx, startWeek) });
   });
 
@@ -367,20 +382,22 @@ export function blockPlanRoutes(db: Db) {
     const targetsBefore = [...repo.getTargets(db, ctx.userId, startWeek, end)].map(([weekStart, v]) => ({ weekStart, ...v }));
     // The race plan: the skeleton after the posted weeks, written with them (docs/decisions/fartlek-race-plan-skeleton.md).
     const planBefore = repo.listPlanWeeks(db, ctx.userId, startWeek, "9999-12-31").map((w) => ({ weekStart: w.weekStart, raceId: w.raceId, phase: w.phase, role: w.role, km: w.km, longKm: w.longKm }));
+    // A block from today: the km already run in its first week count in that week's target and in the block's goal.
+    const doneKm = doneKmOf({ done: doneOf(ctx, startWeek, ctx.today) });
     const pr = planRaceFor(ctx, startWeek);
-    const plan = pr ? planAfter(ctx, pr, postedWeeks(startWeek, weeks, roles), addDays(startWeek, n * 7)) : null;
+    const plan = pr ? planAfter(ctx, pr, withDoneKm(postedWeeks(startWeek, weeks, roles), doneKm), addDays(startWeek, n * 7)) : null;
     let ids: number[] = [];
     const blockIds: number[] = [];
     db.transaction((tx) => {
       for (const w of current) tx.delete(t.workouts).where(and(eq(t.workouts.userId, ctx.userId), eq(t.workouts.id, w.id))).run();
       let at = 0;
       for (const p of parts) {
-        const goalKm = r1(weeks.slice(at, at + p.weeks).reduce((s, w) => s + weekKm(w), 0));
+        const goalKm = r1(weeks.slice(at, at + p.weeks).reduce((s, w) => s + weekKm(w), 0) + (at === 0 ? doneKm : 0));
         blockIds.push(tx.insert(t.blocks).values({ userId: ctx.userId, kind: p.kind, name: p.name, note: null, startWeek: addDays(startWeek, at * 7), weeks: p.weeks, crossMin: null, goalKm }).returning().get().id);
         at += p.weeks;
       }
       ids = weeks.flatMap((items) => insertItems(tx, ctx, items));
-      writeTargets(tx, ctx.userId, startWeek, weeks, roles);
+      writeTargets(tx, ctx.userId, startWeek, weeks, roles, doneKm);
       if (plan) writePlan(tx, ctx.userId, startWeek, plan, ctx.today);
     });
     gate.done();

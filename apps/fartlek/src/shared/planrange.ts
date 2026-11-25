@@ -13,8 +13,9 @@ import type { Workout } from "./types";
  * (`diffPlans`) so the runner sees what changes and what it does to the block before anything is saved.
  * Pure: the server gathers the seed.
  *
- * A range that starts or ends mid-week is planned as whole weeks and clipped: the days outside it are dropped, and
- * the load of days already run in that week is not in the seed (a small inaccuracy, said so in the decision page).
+ * A range that starts or ends mid-week is planned as whole weeks and clipped: the days outside it are dropped. A block
+ * started from today passes the days already run in that week as `BlockSeed.done`, so their km and load count; other
+ * callers (the week button, a re-plan from the running week) still leave them out of the seed, a small inaccuracy.
  */
 
 export interface PlanRequest {

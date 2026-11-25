@@ -583,6 +583,56 @@ describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-ru
   });
 });
 
+describe("a block started from today", () => {
+  // A runner of about 40 km a week on six days, a 46 km week a month back, heavy form (−27 %); an in-phase block (build,
+  // build, lighter) started on the Wednesday of the running week (docs/decisions/fartlek-skapa-block.md).
+  const WED = addDays(MONDAY, 2);
+  const runner = seed({ weeks: 3, ctl: 42, atl: 53.5, kmBefore: [40, 41, 42], tolerance: { km: 46, peakKm: 46, peakWeek: addDays(MONDAY, -28), weeksAgo: 4 },
+    runDays: [1, 2, 3, 4, 6, 0], longestKm: 16, roles: ["build", "build", "lighter"] });
+  const easy = (date: string, km: number): SuggestItem => ({ date, type: "easy", km, durationMin: null, steps: null });
+  const from = (s: BlockSeed) => planRange(s, { from: WED, to: addDays(MONDAY, 20) });
+
+  it("keeps the first week's build target and drops only the days that are over when nothing was run on them", () => {
+    const whole = suggestBlock(runner);
+    const p = from({ ...runner, done: { before: WED, items: [] } });
+    const w0 = p.suggestion.weeks[0];
+    expect(w0.role).toBe("build");
+    expect(w0.targetKm).toBe(whole.weeks[0].targetKm);
+    // The days ahead are the whole week's sessions on them: what Monday and Tuesday held is not made up.
+    expect(p.items[0]).toEqual(whole.weeks[0].items.filter((it) => it.date >= WED));
+    expect(weekKm(p.items[0])).toBeGreaterThan(0.6 * w0.targetKm);
+    expect(p.items[0].every((it) => it.date >= WED)).toBe(true);
+  });
+
+  it("plans the days ahead so what was run and what is planned come to about the target, and counts the runs", () => {
+    const ran = [easy(MONDAY, 6), easy(addDays(MONDAY, 1), 7)];
+    const p = from({ ...runner, done: { before: WED, items: ran } });
+    const w0 = p.suggestion.weeks[0];
+    const total = 13 + weekKm(p.items[0]);
+    expect(total).toBeLessThanOrEqual(w0.targetKm + 0.5);
+    expect(total).toBeGreaterThan(w0.targetKm - 4);
+    // The evaluation counts the runs already done: the week's km and its load.
+    expect(p.eval.weeks[0].km).toBeCloseTo(total, 1);
+    const blind = evaluateBlock(runner, p.items);
+    expect(p.eval.weeks[0].atl).toBeGreaterThan(blind.weeks[0].atl);
+    // Run more than planned on Monday and Tuesday: the days ahead shrink so the week never passes its target.
+    const big = from({ ...runner, done: { before: WED, items: [easy(MONDAY, 14), easy(addDays(MONDAY, 1), 12)] } });
+    expect(26 + weekKm(big.items[0])).toBeLessThanOrEqual(big.suggestion.weeks[0].targetKm + 0.5);
+    expect(big.items[0].every((it) => it.date >= WED)).toBe(true);
+  });
+
+  it("changes nothing for a block on a week not begun", () => {
+    expect(suggestBlock({ ...runner, done: null })).toEqual(suggestBlock(runner));
+    expect(evaluateBlock({ ...runner, done: null }, suggestBlock(runner).weeks.map((w) => w.items))).toEqual(evaluateBlock(runner, suggestBlock(runner).weeks.map((w) => w.items)));
+  });
+
+  it("judges the run days on whole weeks", () => {
+    const four = { ...runner, runDays: [2, 4, 6, 0] };
+    const clipped = from({ ...four, done: { before: WED, items: [] } });
+    expect(blockDaysAdvice({ ...four, done: { before: WED, items: [] } }, clipped.suggestion.weeks)).toEqual(blockDaysAdvice(four, suggestBlock(four).weeks));
+  });
+});
+
 describe("blockDaysAdvice", () => {
   // A runner of about 40 km a week on four days, a 46 km week a month back, heavy form; the block starts in the
   // running week, so its Monday and Tuesday are over and the plan is clipped to the days ahead (as the route does).
