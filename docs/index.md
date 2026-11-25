@@ -4,22 +4,14 @@
 
 ## Recent activity
 
+- 2026-11-25 · ingest · What Fartlek's planning engine rests on ([log/2026-11.md](log/2026-11.md))
+- 2026-11-25 · decision · Fartlek: a marathoner's long run may reach 30 km on a lower week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek grows a low-volume runner by km, and a marathoner's long run takes up to half the week ([log/2026-11.md](log/2026-11.md))
+- 2026-11-25 · decision · Fartlek grows a low-volume runner by km ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek plan simulator: the whole road for a made-up runner ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek doubles after gym, and one week editor for the days ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek Skapa block asks for gym and cross-training days ([log/2026-11.md](log/2026-11.md))
-<<<<<<< HEAD
 - 2026-11-25 · lint · Long-run ceiling page marked partly overtaken ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek marathon long-run track built ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek marathon long runs: five runs, 30 km target, cap follows proven peak ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek marathon long-run plan settled ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · note · Fartlek marathon plan for a low-volume runner: long runs over 30 km ([log/2026-11.md](log/2026-11.md))
-=======
-- 2026-11-25 · decision · Fartlek: a block from today keeps the running week's build target ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek "add a run day" no longer loops in a running week ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek long run stops at 30 km, a race can cap the biggest week ([log/2026-11.md](log/2026-11.md))
-- 2026-11-24 · note · Fartlek race plan skeleton built ([log/2026-11.md](log/2026-11.md))
->>>>>>> d4cab36 (✨ Fartlek grows a low-volume runner by km, and lets a marathoner's long run take up to half the week)
 
 ## Pages
 
@@ -50,13 +42,9 @@
 - [Fartlek finds interval laps against the threshold estimate](decisions/fartlek-interval-laps.md): Interval laps are ≥ 3 min and at most 10 % slower than the threshold estimate; without one, near the median of the work laps instead of the fastest lap _(decision · accepted · 2026-11-11)_
 - [Fartlek plans the key sessions first, with the long run on a 30-day ladder](decisions/fartlek-key-sessions-first.md): Week and block suggestions place the long run (longest run of 30 days + 1 km, never more than 10 % over it), then the next threshold rung, then fill with zone 2; one dial; the 35 % long-run share is gone; Home offers to fix a key session ahead after a missed one _(decision · accepted · 2026-11-14)_
 - [Fartlek gets its own landing page on the portfolio, built from live components](decisions/fartlek-landing-page.md): /fartlek on the portfolio renders Fartlek's real components on hand-tuned demo data (no screenshots), with a theme toggle; the Fartlek card says "Läs mer" instead of "Öppna appen"; "öppen källkod" (present tense) without a GitHub link; about/contact waits for the owner _(decision · accepted · 2026-11-23)_
-<<<<<<< HEAD
 - [Fartlek's long-run ceiling and a race's cap on the biggest week](decisions/fartlek-long-run-ceiling.md): Each race can carry a km cap on its build weeks (suggested 1.5 × proven peak for a half, 1.75 × for a marathon); outside the marathon long-run track the long run takes up to 40 % of a marathon plan's build weeks; the 30 / 32 km split and 3 h limit are replaced by one 32 km ceiling (3.5 h for a marathon) _(decision · accepted · 2026-11-25)_
+- [Fartlek lets a low-volume runner grow by km, not only by per cent](decisions/fartlek-low-volume-growth.md): A build week may always grow 2.5 km (not only 10 %), and a block under 40 km climbs 2.5 km a build week from the tolerated load; the spike rule, the km-ramp limit and the form guard stay _(decision · accepted · 2026-11-26)_
 - [Fartlek marathon plan for a low-volume runner: long runs over 30 km need their own track](decisions/fartlek-marathon-long-run-plan.md): Why a marathon plan for a runner with a 35 km proven peak week never gets a long run past about 21 km, and what was decided: five long runs (three 30+ km, two 26–30 km) on a long-run track planned back from the race, 30 km as the target and 32 only when the cap allows, 55–60 km weeks with up to 50 % long run, a hard cap at 1.75 × proven peak that follows the proven peak as it grows _(decision · accepted · 2026-11-25)_
-=======
-- [Fartlek's long run stops at 30 km; only marathon key sessions go to 32, and a race can cap the biggest week](decisions/fartlek-long-run-ceiling.md): A plain long run stops at 30 km (or 3 h); only a marathon race-phase long blueprint may reach 32 km; in a marathon plan's build and race-phase weeks the long run may take 40 % of the week so 30 km comes at about 75 km a week; each race can carry a km cap on its build weeks, suggested at 1.5 × the proven peak week _(decision · accepted · 2026-11-25)_
-- [Fartlek lets a low-volume runner grow by km, not only by per cent, and a marathoner's long run take up to half the week](decisions/fartlek-low-volume-growth.md): A build week may always grow 2.5 km (not only 10 %), a block under 40 km climbs 2.5 km a build week, and a marathon plan's long run may take 50 % of the week up to 50 km, falling to 40 % at 75 km; the spike rule, the km-ramp limit and the form guard stay _(decision · accepted · 2026-11-25)_
->>>>>>> d4cab36 (✨ Fartlek grows a low-volume runner by km, and lets a marathoner's long run take up to half the week)
 - [Fartlek's morning notification: today's session and today's form](decisions/fartlek-morning-push.md): A push at a time the runner picks with today's sessions and form score; with Garmin it syncs first and waits up to two hours for last night's HRV or sleep _(decision · accepted · 2026-11-20)_
 - [Fartlek starts the block after a 10 km+ race with recovery weeks gated by days since the race](decisions/fartlek-post-race-recovery.md): After an A or B race of 10 km or longer the next block's first weeks get a new `recovery` role (volume as a share of the pre-race peak, distance and priority decide how many), quality returns by day gates in the order strides, threshold, intervals; the 14-day refusal goes; built 2026-11-24 from the step-by-step build plan _(decision · accepted · 2026-11-24)_
 - [Fartlek plans the weeks up to an A or B race backwards (peak builds, then a two-week taper)](decisions/fartlek-race-blocks.md): Spec for race-mode block planning: from the race date, two taper weeks, up to three build weeks before them, a lighter week ahead of those, and the base engine's guards kept; replaces the "race within 16 weeks refuses" rule _(decision · accepted · 2026-11-24)_
@@ -93,6 +81,7 @@
 
 ### research
 
+- [What Fartlek's planning engine rests on (research, convention, our own choice)](research/fartlek-engine-evidence.md): Every rule and number of the block and week engine, with its source and how strong that is, so a tweak knows whether it touches research or a rule of thumb; the engine's goal outside a race block in one line _(research · 2026-11-25)_
 - [Fartlek vs intervals.icu and TrainingPeaks (research)](research/fartlek-vs-intervals-trainingpeaks.md): Where Fartlek stands against intervals.icu and TrainingPeaks (Nov 2026), whether to keep building it, and what that means for the roadmap _(research · 2026-11-12)_
 - [How marathon and half-marathon methods shape the last weeks, and what studies say](research/marathon-specific-phase.md): Phases, key sessions, long-run counts and caps, taper and pace setting in Pfitzinger, Daniels, Hansons, Canova, Norwegian-style and app plans (Runna, Garmin, Higdon), plus the studies on long runs, critical speed, overreaching before a taper and injury risk _(research · 2026-11-24)_
 - [Training blocks for runplan (research)](research/training-blocks.md): What the evidence says about blocks, intensity distribution, long runs, injury spikes and tapering, and what runplan should do with it _(research · 2026-11-09)_
