@@ -328,8 +328,9 @@ export function blockPlanRoutes(db: Db) {
         recovery: recovery ?? ob?.recovery ?? null, otherRaces: ob?.otherRaces, backKm: back?.km ?? null, plan: pr });
       const plan = planRange(seed, { from, to: end });
       const suggestion = from > startWeek ? { ...plan.suggestion, eval: plan.eval, weeks: plan.suggestion.weeks.map((w, i) => ({ ...w, items: plan.items[i] })) } : plan.suggestion;
-      // Not enough run days for the block: the dialog offers another one. Never when re-planning a running block.
-      const advice = blockDaysAdvice(seed, suggestion.weeks);
+      // Not enough run days for the block: the dialog offers another one. Judged on whole weeks, never on the running
+      // week clipped to the days ahead (its target counts the days that are over, so no added day could ever fill it).
+      const advice = blockDaysAdvice(seed, plan.suggestion.weeks);
       return { seed, suggestion, advice };
     });
     const next = repo.listRaces(db, ctx.userId).find((x) => (x.priority === "A" || x.priority === "B") && x.date >= startWeek) ?? null;

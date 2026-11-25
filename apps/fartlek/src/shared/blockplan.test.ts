@@ -1,9 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { addDays, daysBetween, weekday } from "./dates";
 import { COACH } from "./coach";
-import { BLOCK, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, projectVolumes, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
+import { BLOCK, blockDaysAdvice, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, projectVolumes, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
 import { COACH as COACH_RACE } from "./coach";
 import { NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
+import { planRange } from "./planrange";
 import { stridesOf, withStrides } from "./steps";
 import type { PhaseSeed } from "./racephase";
 const floorHalf = (n: number) => Math.floor(n * 2) / 2;
@@ -579,5 +580,37 @@ describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-ru
     for (const w of s.weeks.filter((x) => x.role === "build")) expect(w.targetKm).toBeLessThanOrEqual(70);
     const free = suggestBlock(seed({ ...big, longestKm: 24 }));
     expect(Math.max(...free.weeks.map((w) => w.targetKm))).toBeGreaterThan(70);
+  });
+});
+
+describe("blockDaysAdvice", () => {
+  // A runner of about 40 km a week on four days, a 46 km week a month back, heavy form; the block starts in the
+  // running week, so its Monday and Tuesday are over and the plan is clipped to the days ahead (as the route does).
+  const runner = seed({ weeks: 3, ctl: 40, atl: 51, kmBefore: [38, 40, 42], tolerance: { km: 46, peakKm: 46, peakWeek: null, weeksAgo: 4 },
+    runDays: [2, 4, 6, 0], longestKm: 16 });
+  const running = (s: BlockSeed) => {
+    const p = planRange(s, { from: addDays(MONDAY, 2), to: addDays(MONDAY, 20) });
+    return p.suggestion.weeks.map((w, i) => ({ ...w, items: p.items[i] }));
+  };
+
+  it("asks for a day only when adding it settles the plan, so accepting never loops up to seven days", () => {
+    let s = runner;
+    const asked: number[] = [];
+    for (let i = 0; i < 7; i++) {
+      const a = blockDaysAdvice(s, running(s));
+      if (!a) break;
+      asked.push(s.runDays.length);
+      expect(a.free.length).toBeGreaterThan(0);
+      s = { ...s, runDays: [...s.runDays, a.free[0]] };
+    }
+    // At most the one day the peak week calls for (46 km: five days), never a run of questions up to seven.
+    expect(asked.length).toBeLessThanOrEqual(1);
+    expect(s.runDays.length).toBeLessThan(7);
+  });
+
+  it("judges the days on whole weeks, not on a week clipped to the days ahead", () => {
+    const five = { ...runner, runDays: [2, 3, 4, 6, 0] };
+    expect(blockDaysAdvice(five, suggestBlock(five).weeks)).toBeNull();
+    expect(blockDaysAdvice(five, running(five))).toBeNull();
   });
 });
