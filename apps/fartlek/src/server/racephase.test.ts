@@ -61,13 +61,17 @@ describe("race paces of the race phase", () => {
     expect((await get<RaceRow[]>("/api/races")).find((r) => r.id === id)).toMatchObject({ mpSec: 300, paceSource: "goal" });
   });
 
-  it("refuses an answer outside a phase, a goal without a goal time, and keep with nothing locked", async () => {
+  it("answers for a race planned ahead, refuses a race without a phase, a goal without a goal time, and keep with nothing locked", async () => {
     const a = createApp(createDb(":memory:"), loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv));
     await a.request("/api/settings");
     const far = await (await a.request("/api/races", json({ name: "Far", date: "2027-03-28", distanceKm: 42.195, priority: "A" }))).json() as RaceRow[];
-    expect((await a.request(`/api/races/${far[0].id}/race-pace`, json({ choice: "prediction" }))).status).toBe(400); // 18 weeks out
+    // 18 weeks out: a block planned ahead reaches its phase, so the question can be answered now.
+    expect((await a.request(`/api/races/${far[0].id}/race-pace`, json({ choice: "prediction" }))).status).toBe(200);
+    const ten = await (await a.request("/api/races", json({ name: "Ten", date: "2027-02-14", distanceKm: 10, priority: "A" }))).json() as RaceRow[];
+    const tenId = ten.find((r) => r.name === "Ten")!.id;
+    expect((await a.request(`/api/races/${tenId}/race-pace`, json({ choice: "prediction" }))).status).toBe(400); // not a marathon or half
     const near = await (await a.request("/api/races", json({ name: "Near", date: "2026-12-13", distanceKm: 21.0975, priority: "A" }))).json() as RaceRow[];
-    const nearId = near.find((r) => r.id !== far[0].id)!.id;
+    const nearId = near.find((r) => r.name === "Near")!.id;
     // The next A race is the one that counts: the near half, not the far marathon.
     expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "goal" }))).status).toBe(400);
     expect((await a.request(`/api/races/${nearId}/race-pace`, json({ choice: "keep" }))).status).toBe(400);

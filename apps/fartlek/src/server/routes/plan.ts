@@ -4,6 +4,7 @@ import * as t from "../db/schema";
 import * as repo from "../repo";
 import { afterResult, raceChecks, resultSuggestions } from "../races";
 import { lockRacePace, phaseRace, racePaceView } from "../racephase";
+import { RACE_PHASE } from "../../shared/racephase";
 import { refreshSkeleton } from "../raceplan";
 import { ctxFor, stepMatchFor, stepRefs, weekSummaries, type Ctx } from "../analysis";
 import { stepSummary } from "../../shared/stepmatch";
@@ -225,8 +226,12 @@ export function planRoutes(db: Db) {
     const race = repo.listRaces(db, ctx.userId).find((x) => x.id === idParam(c.req.param("id")));
     if (!race) return c.json({ error: "not found" }, 404);
     const choice = oneOf((await body(c)).choice, ["prediction", "goal", "keep"] as const, "choice");
-    const ph = phaseRace(ctx, weekStartOf(ctx.today, ctx.settings.weekStart));
-    if (!ph || ph.race.id !== race.id) throw new BadRequest("the race is not in its race-specific phase");
+    // Judged from the race's own phase, not today: the question comes up as soon as a plan reaches the phase's weeks,
+    // which a block planned ahead does months before them (and its write waits on the answer).
+    const today = weekStartOf(ctx.today, ctx.settings.weekStart);
+    const first = weekStartOf(addDays(race.date, -7 * (RACE_PHASE.weeks - 1)), ctx.settings.weekStart);
+    const ph = race.date >= ctx.today ? phaseRace(ctx, first > today ? first : today) : null;
+    if (!ph || ph.race.id !== race.id) throw new BadRequest("the race has no race-specific phase");
     if (choice === "goal" && !race.goalSeconds) throw new BadRequest("the race has no goal time");
     if (choice === "keep" && race.paceLockedOn == null) throw new BadRequest("no paces are locked");
     lockRacePace(ctx, race, choice === "keep" ? "keep" : choice);
