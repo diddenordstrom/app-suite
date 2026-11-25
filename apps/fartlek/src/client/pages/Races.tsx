@@ -4,6 +4,7 @@ import { api, useAction, useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
 import { Badge, BusyButton, Button, Card, CardTitle, ErrorText, Field, InfoTip, Input, Select } from "../ui";
 import { PredictionBody } from "../perf";
+import { MoreMenu } from "../moremenu";
 import { AnswerKey, PastRaces } from "../raceresults";
 import { fmtCountdown, fmtDay } from "../bits";
 import { t } from "../i18n";
@@ -62,19 +63,18 @@ export function Races() {
             {upcoming.map((r) => {
               const gp = r.goalSeconds ? goalPace(r.goalSeconds, r.distanceKm) : null;
               return (
-                <li key={r.id} className="flex flex-wrap items-center justify-between gap-2 py-2 text-sm">
-                  <div>
-                    <div className="font-medium">{r.name} <Badge>{r.priority}</Badge> <Badge className="uppercase">{fmtCountdown(countdown(today, r.date))}</Badge></div>
-                    <div className="text-xs text-muted-foreground">
-                      {fmtDay(r.date)} · {fmt.dist(r.distanceKm, 2)}
-                      {gp && <> · {t("races.goal", { time: fmtClock(r.goalSeconds!) })} = {fmt.pace(gp)} · {t("races.needsThreshold", { pace: fmt.pace(neededThreshold(gp, r.distanceKm)) })}</>}
+                <li key={r.id} className="space-y-2 py-3 text-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="min-w-0">
+                      <div className="font-medium">{r.name} <Badge>{r.priority}</Badge> <Badge className="uppercase">{fmtCountdown(countdown(today, r.date))}</Badge></div>
+                      <div className="text-xs text-muted-foreground">
+                        {fmtDay(r.date)} · {fmt.dist(r.distanceKm, 2)}
+                        {gp && <> · {t("races.goal", { time: fmtClock(r.goalSeconds!) })} = {fmt.pace(gp)} · {t("races.needsThreshold", { pace: fmt.pace(neededThreshold(gp, r.distanceKm)) })}</>}
+                      </div>
                     </div>
-                    {hints.data?.hints[r.id] && <Hints h={hints.data.hints[r.id]} />}
+                    <MoreMenu label={t("races.more", { name: r.name })} items={[{ label: t("common.edit"), onClick: () => edit(r) }, { label: t("common.remove"), onClick: () => remove(r), danger: true }]} />
                   </div>
-                  <div className="flex gap-1">
-                    <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => edit(r)}>{t("common.edit")}</Button>
-                    <Button variant="ghost" className="h-8 px-2 text-xs" onClick={() => remove(r)}>{t("common.remove")}</Button>
-                  </div>
+                  {hints.data?.hints[r.id] && <Hints h={hints.data.hints[r.id]} />}
                   {pred(r.id) && (
                     <div className="w-full" data-tour={r.id === upcoming[0]?.id ? "race-prediction" : undefined}>
                       <div className="flex items-center gap-1 text-xs font-medium text-muted-foreground">{t("pred.title")}<InfoTip label={t("pred.title")}>{t("chartInfo.pred")}</InfoTip></div>
@@ -164,7 +164,7 @@ function Hints({ h }: { h: RaceHints }) {
   if (!h.taper && !h.build) return null;
   const short = (d: string) => fmtDay(d, { day: "numeric", month: "short" });
   return (
-    <div className="mt-2 space-y-1 rounded-md bg-muted px-3 py-2 text-xs">
+    <div className="space-y-1 rounded-md bg-muted px-3 py-2 text-xs">
       <div className="font-medium">{t("races.hintsTitle")}</div>
       {h.taper && (
         <p>{h.taper.lowKm != null

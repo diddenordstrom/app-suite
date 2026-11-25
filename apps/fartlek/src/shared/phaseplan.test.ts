@@ -144,10 +144,11 @@ describe("the race phase in the plan", () => {
     // Both without the deep aim (an injury turns it off), so only the steps can differ.
     const calm = plan(45, { step: 1, backOff: true }), hurt = plan(45, { step: 1, injury: true });
     const sessions = (x: typeof calm) => x.s.weeks.flatMap((w) => w.items);
-    // Same weeks, same days and types, same km a week.
+    // Same weeks, the key sessions on the same days, same km a week (a held step is shorter, so zone 2 may get one more run).
+    const keys = (x: typeof calm) => sessions(x).filter((it) => it.type !== "easy");
     expect(hurt.s.weeks.map((w) => w.targetKm)).toEqual(calm.s.weeks.map((w) => w.targetKm));
-    expect(sessions(hurt).map((it) => [it.date, it.type])).toEqual(sessions(calm).map((it) => [it.date, it.type]));
-    expect(sessions(hurt).map((it) => it.blueprint?.split("#")[0] ?? null)).toEqual(sessions(calm).map((it) => it.blueprint?.split("#")[0] ?? null));
+    expect(keys(hurt).map((it) => [it.date, it.type])).toEqual(keys(calm).map((it) => [it.date, it.type]));
+    expect(keys(hurt).map((it) => it.blueprint?.split("#")[0] ?? null)).toEqual(keys(calm).map((it) => it.blueprint?.split("#")[0] ?? null));
     // Every blueprint stays at the step it was at, tagged held; without injury they step on.
     const tags = (x: typeof calm) => sessions(x).map((it) => it.blueprint).filter((b): b is string => !!b).map((b) => parseBlueprintTag(b)!);
     expect(tags(hurt).length).toBeGreaterThan(0);

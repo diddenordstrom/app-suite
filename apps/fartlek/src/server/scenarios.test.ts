@@ -54,6 +54,30 @@ group("planning scenarios", () => {
     }
   });
 
+  it("starts a block from today without also making the running week lighter: the days that are over are its easing", () => {
+    // Heavy form and an A marathon 27 weeks out: in phase, build, build, lighter. From a Wednesday with nothing run on
+    // Monday and Tuesday, the first week keeps its build target and loses only those days; a fresh week still starts lighter.
+    const none = r("from today, heavy"), run = r("from today, heavy, run"), fresh = r("heavy, next week");
+    for (const x of [none, run]) {
+      expect(x.race!.startPct, describe(x)).toBeLessThan(-25);
+      expect(x.race!.roles, describe(x)).toBe("bbl");
+      expect(x.race!.weeks[0].items.every((it) => it.date >= TODAY), describe(x)).toBe(true);
+    }
+    const target = none.race!.weeks[0].targetKm;
+    expect(none.race!.doneKm).toBe(0);
+    // Not lighter and clipped (70 % of the week, less two days): the build week less what Monday and Tuesday held.
+    expect(none.race!.km[0], describe(none)).toBeGreaterThan(0.65 * target);
+    expect(none.race!.km[0], describe(none)).toBeLessThanOrEqual(target);
+    // With Monday and Tuesday run, what was run and what is planned come to about the target, never past it.
+    const w0 = run.race!.weeks[0];
+    expect(run.race!.doneKm, describe(run)).toBeGreaterThan(5);
+    expect(run.race!.doneKm + run.race!.km[0], describe(run)).toBeLessThanOrEqual(w0.targetKm + 0.5);
+    expect(run.race!.doneKm + run.race!.km[0], describe(run)).toBeGreaterThan(w0.targetKm - 4);
+    // The runs already done count in the form and fitness of the block.
+    expect(run.race!.ctl[1], describe(run)).toBeGreaterThan(none.race!.ctl[1]);
+    expect(fresh.race!.roles, describe(fresh)).toBe("lbl");
+  });
+
   it("brings a runner returning from a dip back towards the 35 km run before, not a lighter week", () => {
     const x = r("dip and return");
     expect(x.week.chosen, describe(x)).toBe("volume");

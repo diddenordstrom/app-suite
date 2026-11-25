@@ -6,7 +6,7 @@ import { TYPE_COLOR } from "./bits";
 import { StepsPanel } from "./sessionbuilder";
 import { DayCell, editStep, editType, newEasy, signed, signedInt, SpikeInfo, useDayDrag, Warnings } from "./suggestweek";
 import { addDays, daysBetween, weekNumber, weekday, type ISODate } from "@/shared/dates";
-import { BLOCK, type BlockEval, type BlockSeed, type PlannedWeek, type WeekRole } from "@/shared/blockplan";
+import { BLOCK, doneKmOf, type BlockEval, type BlockSeed, type PlannedWeek, type WeekRole } from "@/shared/blockplan";
 import { withStrides } from "@/shared/steps";
 import type { SuggestItem, SuggestType } from "@/shared/nextweek";
 
@@ -149,6 +149,10 @@ function WeekHead({ b, i, ev, plan, deepest, editable, onRemove, compact, label 
         )}
       </div>
       <span className="text-xs tabular-nums text-muted-foreground">{t("blk.weekSub", { pct: e.growth == null ? "–" : `${signedInt(e.growth * 100)} %`, form: signed(e.low), end: signed(e.form) })}</span>
+      {i === 0 && b.seed.done && (
+        // A block from today: the week's km count what was already run in it (docs/decisions/fartlek-skapa-block.md).
+        <span className="text-xs tabular-nums text-muted-foreground">{t("blk.weekDone", { done: fmt.dist(doneKmOf(b.seed)), planned: fmt.dist(Math.max(0, e.km - doneKmOf(b.seed))) })}</span>
+      )}
       <div className="flex flex-wrap items-center gap-1">
         {editable && b.roles[i] !== "race" ? (
           <select value={b.roles[i]} onChange={(x) => b.setRole(i, x.target.value as WeekRole)} aria-label={t("be.weekType", { week: weekNumber(ws) })}

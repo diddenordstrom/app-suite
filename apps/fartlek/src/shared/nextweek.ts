@@ -305,18 +305,26 @@ const peakSessions = (weeks: AdviceWeek[]) => {
   return peak.items.filter((it) => it.type !== "cross").length;
 };
 
+/** Most km a week falls short of its target on the days it has. */
+const shortOf = (weeks: AdviceWeek[]) => r1(Math.max(0, ...weeks.map((w) => w.targetKm - w.items.filter((it) => it.type !== "cross").reduce((s, it) => s + it.km, 0))));
+
 /**
- * `trial` plans the same weeks again with a given set of run days. With it, a signal only becomes a question if
- * some free day would make a difference in that plan (more run km, or more sessions in the peak week), and
- * `free` lists only those days: a day the engine would leave empty is never offered.
+ * `trial` plans the same weeks again with a given set of run days. With it, the days the runner has are judged on
+ * `trial(runDays)`, whole weeks from the same engine as the days tried, so a plan clipped to the days still ahead
+ * (a running week, whose `targetKm` counts the days that are over) never reads as a week falling short. A signal
+ * only becomes a question if some free day would settle it in that plan: for `fit`, the week no longer falls
+ * short; for `peak`, the peak week gets another session or the plan more run km. `free` lists only those days,
+ * so accepting the advice never leads to the same question again, and a day the engine would leave empty is never offered.
  */
 export function daysAdvice(runDays: number[], longRunDay: number, weeks: AdviceWeek[], trial?: (runDays: number[]) => AdviceWeek[]): DaysAdvice | null {
   const have = new Set(runDays.length ? runDays : [longRunDay]).size;
   if (have >= 7 || !weeks.length) return null;
+  if (trial) weeks = trial(runDays);
+  if (!weeks.length) return null;
   const builds = weeks.filter((w) => !w.lighter);
   const peakKm = Math.max(0, ...(builds.length ? builds : weeks).map((w) => w.targetKm));
-  const shortKm = r1(Math.max(0, ...weeks.map((w) => w.targetKm - w.items.filter((it) => it.type !== "cross").reduce((s, it) => s + it.km, 0))));
-  const why: DaysAdvice["why"] = [];
+  const shortKm = shortOf(weeks);
+  let why: DaysAdvice["why"] = [];
   const needPeak = daysFor(peakKm);
   if (needPeak > have) why.push("peak");
   if (shortKm > tune().shortKm) why.push("fit");
@@ -330,9 +338,14 @@ export function daysAdvice(runDays: number[], longRunDay: number, weeks: AdviceW
   const taken = new Set(runDays.length ? runDays : [longRunDay]);
   const order = Array.from({ length: 7 }, (_, i) => weekday(addDays(first.weekStart, i)));
   let free = order.filter((wd) => !taken.has(wd)).sort((a, b) => gap(b) - gap(a) || order.indexOf(a) - order.indexOf(b));
-  const tried = trial ? free.map((wd) => { const w = trial([...taken, wd]); return { wd, gainKm: r1(runKmOf(w) - runKmOf(weeks)), sessions: peakSessions(w) }; }) : [];
-  if (trial) free = tried.filter((x) => x.gainKm >= tune().shortKm || x.sessions > peakSessions(weeks)).map((x) => x.wd);
-  if (trial && !free.length) return null;
+  if (trial) {
+    const tried = free.map((wd) => { const w = trial([...taken, wd]); return { wd, fits: shortOf(w) <= tune().shortKm, grows: r1(runKmOf(w) - runKmOf(weeks)) >= tune().shortKm || peakSessions(w) > peakSessions(weeks) }; });
+    // A shortfall no single day settles is not about days: it is not asked about.
+    if (why.includes("fit") && !tried.some((x) => x.fits)) why = why.filter((x) => x !== "fit");
+    if (!why.length) return null;
+    free = tried.filter((x) => (why.includes("fit") ? x.fits : x.grows)).map((x) => x.wd);
+    if (!free.length) return null;
+  }
   return { have, need: Math.max(needPeak, why.includes("fit") ? have + 1 : 0), why, peakKm: r1(peakKm), shortKm, free };
 }
 
@@ -556,7 +569,7 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   const rest = total - used;
   const easyMax = Math.max(NEXT.easyMinKm, tune().easy.ofLong * items[0].km);
   // As many easy runs as keep each under its share of the long run, and at least as many as the week's volume
-  // calls for (`daysFor`: 5 run days from 40 km): otherwise a growing long run lets the easy runs grow with it,
+  // calls for (`daysFor`: 5 run days from 50 km): otherwise a growing long run lets the easy runs grow with it,
   // a free day never changes the plan, and the week is never offered the day it needs.
   const want = Math.max(1, Math.ceil(rest / easyMax - 1e-9), daysFor(total) - 1 - thr.length);
   while (easyDays.length && (easyDays.length > want || rest / easyDays.length < NEXT.easyMinKm)) easyDays = easyDays.slice(0, -1);

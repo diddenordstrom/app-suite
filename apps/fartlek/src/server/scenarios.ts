@@ -11,6 +11,7 @@ import { addDays, todayIn, weekday, weekStartOf, type ISODate } from "../shared/
 import type { Suggestion } from "../shared/nextweek";
 import type { BlockSuggestion, PlannedWeek } from "../shared/blockplan";
 import type { RaceRoad } from "../shared/raceplan";
+import { formPct } from "../shared/load";
 
 export interface Scenario {
   name: string;
@@ -27,6 +28,10 @@ export interface Scenario {
   race?: { inWeeks: number; priority: "A" | "B"; /** Default 21.1 (a half). */ distanceKm?: number; goalSeconds?: number };
   /** A race run this many days before the block's start (a race-list row and a run that day): the block starts with recovery weeks. */
   raceAgo?: { days: number; priority: "A" | "B"; distanceKm: number };
+  /** "Skapa block" from today, in the running week (its days before today are over), instead of from next week. */
+  fromToday?: boolean;
+  /** The days of the running week before today: run as planned (default), or nothing run. */
+  runBeforeToday?: boolean;
 }
 
 export const SCENARIOS: Scenario[] = [
@@ -152,6 +157,28 @@ export const SCENARIOS: Scenario[] = [
     weeks: [44, 45, 46, 45, 44, 46, 45, 45, 46, 45, 44, 45],
     runDays: [1, 2, 4, 6, 0], longRunDay: 0, threshold: { pace: 255, hr: 172 }, maxHr: 190, race: { inWeeks: 10, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 },
   },
+  // A block started in the running week, from today (docs/decisions/fartlek-skapa-block.md): the days that are over are the easing.
+  {
+    name: "from today, heavy",
+    note: "about 40 km on six days, a 46 km week a month back, heavy form, an A marathon 27 weeks out; the block starts today with nothing run this week",
+    weeks: [36, 38, 39, 38, 40, 39, 40, 46, 40, 41, 46, 0],
+    runDays: [1, 2, 3, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190,
+    race: { inWeeks: 27, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 + 45 * 60 }, fromToday: true, runBeforeToday: false,
+  },
+  {
+    name: "from today, heavy, run",
+    note: "the same runner with the days before today run as planned",
+    weeks: [36, 38, 39, 38, 40, 39, 40, 46, 40, 41, 46, 40],
+    runDays: [1, 2, 3, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190,
+    race: { inWeeks: 27, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 + 45 * 60 }, fromToday: true,
+  },
+  {
+    name: "heavy, next week",
+    note: "the same runner after a 52 km running week, the block on a week not begun: heavy form still makes the first week lighter",
+    weeks: [36, 38, 39, 38, 40, 39, 40, 46, 40, 41, 46, 52],
+    runDays: [1, 2, 3, 4, 6, 0], longRunDay: 0, threshold: { pace: 260, hr: 172 }, maxHr: 190,
+    race: { inWeeks: 27, priority: "A", distanceKm: 42.195, goalSeconds: 3 * 3600 + 45 * 60 },
+  },
 ];
 
 const ORIGIN = "http://localhost:5173";
@@ -174,7 +201,9 @@ export interface ScenarioResult {
   week: { chosen: string; km: number; items: string; why: string; form: number; formPct: number; state: string; growth: number | null };
   blocks: { weeks: number; km: number[]; state: string; chosen: string; deepestPct: number | null }[];
   /** "Skapa block" with the race ahead: the weeks' roles and km, the blocks it makes now, and form on race day. */
-  race: { roles: string; km: number[]; chunks: string; now: number; raceForm: number | null; state: string; weeks: PlannedWeek[]; warnings: BlockSuggestion["phaseWarnings"] } | null;
+  race: { roles: string; km: number[]; chunks: string; now: number; raceForm: number | null; state: string; weeks: PlannedWeek[]; warnings: BlockSuggestion["phaseWarnings"];
+    /** Km run in the block's first week before today (a block from today), fitness at the start and the end, the deepest build week's form. */
+    doneKm: number; ctl: [number, number]; deepestPct: number | null; startPct: number | null; lighterFirst: string | null } | null;
   /** The race plan's road, when the race has one. */
   road?: RaceRoad | null;
 }
@@ -203,6 +232,7 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
       const pace = r.kind === "threshold" ? thr.pace + 30 : r.kind === "long" ? thr.pace + 85 : thr.pace + 80;
       const hr = r.kind === "threshold" ? thr.hr - 6 : thr.hr - 24;
       if (r.date < today) {
+        if (i === sc.weeks.length - 1 && sc.runBeforeToday === false) continue;
         q(`insert into activities (user_id, id, name, type_key, start_time_local, date, distance_m, duration_s, avg_hr, is_run)
            values (1, ?, ?, 'running', ?, ?, ?, ?, ?, 1)`, `sc:${++n}`, r.kind, `${r.date} 07:00:00`, r.date, r.km * 1000, Math.round(r.km * pace), hr);
       } else {
@@ -212,6 +242,7 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
   });
 
   const weekStart = addDays(thisWeek, 7);
+  const blockStart = sc.fromToday ? thisWeek : weekStart;
   if (sc.raceAgo) {
     const date = addDays(weekStart, -sc.raceAgo.days);
     await app.request("/api/races", json({ name: "Loppet", date, priority: sc.raceAgo.priority, distanceKm: sc.raceAgo.distanceKm }));
@@ -231,10 +262,10 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
   let race: ScenarioResult["race"] = null;
   if (sc.race || sc.raceAgo) {
     if (sc.race) {
-      const date = addDays(weekStart, (sc.race.inWeeks - 1) * 7 + 5);
+      const date = addDays(blockStart, (sc.race.inWeeks - 1) * 7 + 5);
       await app.request("/api/races", json({ name: "Testloppet", date, priority: sc.race.priority, distanceKm: sc.race.distanceKm ?? 21.1, ...(sc.race.goalSeconds ? { goalSeconds: sc.race.goalSeconds } : {}) }));
     }
-    const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string; road?: RaceRoad | null }>(`/api/plan/block-suggest?startWeek=${weekStart}`);
+    const b = await get<{ ok: boolean; suggestion?: BlockSuggestion; seed?: { ctl: number; atl: number; lighterFirst?: boolean; lighterFirstWhy?: string | null }; doneDays?: Record<ISODate, number>; racePlan?: { chunks: { weeks: number; kind: string }[]; now: number } | null; reason?: string; road?: RaceRoad | null }>(`/api/plan/block-suggest?startWeek=${blockStart}`);
     const road = b.road ?? null;
     if (b.ok && b.suggestion) {
       race = {
@@ -243,8 +274,11 @@ export async function runScenario(sc: Scenario, today: ISODate = todayIn("Europe
         chunks: (b.racePlan?.chunks ?? []).map((c) => `${c.kind}:${c.weeks}`).join(" + "), now: b.racePlan?.now ?? 0,
         raceForm: b.suggestion.eval.race?.form ?? null, state: b.suggestion.eval.state,
         weeks: b.suggestion.weeks, warnings: b.suggestion.phaseWarnings,
+        doneKm: Math.round(Object.values(b.doneDays ?? {}).reduce((a, k) => a + k, 0) * 10) / 10,
+        ctl: [Math.round((b.seed?.ctl ?? 0) * 10) / 10, b.suggestion.eval.ctl], deepestPct: b.suggestion.eval.deepest?.formPct ?? null,
+        startPct: b.seed ? Math.round(formPct(b.seed.ctl - b.seed.atl, b.seed.ctl)) : null, lighterFirst: b.seed?.lighterFirst ? b.seed.lighterFirstWhy ?? "yes" : null,
       };
-    } else race = { roles: "", km: [], chunks: `refused: ${b.reason}`, now: 0, raceForm: null, state: "", weeks: [], warnings: null };
+    } else race = { roles: "", km: [], chunks: `refused: ${b.reason}`, now: 0, raceForm: null, state: "", weeks: [], warnings: null, doneKm: 0, ctl: [0, 0], deepestPct: null, startPct: null, lighterFirst: null };
     return { scenario: sc, weekStart, week: { chosen: s.chosen, km: s.eval.km, items, why, form: s.eval.form, formPct: s.eval.formPct, state: s.eval.state, growth: s.eval.growth }, blocks, race, road };
   }
   for (const weeks of [2, 4]) {
@@ -278,6 +312,7 @@ export function describe(r: ScenarioResult): string {
     ...(r.race && !r.road ? r.race.weeks.map((w) => `    ${w.weekStart} ${w.role[0]} ${w.items.map((it) => `${it.type === "threshold" ? "T" : it.type === "long" ? "L" : it.type === "cross" ? "X" : "E"}${it.km}${it.blueprint ? `[${it.blueprint}]` : ""}`).join(" ")}`) : []),
     ...(r.race?.warnings && (r.race.warnings.lowWeek || r.race.warnings.shortLong) ? [`    warnings: ${JSON.stringify(r.race.warnings)}`] : []),
     ...(r.race ? [`  race plan ${r.race.chunks} (now ${r.race.now}): ${r.race.roles} · ${r.race.km.join(" → ")} km · ${r.race.state} · race-day form ${r.race.raceForm ?? "–"}`] : []),
+    ...(r.race && sc.fromToday ? [`  from today: form ${r.race.startPct ?? "–"} %${r.race.lighterFirst ? ` (lighter first: ${r.race.lighterFirst})` : ""} · ${r.race.doneKm} km run before today · deepest ${r.race.deepestPct == null ? "–" : Math.round(r.race.deepestPct)} % · fitness ${r.race.ctl[0]} → ${r.race.ctl[1]}`] : []),
   ].join("\n");
 }
 

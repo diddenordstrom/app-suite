@@ -221,8 +221,10 @@ export function nextWeekRoutes(db: Db) {
       // The week as a range, from today in the running week, planned by the one engine entry (shared/planrange.ts).
       const plan = planRange(weekAsBlock(seed), { from: weekStart > ctx.today ? weekStart : ctx.today, to: addDays(weekStart, 6), light: seed.backoff });
       const suggestion = asWeekSuggestion(seed, plan.suggestion, { items: plan.items[0], eval: plan.eval.weeks[0] });
-      // Not enough run days for the week: the dialog offers another one (shared/nextweek.ts `daysAdvice`).
-      const advice = daysAdvice(seed.runDays, seed.longRunDay, [{ weekStart, targetKm: suggestion.targetKm, items: suggestion.items }],
+      // Not enough run days for the week: the dialog offers another one (shared/nextweek.ts `daysAdvice`), judged on the
+      // whole week, not the days still ahead.
+      const whole = plan.suggestion.weeks[0];
+      const advice = daysAdvice(seed.runDays, seed.longRunDay, [{ weekStart, targetKm: whole.targetKm, items: whole.items }],
         (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; });
       return { suggestion, advice };
     });

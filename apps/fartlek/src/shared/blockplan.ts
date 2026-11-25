@@ -127,7 +127,22 @@ export interface BlockSeed {
   longShareFrom?: ISODate | null;
   /** The runner's cap on a build week's km for the race the weeks lead to (docs/decisions/fartlek-long-run-ceiling.md). */
   capKm?: number | null;
+  /**
+   * A block started in the running week, from today (docs/decisions/fartlek-skapa-block.md): the first week's days before
+   * `before` are over, and `items` is what was run on them (easy runs of the km run). The first week keeps its whole-week
+   * target; its sessions go on the days that are left (what was not run is not made up), never past the target less what
+   * was run; the evaluation counts the runs. `weekKm`: what the week then comes to (run + planned), which the caps of the
+   * weeks after it grow from (set by `suggestBlock`; null = its target).
+   */
+  done?: { before: ISODate; items: SuggestItem[]; weekKm?: number | null } | null;
 }
+
+/** Run km already run in the first week of a block started from today. */
+export const doneKmOf = (seed: Pick<BlockSeed, "done">) => r1((seed.done?.items ?? []).filter(isRun).reduce((s, it) => s + it.km, 0));
+
+/** A week's items with what was run on its days that are over (the first week of a block started from today). */
+const withDone = (seed: BlockSeed, i: number, items: SuggestItem[]): SuggestItem[] =>
+  i === 0 && seed.done ? [...seed.done.items, ...items.filter((it) => it.date >= seed.done!.before)].sort((a, b) => a.date.localeCompare(b.date)) : items;
 
 /**
  * What a week is for. `build` and `lighter` as in any block; before a race, `taper` (the week before the race week)
@@ -328,7 +343,9 @@ export const floorFor = (seed: Pick<BlockSeed, "ctl" | "atl">) => {
 };
 
 /** Evaluate the weeks in a chain: each starts with the fitness, fatigue and km window the one before left. */
-export function evaluateBlock(seed: BlockSeed, weeks: SuggestItem[][]): BlockEval {
+export function evaluateBlock(seed: BlockSeed, planned: SuggestItem[][]): BlockEval {
+  // The runs already done in the first week count in the load and the km, like the sessions ahead.
+  const weeks = planned.map((items, i) => withDone(seed, i, items));
   let ctl = seed.ctl, atl = seed.atl, hardBefore = seed.hardBefore, longest = seed.longestKm;
   const window = [...seed.kmBefore];
   const out: BlockWeekEval[] = [];
@@ -426,7 +443,8 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
       built++;
     }
     out.push(v);
-    window.push(v.km);
+    // The weeks after a first week started from today grow from what that week comes to, not from its target.
+    window.push(i === 0 && seed.done?.weekKm != null ? seed.done.weekKm : v.km);
   }
   return out;
 }
@@ -456,7 +474,7 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
   const buildIdx = vols.map((v, i) => (v.lighter ? -1 : vols.slice(0, i + 1).filter((x) => !x.lighter).length - 1));
   const builds = buildIdx.filter((b) => b >= 0).length;
   // The long run steps up from the longest long run before it; the 30-day rule counts any run.
-  let longest = seed.longestKm, any = seed.longestKm;
+  let longest = seed.longestKm, any = Math.max(seed.longestKm, ...(seed.done?.items ?? []).filter(isRun).map((it) => it.km));
   // The race phase's blueprints step on along the plan: one step each time a full session is planned (a held one never advances).
   const steps: Record<string, number> = { ...(seed.phase?.steps ?? {}) };
   // The next rung: phase weeks go on from where the build weeks before the phase left the ladder.
@@ -525,8 +543,26 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
     // The rest days after the race are not run days, so the week's runs land on the days left (gateAfterRace still drops any).
     const restDays = afterRace && row!.restDays > 0 ? Array.from({ length: 7 }, (_, k) => addDays(ws.weekStart, k)).filter((d) => dayOf(d) >= 1 && dayOf(d) <= row!.restDays).map(weekday) : [];
     const runDays = restDays.length && seed.runDays.some((x) => !restDays.includes(x)) ? seed.runDays.filter((x) => !restDays.includes(x)) : seed.runDays;
-    const built = build(runDays === seed.runDays ? ws : { ...ws, runDays }, { km: v.km, longKm, tempo, thr: withinQuality(thr, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
+    const shapeOf = (km: number, long: number | null, q: Thr[]): WeekShape => ({ km, longKm: long, tempo, thr: withinQuality(q, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
       maxKm, ...strides, ...(phased && !thrGated ? { phase: phased } : {}) });
+    const whole = build(runDays === seed.runDays ? ws : { ...ws, runDays }, shapeOf(v.km, longKm, thr));
+    let built = whole;
+    if (i === 0 && seed.done) {
+      // Started from today (docs/decisions/fartlek-skapa-block.md): the week as planned whole, its days that are over
+      // dropped. What was not run on them is not made up: those days are the week's easing. What was run counts, so
+      // the days ahead never take the week past its target: then they get the target less what was run.
+      const before = seed.done.before;
+      built = whole.filter((it) => it.date >= before);
+      const left = Math.max(0, floorHalf(v.km - doneKmOf(seed)));
+      if (weekKm(built) > left + 0.5) {
+        const ahead = runDays.filter((wd) => Array.from({ length: 7 }, (_, k) => addDays(ws.weekStart, k)).some((d) => d >= before && weekday(d) === wd));
+        const on = { ...ws, runDays: ahead };
+        const long = longKm == null ? null : Math.min(longKm, left);
+        built = ahead.length && left >= NEXT.easyMinKm ? build(on, shapeOf(left, long, thr)) : [];
+        // The key sessions may not take the days ahead past what is left either: the threshold goes first.
+        if (weekKm(built) > left + 0.5 && thr.length) built = build(on, { ...shapeOf(left, long, []), ...(phased && !thrGated ? { phase: { long: phased.long, quality: [] } } : {}) });
+      }
+    }
     let items = seed.race ? aroundRace(built, seed.race.date, ws.weekStart) : built;
     for (const o of seed.otherRaces ?? []) if (o.date >= ws.weekStart && o.date <= last) items = aroundRace(items, o.date, ws.weekStart);
     items = gateAfterRace(items, rec, row);
@@ -648,6 +684,14 @@ function fitWeeks(seed: BlockSeed, base: Shape): number[] {
  * or lighter weeks when it is too hard. Every try is kept for the "testing" animation.
  */
 export function suggestBlock(seed: BlockSeed): BlockSuggestion {
+  // Started from today: plan once to see what the first week comes to (run + the days left), then plan the weeks after it
+  // from that, so a week whose first days were not run doesn't raise the caps after it as if it had been run in full.
+  if (seed.done && seed.done.weekKm === undefined) {
+    const first = suggestBlock({ ...seed, done: { ...seed.done, weekKm: null } });
+    const w0 = first.weeks[0];
+    const km = w0 ? r1(doneKmOf(seed) + weekKm(w0.items)) : null;
+    return km != null && km < w0.targetKm - 0.5 ? suggestBlock({ ...seed, done: { ...seed.done, weekKm: km } }) : first;
+  }
   // The block never starts bigger than the same engine plans that week on its own ("Föreslå veckan"): it backs off
   // after a jump, judged on the form the week starts with.
   if (seed.firstWeekMax === undefined) {
@@ -768,8 +812,11 @@ export function suggestBlock(seed: BlockSeed): BlockSuggestion {
 export const weekKm = (items: SuggestItem[]) => r1(items.filter(isRun).reduce((s, it) => s + it.km, 0));
 
 /** "Add a run day" for a suggested block (nextweek.ts `daysAdvice`): null when the days it has will do. */
-export const blockDaysAdvice = (seed: BlockSeed, weeks: PlannedWeek[]) =>
-  daysAdvice(seed.runDays, seed.longRunDay, weeks, (runDays) => suggestBlock({ ...seed, runDays }).weeks);
+export const blockDaysAdvice = (seed: BlockSeed, weeks: PlannedWeek[]) => {
+  // Judged on whole weeks: a first week started from today plans only the days ahead, and no added day changes the days that are over.
+  const whole = seed.done ? { ...seed, done: null } : seed;
+  return daysAdvice(whole.runDays, whole.longRunDay, weeks, (runDays) => suggestBlock({ ...whole, runDays }).weeks);
+};
 
 /* ---------- "Föreslå veckan": the same engine with one week ---------- */
 

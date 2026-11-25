@@ -40,7 +40,7 @@ export const TUNE = {
    */
   taper: { first: 0.7, race: 0.5, bRace: 0.7 },
   /** Run days a week's volume calls for: 3 below `d4`, then 4, 5, 6 and 7 from these km a week. */
-  daysFromKm: { d4: 25, d5: 40, d6: 55, d7: 70 },
+  daysFromKm: { d4: 25, d5: 50, d6: 55, d7: 70 },
   /** A week that falls this many km short of its target on the days it has needs another day. */
   shortKm: 1,
 };
