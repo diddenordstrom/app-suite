@@ -18,7 +18,7 @@ describe("race paces of the race phase", () => {
   type Pace = { mp: number | null; hmp: number | null; source: string; overCap: boolean };
   type View = { raceId: number; kind: string; wip: number; paces: Pace; locked: boolean; lockedOn: string | null; question: { kind: string } | null } | null;
   type Next = { racePace: View };
-  type RaceRow = { id: number; mpSec: number | null; hmpSec: number | null; paceSource: string | null; paceLockedOn: string | null };
+  type RaceRow = { id: number; name: string; mpSec: number | null; hmpSec: number | null; paceSource: string | null; paceLockedOn: string | null };
   const item = (date: string) => [{ date, type: "easy", km: 6 }];
 
   beforeAll(() => { vi.useFakeTimers({ toFake: ["Date"] }); at("2026-11-18"); });
