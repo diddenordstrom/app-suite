@@ -4,6 +4,7 @@ import * as t from "../db/schema";
 import * as repo from "../repo";
 import { afterResult, raceChecks, resultSuggestions } from "../races";
 import { lockRacePace, phaseRace, racePaceView } from "../racephase";
+import { refreshSkeleton } from "../raceplan";
 import { ctxFor, stepMatchFor, stepRefs, weekSummaries, type Ctx } from "../analysis";
 import { stepSummary } from "../../shared/stepmatch";
 import { parseSteps, plannedFromSteps, readSteps, type WorkoutSteps } from "../../shared/steps";
@@ -191,6 +192,8 @@ export function planRoutes(db: Db) {
       priority: oneOf(b.priority ?? "A", ["A", "B", "C"] as const, "priority"),
       // Left out of an edit that doesn't send it, so changing the goal keeps the result.
       ...("resultSeconds" in b ? { resultSeconds: optNum(b.resultSeconds, "result", 60, 7 * 86400) } : {}),
+      // The same for the peak-week cap (docs/decisions/fartlek-long-run-ceiling.md), in km.
+      ...("peakKm" in b ? { peakKm: optNum(b.peakKm, "peakKm", 10, 400) } : {}),
     };
   };
   r.get("/races", (c) => c.json(repo.listRaces(db, uid(c))));
@@ -208,6 +211,8 @@ export function planRoutes(db: Db) {
     const fields = raceFields(await body(c));
     db.update(t.races).set(fields).where(own(t.races, uid(c), id)).run();
     if (before && (before.date !== fields.date || before.distanceKm !== fields.distanceKm || before.priority !== fields.priority)) dropPlan(uid(c), id);
+    // A new cap re-projects the stored skeleton after the blocks, so no week keeps a target over it.
+    else if (before && "peakKm" in fields && before.peakKm !== fields.peakKm) refreshSkeleton(ctxFor(db, uid(c)), id);
     afterResult(ctxFor(db, uid(c)), id);
     return c.json(repo.listRaces(db, uid(c)));
   });

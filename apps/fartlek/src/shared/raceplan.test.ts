@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { addDays } from "./dates";
 import { blockWeekCap, raceChunks, RECOVERY } from "./blockplan";
 import { tune } from "./tuning";
-import { chunkKind, otherRacesIn, phaseLengths, phaseOfWeeks, projectSkeleton, raceKindOf, wipOf, type PlanPhase, type RaceKind, type SkeletonInput } from "./raceplan";
+import { chunkKind, keyLongWeek, otherRacesIn, phaseLengths, phaseOfWeeks, projectSkeleton, raceKindOf, suggestedCap, wipOf, type PlanPhase, type RaceKind, type SkeletonInput } from "./raceplan";
 
 // docs/decisions/fartlek-race-plan-skeleton.md
 const floorHalf = (n: number) => Math.floor(n * 2) / 2;
@@ -96,13 +96,14 @@ describe("projectSkeleton", () => {
     const sk = projectSkeleton(golden());
     const got = sk.weeks.map((w) => `${w.wip > 0 ? w.wip : "rec"} ${w.role === "build" ? "b" : w.role === "lighter" ? "l" : w.role} ${w.km} ${w.longKm}`);
     expect(got).toEqual([
-      "16 b 45 18.5", "15 b 47 19", "14 b 49.5 19.5", "13 l 34.5 13.5", "12 b 48 19.5", "11 b 51.5 20", "10 b 54 21", "9 l 37.5 14.5",
-      "8 b 52 21", "7 b 56.5 21.5", "6 b 59 22", "5 l 41 15.5", "4 b 57 22", "3 b 62.5 22", "2 taper 43.5 15.5", "1 race 31 null",
+      // From the build phase (wip 12) the long run may take 40 % of the week, so the ladder (+8 %) leads instead of the week's share.
+      "16 b 45 18.5", "15 b 47 19", "14 b 49.5 19.5", "13 l 34.5 13.5", "12 b 48 19.5", "11 b 51.5 20.5", "10 b 54 21.5", "9 l 37.5 15",
+      "8 b 52 21.5", "7 b 56.5 22.5", "6 b 59 23.5", "5 l 41 16.5", "4 b 57 23.5", "3 b 62.5 23.5", "2 taper 43.5 16.5", "1 race 31 null",
       "rec recovery 9 3", "rec recovery 28 8", "rec recovery 40.5 12", "rec recovery 50 15",
     ]);
     expect(sk.weeks.map((w) => w.phase)).toEqual([...Array(4).fill("base"), ...Array(6).fill("build"), ...Array(4).fill("specific"), "taper", "race", ...Array(4).fill("recovery")]);
     expect(sk.peakKm).toBe(62.5);
-    expect(sk.longPeak).toEqual({ weekStart: "2027-02-08", km: 22, wip: 6 });
+    expect(sk.longPeak).toEqual({ weekStart: "2027-02-08", km: 23.5, wip: 6 });
   });
 
   it("holds the long run in the weeks before the taper", () => {
@@ -175,5 +176,29 @@ describe("projectSkeleton", () => {
     const t0 = performance.now();
     for (let k = 0; k < 200; k++) projectSkeleton(golden({ planStart: addDays("2027-03-15", -29 * 7), firstWeek: addDays("2027-03-15", -29 * 7) }));
     expect(performance.now() - t0).toBeLessThan(1000);
+  });
+});
+
+describe("long-run ceiling and the peak-week cap (docs/decisions/fartlek-long-run-ceiling.md)", () => {
+  it("holds every build week of the road under the runner's cap", () => {
+    const sk = projectSkeleton(golden({ capKm: 55 }));
+    for (const w of sk.weeks.filter((x) => x.role === "build")) expect(w.km).toBeLessThanOrEqual(55);
+    expect(sk.peakKm).toBe(55);
+    // Taper and recovery follow the capped peak.
+    expect(sk.weeks.find((w) => w.role === "taper")!.km).toBeLessThan(projectSkeleton(golden()).weeks.find((w) => w.role === "taper")!.km);
+  });
+
+  it("suggests 1.5 × the proven peak week, to 5 km", () => {
+    expect(suggestedCap(55)).toBe(80);
+    expect(suggestedCap(44)).toBe(65);
+    expect(suggestedCap(0)).toBeNull();
+  });
+
+  it("lets a marathon road's long run reach 30 km at about 75 km a week, and no further outside the key weeks", () => {
+    const big = projectSkeleton(golden({ window: [70, 74, 72], tolerance: { km: 75, peakKm: 75, peakWeek: null, weeksAgo: 1 }, anchorKm: 75, longestKm: 26, capKm: 78 }));
+    const longs = big.weeks.filter((w) => w.role === "build").map((w) => ({ wip: w.wip, long: w.longKm!, km: w.km }));
+    expect(Math.max(...longs.map((l) => l.long))).toBeGreaterThanOrEqual(30);
+    for (const l of longs) if (!keyLongWeek("marathon", l.wip)) expect(l.long).toBeLessThanOrEqual(30);
+    for (const l of longs) expect(l.long).toBeLessThanOrEqual(32);
   });
 });

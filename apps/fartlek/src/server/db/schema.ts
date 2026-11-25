@@ -192,6 +192,8 @@ export const races = sqliteTable("races", {
   hmpSec: real("hmp_sec"),
   paceSource: text("pace_source"),
   paceLockedOn: text("pace_locked_on"),
+  /** The runner's cap on a build week's km on the way to this race (docs/decisions/fartlek-long-run-ceiling.md); null = none. */
+  peakKm: real("peak_km"),
 });
 
 /**

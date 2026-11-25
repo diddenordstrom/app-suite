@@ -2,7 +2,7 @@ import { useState } from "react";
 import { api } from "./http";
 import { t, tn } from "./i18n";
 import { useFmt } from "./prefs";
-import { Button, cn } from "./ui";
+import { Button, Input, cn } from "./ui";
 import { fmtDay } from "./bits";
 import { weekNumber } from "@/shared/dates";
 import { fmtClock } from "@/shared/format";
@@ -32,6 +32,7 @@ export function RaceRoad({ road, compact, onChanged }: { road: Road; compact?: b
     <section className="space-y-2" aria-label={t("road.title", { race: road.race.name })}>
       <div className="text-sm font-medium">{t("road.title", { race: road.race.name })}</div>
       {road.short && !compact && <ShortNote road={road} dist={dist} onChanged={onChanged} />}
+      {!compact && <CapRow road={road} onChanged={onChanged} />}
       <div className="flex gap-0.5">
         {road.bands.map((b) => (
           <div key={b.from} className="min-w-0 overflow-hidden rounded-md bg-muted px-1.5 py-1 text-[11px]" style={{ flexGrow: b.weeks, flexBasis: 0 }} title={`${t(PHASE_KEY[b.phase])} · ${tn("be.weeksN", b.weeks)} · ${fmt.dist(b.km, 0)}`}>
@@ -82,6 +83,42 @@ export function RaceRoad({ road, compact, onChanged }: { road: Road; compact?: b
   );
 }
 
+/** PUT the race with some fields changed, the rest as they are (the race routes take the whole race). */
+async function putRace(id: number, patch: Record<string, unknown>) {
+  const races = await api<{ id: number; name: string; date: string; distanceKm: number; priority: string; goalSeconds: number | null }[]>("/races");
+  const r = races.find((x) => x.id === id);
+  if (r) await api(`/races/${r.id}`, { method: "PUT", body: { name: r.name, date: r.date, distanceKm: r.distanceKm, priority: r.priority, goalSeconds: r.goalSeconds, ...patch } });
+}
+
+/** The cap on a build week (docs/decisions/fartlek-long-run-ceiling.md): set in km, a suggestion from the proven peak week. */
+function CapRow({ road, onChanged }: { road: Road; onChanged?: () => void }) {
+  const fmt = useFmt();
+  const { km, suggestedKm, provenKm } = road.cap;
+  const [value, setValue] = useState(km != null ? String(fmt.distNum(km)) : "");
+  const [busy, setBusy] = useState(false);
+  const save = async (next: number | null) => {
+    setBusy(true);
+    try { await putRace(road.race.id, { peakKm: next }); setValue(next != null ? String(fmt.distNum(next)) : ""); onChanged?.(); } finally { setBusy(false); }
+  };
+  const typed = Number(value.replace(",", "."));
+  const typedKm = value && Number.isFinite(typed) && typed > 0 ? Math.round(fmt.fromUser(typed) * 10) / 10 : null;
+  return (
+    <div className="space-y-1.5 rounded-lg bg-muted px-3 py-2 text-sm">
+      <div className="font-medium">{t("road.cap.title")}</div>
+      <p className="text-xs text-muted-foreground">{km != null ? t("road.cap.set", { km: fmt.dist(km, 0) }) : t("road.cap.none")}</p>
+      <div className="flex flex-wrap items-center gap-2">
+        <Input inputMode="decimal" className="h-8 w-24" value={value} onChange={(e) => setValue(e.target.value)} aria-label={t("road.cap.title")} placeholder={suggestedKm != null ? String(fmt.distNum(suggestedKm)) : fmt.unit} />
+        <Button variant="outline" className="h-8" disabled={busy || typedKm == null || typedKm === km} onClick={() => save(typedKm)}>{t("common.save")}</Button>
+        {suggestedKm != null && suggestedKm !== km && (
+          <Button variant="outline" className="h-8" disabled={busy} onClick={() => save(suggestedKm)}>{t("road.cap.use", { km: fmt.dist(suggestedKm, 0) })}</Button>
+        )}
+        {km != null && <Button variant="ghost" className="h-8" disabled={busy} onClick={() => save(null)}>{t("road.cap.clear")}</Button>}
+      </div>
+      {suggestedKm != null && <p className="text-xs text-muted-foreground">{t("road.cap.suggest", { km: fmt.dist(suggestedKm, 0), peak: fmt.dist(provenKm, 0) })}</p>}
+    </div>
+  );
+}
+
 /** Too little time: say so, and offer today's prediction as the goal (never applied without the tap). */
 function ShortNote({ road, dist, onChanged }: { road: Road; dist: string; onChanged?: () => void }) {
   const s = road.short!;
@@ -91,9 +128,7 @@ function ShortNote({ road, dist, onChanged }: { road: Road; dist: string; onChan
     if (s.suggestedSeconds == null) return;
     setBusy(true);
     try {
-      const races = await api<{ id: number; name: string; date: string; distanceKm: number; priority: string; goalSeconds: number | null }[]>("/races");
-      const r = races.find((x) => x.id === road.race.id);
-      if (r) await api(`/races/${r.id}`, { method: "PUT", body: { name: r.name, date: r.date, distanceKm: r.distanceKm, priority: r.priority, goalSeconds: s.suggestedSeconds } });
+      await putRace(road.race.id, { goalSeconds: s.suggestedSeconds });
       setDone(true);
       onChanged?.();
     } finally { setBusy(false); }
