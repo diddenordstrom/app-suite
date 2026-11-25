@@ -78,11 +78,25 @@ export function RaceRoad({ road, compact, onChanged }: { road: Road; compact?: b
   );
 }
 
-type Fit = "full" | "name" | "none";
+type Fit = "full" | "name" | "short" | "none";
+type Band = Road["bands"][number] & { withRace?: boolean };
+
+/** The taper and the race week as one band (the taper, race week included): two 1-week bands read as a 1:1 block. */
+export function stripBands(bands: Road["bands"]): Band[] {
+  const out: Band[] = [];
+  for (const b of bands) {
+    const last = out.at(-1);
+    if (b.phase === "race" && last?.phase === "taper" && !last.withRace) {
+      out[out.length - 1] = { ...last, weeks: last.weeks + b.weeks, km: Math.round((last.km + b.km) * 10) / 10, withRace: true };
+    } else out.push({ ...b });
+  }
+  return out;
+}
 
 /**
- * The phases as bands as wide as their weeks. A band shows only the text that fits whole (name and weeks, the name, or
- * nothing); the phases too narrow for their name are spelled out on a line under the strip instead of cut to "N…".
+ * The phases as bands as wide as their weeks. A band shows only the text that fits whole (name and weeks, the name, the
+ * weeks alone as "2 v", or nothing); the phases too narrow for their name are spelled out on a line under the strip
+ * instead of cut to "N…". The taper band that holds the race week carries the ⚑.
  */
 function PhaseStrip({ road }: { road: Road }) {
   const fmt = useFmt();
@@ -94,7 +108,7 @@ function PhaseStrip({ road }: { road: Road }) {
     // The text stays laid out (only made invisible), so it can be measured again when the strip grows.
     const over = (e: Element | undefined) => !!e && e.scrollWidth > e.clientWidth + 0.5;
     const measure = () => {
-      const next = Array.from(el.children, (band): Fit => over(band.children[0]) ? "none" : over(band.children[1]) ? "name" : "full");
+      const next = Array.from(el.children, (band): Fit => over(band.children[0]) ? (over(band.children[2]) ? "none" : "short") : over(band.children[1]) ? "name" : "full");
       setFit((prev) => (prev.length === next.length && prev.every((f, i) => f === next[i]) ? prev : next));
     };
     measure();
@@ -104,15 +118,19 @@ function PhaseStrip({ road }: { road: Road }) {
     void document.fonts?.ready.then(measure);
     return () => ro.disconnect();
   }, [road.bands]);
-  const text = (b: Road["bands"][number]) => `${t(PHASE_KEY[b.phase])} · ${tn("be.weeksN", b.weeks)} · ${fmt.dist(b.km, 0)}`;
-  const hidden = road.bands.filter((_, i) => fit[i] === "none");
+  const bands = stripBands(road.bands);
+  const text = (b: Band) => b.withRace
+    ? t("road.taperWithRace", { phase: t(PHASE_KEY[b.phase]), weeks: tn("be.weeksN", b.weeks), km: fmt.dist(b.km, 0) })
+    : `${t(PHASE_KEY[b.phase])} · ${tn("be.weeksN", b.weeks)} · ${fmt.dist(b.km, 0)}`;
+  const hidden = bands.filter((_, i) => fit[i] === "none" || fit[i] === "short");
   return (
     <div className="space-y-1">
       <div ref={ref} className="flex gap-0.5">
-        {road.bands.map((b, i) => (
-          <div key={b.from} className="min-w-0 overflow-hidden rounded-md bg-muted px-1.5 py-1 text-[11px]" style={{ flexGrow: b.weeks, flexBasis: 0 }} title={text(b)}>
-            <div className={cn("overflow-hidden whitespace-nowrap font-semibold", fit[i] === "none" && "invisible")}>{t(PHASE_KEY[b.phase])}</div>
+        {bands.map((b, i) => (
+          <div key={b.from} className="relative min-w-0 overflow-hidden rounded-md bg-muted px-1.5 py-1 text-[11px]" style={{ flexGrow: b.weeks, flexBasis: 0 }} title={text(b)}>
+            <div className={cn("overflow-hidden whitespace-nowrap font-semibold", fit[i] && fit[i] !== "full" && fit[i] !== "name" && "invisible")}>{b.withRace && "⚑ "}{t(PHASE_KEY[b.phase])}</div>
             <div className={cn("overflow-hidden whitespace-nowrap text-muted-foreground", fit[i] && fit[i] !== "full" && "invisible")}>{tn("be.weeksN", b.weeks)} · {fmt.dist(b.km, 0)}</div>
+            <div className={cn("absolute inset-x-1.5 top-1 overflow-hidden whitespace-nowrap font-semibold", fit[i] !== "short" && "invisible")}>{b.withRace && "⚑ "}{t("road.weeksShort", { weeks: b.weeks })}</div>
           </div>
         ))}
       </div>

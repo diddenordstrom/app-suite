@@ -125,14 +125,17 @@ export function SeasonStrip({ data, selected, onSelect }: { data: BlocksData; se
         {blocks.map((b) => (
           <button key={b.id} type="button" onClick={() => onSelect(b.id)} title={`${blockName(b)} · ${short(b.summary.start)} – ${short(b.summary.end)}`}
             aria-pressed={b.id === selected}
-            className={cn("absolute top-7 h-9 overflow-hidden whitespace-nowrap rounded-md border-l-4 px-1.5 text-left text-xs font-semibold text-foreground", b.id === selected && "outline-2 outline-offset-2 outline-foreground")}
+            className={cn("absolute top-7 flex h-9 items-center overflow-hidden whitespace-nowrap rounded-md border-l-4 px-1.5 text-left text-xs font-semibold text-foreground", b.id === selected && "outline-2 outline-offset-2 outline-foreground")}
             style={{ left: `${pos(b.startWeek)}%`, width: `calc(${(b.weeks * 7 / span) * 100}% - 2px)`, borderLeftColor: BLOCK_COLOR[b.kind], background: `color-mix(in oklab, ${BLOCK_COLOR[b.kind]} 28%, var(--card))` }}>
-            {blockName(b)} · {b.weeks}
+            {/* The name gives way (cut with "…", whole in the title); the weeks always show. */}
+            <span className="min-w-0 truncate">{blockName(b)}</span><span className="shrink-0">&nbsp;· {b.weeks}</span>
           </button>
         ))}
         {flagged.map(({ race: r, label }) => (
           <div key={r.id} className="pointer-events-none absolute inset-y-0" style={{ left: `${pos(r.date)}%` }} title={`${r.name} · ${short(r.date)}`}>
-            <div className="absolute bottom-5 top-4 w-0.5 bg-foreground" />
+            {/* The line stops at the blocks' edges and goes on under them, so it never cuts a block's name. */}
+            <div className="absolute top-4 h-3 w-0.5 bg-foreground" />
+            <div className="absolute bottom-5 top-16 w-0.5 bg-foreground" />
             <div className={cn("absolute top-0 max-w-40 truncate whitespace-nowrap text-xs font-semibold", labelRight(pos(r.date)) ? "left-1" : "right-1")}>⚑{label && ` ${r.name}`}</div>
           </div>
         ))}
