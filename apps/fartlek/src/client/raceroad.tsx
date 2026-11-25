@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useLayoutEffect, useRef, useState } from "react";
 import { api } from "./http";
 import { t, tn } from "./i18n";
 import { useFmt } from "./prefs";
@@ -29,18 +29,11 @@ export function RaceRoad({ road, compact, onChanged }: { road: Road; compact?: b
   const label = (w: RoadWeek) => t("road.weekLabel", { week: weekNumber(w.weekStart), phase: t(PHASE_KEY[w.phase]), km: w.km == null ? "–" : fmt.dist(w.km) });
   const dist = t(road.race.kind === "marathon" ? "road.dist.marathon" : "road.dist.half");
   return (
-    <section className="space-y-2" aria-label={t("road.title", { race: road.race.name })}>
+    <section className="space-y-3" aria-label={t("road.title", { race: road.race.name })}>
       <div className="text-sm font-medium">{t("road.title", { race: road.race.name })}</div>
       {road.short && !compact && <ShortNote road={road} dist={dist} onChanged={onChanged} />}
       {!compact && <CapRow road={road} onChanged={onChanged} />}
-      <div className="flex gap-0.5">
-        {road.bands.map((b) => (
-          <div key={b.from} className="min-w-0 overflow-hidden rounded-md bg-muted px-1.5 py-1 text-[11px]" style={{ flexGrow: b.weeks, flexBasis: 0 }} title={`${t(PHASE_KEY[b.phase])} · ${tn("be.weeksN", b.weeks)} · ${fmt.dist(b.km, 0)}`}>
-            <div className="truncate font-semibold">{t(PHASE_KEY[b.phase])}</div>
-            <div className="truncate text-muted-foreground">{tn("be.weeksN", b.weeks)} · {fmt.dist(b.km, 0)}</div>
-          </div>
-        ))}
-      </div>
+      <PhaseStrip road={road} />
       <div className="pb-1">
         <div className="flex h-20 items-end gap-0.5" aria-hidden>
           {road.weeks.map((w) => (
@@ -72,14 +65,61 @@ export function RaceRoad({ road, compact, onChanged }: { road: Road; compact?: b
         </div>
       )}
       {!compact && (
-        <table className="sr-only">
-          <caption>{t("road.title", { race: road.race.name })}</caption>
-          <tbody>
-            {road.weeks.map((w) => <tr key={w.weekStart}><td>{weekNumber(w.weekStart)}</td><td>{t(PHASE_KEY[w.phase])}</td><td>{w.km == null ? "–" : fmt.dist(w.km)}</td></tr>)}
-          </tbody>
-        </table>
+        // The wrapper, not the table, is sr-only: a caption escapes a clipped table in some browsers and is drawn over what follows.
+        <div className="sr-only">
+          <table>
+            <tbody>
+              {road.weeks.map((w) => <tr key={w.weekStart}><td>{weekNumber(w.weekStart)}</td><td>{t(PHASE_KEY[w.phase])}</td><td>{w.km == null ? "–" : fmt.dist(w.km)}</td></tr>)}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
+  );
+}
+
+type Fit = "full" | "name" | "none";
+
+/**
+ * The phases as bands as wide as their weeks. A band shows only the text that fits whole (name and weeks, the name, or
+ * nothing); the phases too narrow for their name are spelled out on a line under the strip instead of cut to "N…".
+ */
+function PhaseStrip({ road }: { road: Road }) {
+  const fmt = useFmt();
+  const ref = useRef<HTMLDivElement>(null);
+  const [fit, setFit] = useState<Fit[]>([]);
+  useLayoutEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    // The text stays laid out (only made invisible), so it can be measured again when the strip grows.
+    const over = (e: Element | undefined) => !!e && e.scrollWidth > e.clientWidth + 0.5;
+    const measure = () => {
+      const next = Array.from(el.children, (band): Fit => over(band.children[0]) ? "none" : over(band.children[1]) ? "name" : "full");
+      setFit((prev) => (prev.length === next.length && prev.every((f, i) => f === next[i]) ? prev : next));
+    };
+    measure();
+    if (typeof ResizeObserver === "undefined") return;
+    const ro = new ResizeObserver(measure);
+    ro.observe(el);
+    void document.fonts?.ready.then(measure);
+    return () => ro.disconnect();
+  }, [road.bands]);
+  const text = (b: Road["bands"][number]) => `${t(PHASE_KEY[b.phase])} · ${tn("be.weeksN", b.weeks)} · ${fmt.dist(b.km, 0)}`;
+  const hidden = road.bands.filter((_, i) => fit[i] === "none");
+  return (
+    <div className="space-y-1">
+      <div ref={ref} className="flex gap-0.5">
+        {road.bands.map((b, i) => (
+          <div key={b.from} className="min-w-0 overflow-hidden rounded-md bg-muted px-1.5 py-1 text-[11px]" style={{ flexGrow: b.weeks, flexBasis: 0 }} title={text(b)}>
+            <div className={cn("overflow-hidden whitespace-nowrap font-semibold", fit[i] === "none" && "invisible")}>{t(PHASE_KEY[b.phase])}</div>
+            <div className={cn("overflow-hidden whitespace-nowrap text-muted-foreground", fit[i] && fit[i] !== "full" && "invisible")}>{tn("be.weeksN", b.weeks)} · {fmt.dist(b.km, 0)}</div>
+          </div>
+        ))}
+      </div>
+      {hidden.length > 0 && (
+        <p className="text-[11px] text-muted-foreground">{hidden.map((b) => `${t(PHASE_KEY[b.phase])} ${tn("be.weeksN", b.weeks)}`).join(" · ")}</p>
+      )}
+    </div>
   );
 }
 

@@ -98,6 +98,7 @@ export const en = {
 
   "plan.newBlock": "New block",
   "plan.more": "More",
+  "races.more": "More for {name}",
   "plan.noBlock": "no block",
   "plan.easyShare": "easy {pct}% Z1–2",
   "plan.spike": "{pct}% longer than your longest run in the 30 days before ({ref})",
@@ -428,6 +429,7 @@ export const sv: Record<keyof typeof en, string> = {
 
   "plan.newBlock": "Nytt block",
   "plan.more": "Fler val",
+  "races.more": "Fler val för {name}",
   "plan.noBlock": "inget block",
   "plan.easyShare": "lätta {pct} % Z1–2",
   "plan.spike": "{pct} % längre än ditt längsta pass de 30 dagarna innan ({ref})",
