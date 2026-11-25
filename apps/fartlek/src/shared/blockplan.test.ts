@@ -3,7 +3,7 @@ import { addDays, daysBetween, weekday } from "./dates";
 import { COACH } from "./coach";
 import { BLOCK, blockDaysAdvice, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, projectVolumes, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
 import { COACH as COACH_RACE } from "./coach";
-import { NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
+import { markDoubles, NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
 import { planRange } from "./planrange";
 import { stridesOf, withStrides } from "./steps";
 import type { PhaseSeed } from "./racephase";
@@ -748,5 +748,47 @@ describe("gym and other-sport days (docs/decisions/fartlek-gym-cross-days.md)", 
     const a = blockDaysAdvice(big, suggestBlock(big).weeks);
     expect(a).not.toBeNull();
     expect(a!.free.some((d) => [1, 4, 6].includes(d))).toBe(false);
+  });
+
+  // A week of about 55 km on four run days, every other day taken: Monday gym, Thursday swimming, Saturday a ride.
+  const full = { ...runner, kmBefore: [52, 54, 55], tolerance: { km: 58, peakKm: 58, peakWeek: null, weeksAgo: 1 }, longestKm: 20, ctl: 55, atl: 58 };
+  const doubles = (w: { items: SuggestItem[] }) => w.items.filter((it) => it.double);
+
+  it("puts no double anywhere while doubles are off, and offers them when no day is free", () => {
+    const s = suggestBlock(full);
+    expect(s.weeks.flatMap(doubles)).toEqual([]);
+    const a = blockDaysAdvice(full, s.weeks);
+    expect(a).toMatchObject({ free: [], doubles: true });
+  });
+
+  it("allowed after gym: a short easy run on the gym day when the run days don't hold the week, never on a cross-training day", () => {
+    const s = suggestBlock({ ...full, extra: { ...extra, doubles: "gym" } });
+    const d = s.weeks.filter((w) => w.role === "build").flatMap(doubles);
+    expect(d.length).toBeGreaterThan(0);
+    for (const it of d) {
+      expect(weekday(it.date)).toBe(1);
+      expect(it.type).toBe("easy");
+      expect(it.km).toBeLessThanOrEqual(5);
+      expect(it.steps).toBeNull();
+    }
+    // The gym session is still there, and the week asks no more.
+    expect(s.weeks[0].items.filter((it) => weekday(it.date) === 1).map((it) => it.type).sort()).toEqual(["easy", "strength"]);
+    expect(blockDaysAdvice({ ...full, extra: { ...extra, doubles: "gym" } }, s.weeks)).toBeNull();
+  });
+
+  it("never puts a double on the day before the long run", () => {
+    const sat = { gym: [6], cross: [], doubles: "all" as const };
+    const s = suggestBlock({ ...full, extra: sat, runDays: [2, 3, 5, 0] });
+    expect(s.weeks.flatMap(doubles)).toEqual([]);
+  });
+});
+
+describe("markDoubles", () => {
+  it("keeps gym as the day's own session and makes the run beside it the double", () => {
+    const run: SuggestItem = { date: MONDAY, type: "easy", km: 5, durationMin: null, steps: null };
+    const gym: SuggestItem = { date: MONDAY, type: "strength", km: 0, durationMin: 60, steps: null };
+    expect(markDoubles([run, gym])).toEqual([gym, { ...run, double: true }]);
+    // Alone on its day, a run is never a double.
+    expect(markDoubles([{ ...run, double: true }])).toEqual([run]);
   });
 });

@@ -142,12 +142,12 @@ const dayList = (days: number[]) => days.map((d) => WEEKDAY_LONG[d].toLowerCase(
  */
 function DaysStep({ onBack, onNext }: { onBack: () => void; onNext: (changed: boolean) => void }) {
   const { settings, setSettings } = useSettings();
-  const [days, setDays] = useState<WeekDays>({ runDays: settings.runDays, longRunDay: settings.longRunDay, gymDays: settings.gymDays, crossDays: settings.crossDays });
+  const [days, setDays] = useState<WeekDays>({ runDays: settings.runDays, longRunDay: settings.longRunDay, gymDays: settings.gymDays, crossDays: settings.crossDays, doubles: settings.doubles });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const before = gymBeforeLong(days);
   const next = async () => {
-    const changed = (["runDays", "longRunDay", "gymDays", "crossDays"] as const).some((k) => JSON.stringify(days[k]) !== JSON.stringify(settings[k]));
+    const changed = (["runDays", "longRunDay", "gymDays", "crossDays", "doubles"] as const).some((k) => JSON.stringify(days[k]) !== JSON.stringify(settings[k]));
     if (!changed) { onNext(false); return; }
     setBusy(true); setErr(null);
     try {

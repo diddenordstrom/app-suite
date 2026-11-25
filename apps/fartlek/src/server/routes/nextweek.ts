@@ -111,7 +111,7 @@ export function seedFor(ctx: Ctx, weekStart: ISODate, o: { formOverTarget?: bool
 export function extraOf(s: Settings): ExtraDays | null {
   const gym = s.gymDays.filter((d) => d !== s.longRunDay);
   const cross = s.crossDays.filter((c) => c.day !== s.longRunDay && !gym.includes(c.day));
-  return gym.length || cross.length ? { gym, cross } : null;
+  return gym.length || cross.length ? { gym, cross, doubles: s.doubles } : null;
 }
 /** The run days left when the gym and other-sport days are taken out; all of them when that would leave none. */
 export function runDaysOf(s: Settings): number[] {
@@ -243,7 +243,9 @@ export function nextWeekRoutes(db: Db) {
       // whole week, not the days still ahead.
       const whole = plan.suggestion.weeks[0];
       const advice = daysAdvice(seed.runDays, seed.longRunDay, [{ weekStart, targetKm: whole.targetKm, items: whole.items }],
-        (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; }, extraDaysOf(seed.extra));
+        (runDays) => { const s = suggestWeek({ ...seed, runDays }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; },
+        { blocked: extraDaysOf(seed.extra), doublesTrial: seed.extra?.gym.length && (seed.extra.doubles ?? "off") === "off"
+          ? () => { const s = suggestWeek({ ...seed, extra: { ...seed.extra!, doubles: "gym" } }); return [{ weekStart, targetKm: s.targetKm, items: s.items }]; } : undefined });
       return { suggestion, advice };
     });
     return c.json({ weekStart, ok: true, seed, suggestion, replaces, advice, racePace: phaseView(ctx, weekStart, 1) });

@@ -25,6 +25,7 @@ export function getSettings(db: Db, userId: number): Settings {
     longRunDay: r.longRunDay,
     gymDays: r.gymDays ? r.gymDays.split(",").map(Number) : [],
     crossDays: r.crossDays ? r.crossDays.split(",").map((x) => { const [day, min] = x.split(":").map(Number); return { day, min }; }) : [],
+    doubles: r.doubles === "gym" || r.doubles === "all" ? r.doubles : "off",
     maxHr: r.maxHr,
     zones: r.zones ? (JSON.parse(r.zones) as ZoneBounds) : null,
     easyLow: r.easyLow,

@@ -505,7 +505,9 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
   const dayOf = (d: ISODate) => (rec ? daysBetween(rec.date, d) : -1);
   let recStarted = false;
   return vols.map((v, i) => {
-    const ws = weekSeedOf(seed, i, 0, 0, [], false);
+    const plain = weekSeedOf(seed, i, 0, 0, [], false);
+    // Doubles only in build weeks: a lighter, taper, race or recovery week is where the body rests.
+    const ws = v.role !== "build" && plain.extra?.doubles && plain.extra.doubles !== "off" ? { ...plain, extra: { ...plain.extra, doubles: "off" as const } } : plain;
     const last = addDays(ws.weekStart, 6);
     const recWeek = v.role === "recovery";
     // The weeks after recovery step up from what recovery planned, not from the race or the long runs before it.
@@ -842,7 +844,10 @@ export const weekKm = (items: SuggestItem[]) => r1(items.filter(isRun).reduce((s
 export const blockDaysAdvice = (seed: BlockSeed, weeks: PlannedWeek[]) => {
   // Judged on whole weeks: a first week started from today plans only the days ahead, and no added day changes the days that are over.
   const whole = seed.done ? { ...seed, done: null } : seed;
-  return daysAdvice(whole.runDays, whole.longRunDay, weeks, (runDays) => suggestBlock({ ...whole, runDays }).weeks, extraDaysOf(whole.extra));
+  // Doubles are offered when the runner gyms and hasn't allowed them yet (docs/decisions/fartlek-gym-cross-days.md).
+  const x = whole.extra;
+  const doublesTrial = x?.gym.length && (x.doubles ?? "off") === "off" ? () => suggestBlock({ ...whole, extra: { ...x, doubles: "gym" } }).weeks : undefined;
+  return daysAdvice(whole.runDays, whole.longRunDay, weeks, (runDays) => suggestBlock({ ...whole, runDays }).weeks, { blocked: extraDaysOf(x), doublesTrial });
 };
 
 /* ---------- "Föreslå veckan": the same engine with one week ---------- */

@@ -28,6 +28,8 @@ export interface Settings {
   gymDays: number[];
   /** Days and minutes of other sport (swimming, cycling), placed like gym. */
   crossDays: CrossDay[];
+  /** A short easy run may go after gym, or after gym and cross-training, when the run days don't hold the week. Off by default. */
+  doubles: "off" | "gym" | "all";
   maxHr: number | null;
   /** Custom zones; null = use the watch's zones from Garmin. */
   zones: ZoneBounds | null;
@@ -45,6 +47,7 @@ export const DEFAULT_SETTINGS: Settings = {
   longRunDay: 0,
   gymDays: [],
   crossDays: [],
+  doubles: "off",
   maxHr: null,
   zones: null,
   easyLow: null,
@@ -65,6 +68,7 @@ export function parseSettings(input: unknown): Settings | null {
   if (!Number.isInteger(s.longRunDay) || (s.longRunDay as number) < 0 || (s.longRunDay as number) > 6) return null;
   if (!Array.isArray(s.gymDays) || !s.gymDays.every(isDay)) return null;
   if (!Array.isArray(s.crossDays) || !s.crossDays.every((c) => c && typeof c === "object" && isDay(c.day) && Number.isInteger(c.min) && c.min >= 5 && c.min <= 600)) return null;
+  if (s.doubles !== "off" && s.doubles !== "gym" && s.doubles !== "all") return null;
   const cross = new Map((s.crossDays as CrossDay[]).map((c) => [c.day, { day: c.day, min: c.min }]));
   for (const k of ["maxHr", "easyLow", "easyHigh"] as const) if (s[k] !== null && !isHr(s[k])) return null;
   if (s.zones !== null) {
@@ -80,6 +84,7 @@ export function parseSettings(input: unknown): Settings | null {
     longRunDay: s.longRunDay as number,
     gymDays: [...new Set(s.gymDays as number[])].sort(),
     crossDays: [...cross.values()].sort((a, b) => a.day - b.day),
+    doubles: s.doubles,
     maxHr: s.maxHr as number | null,
     zones: s.zones as ZoneBounds | null,
     easyLow: s.easyLow as number | null,

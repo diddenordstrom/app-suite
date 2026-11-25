@@ -8,7 +8,7 @@ import { DayCell, editStep, editType, newEasy, signed, signedInt, SpikeInfo, use
 import { addDays, daysBetween, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { BLOCK, doneKmOf, type BlockEval, type BlockSeed, type PlannedWeek, type WeekRole } from "@/shared/blockplan";
 import { withStrides } from "@/shared/steps";
-import { isTimed, type SuggestItem, type SuggestType } from "@/shared/nextweek";
+import { isTimed, markDoubles, type SuggestItem, type SuggestType } from "@/shared/nextweek";
 
 /*
  * The block editor shared by "Skapa block" and "Räkna om resten": the weeks as columns with the days as rows
@@ -27,7 +27,9 @@ const scaleRun = (x: SuggestItem, f: number): SuggestItem =>
   isTimed(x.type) || x.type === "threshold" ? x : { ...x, km: Math.max(1, half(x.km * f)), steps: x.steps && f !== 1 ? null : x.steps };
 
 /** The block's weeks as the runner edits them: sessions per week and each week's role (build, lighter, taper, race). */
-export function useBlockWeeks(seed: BlockSeed, start: SuggestItem[][], startRoles: WeekRole[]) {
+export function useBlockWeeks(seed: BlockSeed, startRaw: SuggestItem[][], startRoles: WeekRole[]) {
+  // A day holds its own session and at most one double (an easy run after gym), keyed by `double`.
+  const start = useMemo(() => startRaw.map(markDoubles), [startRaw]);
   const [state, setState] = useState({ weeks: start, roles: startRoles });
   const { weeks, roles } = state;
   const lighter = useMemo(() => roles.map((r) => r !== "build"), [roles]);
@@ -35,9 +37,9 @@ export function useBlockWeeks(seed: BlockSeed, start: SuggestItem[][], startRole
   const idx = (d: ISODate) => Math.floor(daysBetween(seed.startWeek, d) / 7);
   const all = weeks.flat();
   const setAll = (items: SuggestItem[]) => setState((s) => ({ ...s, weeks: Array.from({ length: s.weeks.length }, (_, i) =>
-    items.filter((x) => idx(x.date) === i).sort((a, b) => a.date.localeCompare(b.date))) }));
-  const update = (date: ISODate, fn: (it: SuggestItem) => SuggestItem | null) =>
-    setAll(all.flatMap((x) => { if (x.date !== date) return [x]; const y = fn(x); return y ? [y] : []; }));
+    markDoubles(items.filter((x) => idx(x.date) === i))) }));
+  const update = (date: ISODate, fn: (it: SuggestItem) => SuggestItem | null, second = false) =>
+    setAll(all.flatMap((x) => { if (x.date !== date || !!x.double !== second) return [x]; const y = fn(x); return y ? [y] : []; }));
   // The seed the edited weeks are evaluated against: as many weeks as there are now, each with its role as set.
   const edited = useMemo(() => ({ ...seed, weeks: n, roles }), [seed, n, roles]);
   return {
@@ -45,10 +47,12 @@ export function useBlockWeeks(seed: BlockSeed, start: SuggestItem[][], startRole
     changed: JSON.stringify(state) !== JSON.stringify({ weeks: start, roles: startRoles }),
     reset: () => setState({ weeks: start, roles: startRoles }),
     /** Put other weeks in (the engine's re-plan), keeping which weeks are lighter. */
-    load: (w: SuggestItem[][]) => setState((s) => ({ ...s, weeks: w })),
+    load: (w: SuggestItem[][]) => setState((s) => ({ ...s, weeks: w.map(markDoubles) })),
     setType: (date: ISODate, type: SuggestType) => update(date, (x) => editType(x, type, seed.refs)),
     step: (date: ISODate, f: (x: SuggestItem) => SuggestItem) => update(date, f),
     remove: (date: ISODate) => update(date, () => null),
+    stepDouble: (date: ISODate, f: (x: SuggestItem) => SuggestItem) => update(date, f, true),
+    removeDouble: (date: ISODate) => update(date, () => null, true),
     set: (date: ISODate, it: SuggestItem) => update(date, () => it),
     add: (date: ISODate, it?: SuggestItem) => setAll([...all, it ?? newEasy(date)]),
     swap: (a: ISODate, b: ISODate) => setAll(all.map((x) => (x.date === a ? { ...x, date: b } : x.date === b ? { ...x, date: a } : x))),
@@ -206,9 +210,10 @@ export function WeekEditor({ b, ev, plan, canResize, canRetype, fillAdded, locke
   const longKm = Math.max(seed.longestKm, ...b.weeks.flat().filter((x) => x.type === "long").map((x) => x.km), 8);
   const cell = (date: ISODate, items: SuggestItem[]) => {
     if (locked(date)) return <LockedDay key={date} date={date} km={doneKm?.[date] ?? null} label={lockedDays?.[date]} />;
-    const item = items.find((x) => x.date === date) ?? null;
+    const item = items.find((x) => x.date === date && !x.double) ?? null;
+    const double = items.find((x) => x.date === date && x.double) ?? null;
     return (
-      <DayCell key={date} date={date} item={item} refsKm={(x) => fmt.dist(x)} first={date === seed.startWeek || locked(addDays(date, -1))} last={date === blockEnd}
+      <DayCell key={date} date={date} item={item} double={double} onDoubleStep={(dir) => b.stepDouble(date, (x) => stepItem(x, dir, seed))} onDoubleRemove={() => b.removeDouble(date)} refsKm={(x) => fmt.dist(x)} first={date === seed.startWeek || locked(addDays(date, -1))} last={date === blockEnd}
         over={drag.over === date && drag.from !== date} dragged={drag.from === date} dayName={dayName(date)}
         onStart={(p) => drag.start(p, date)} onType={(v) => b.setType(date, v)}
         onStep={(dir) => b.step(date, (x) => stepItem(x, dir, seed))}
@@ -221,7 +226,7 @@ export function WeekEditor({ b, ev, plan, canResize, canRetype, fillAdded, locke
     <WeekHead b={b} i={i} ev={ev} plan={plan[i]} deepest={i === deepestAt} editable={canRetype} compact={compact} label={labels?.[i]}
       onRemove={canRemove ? () => { b.removeWeek(i); setCur(Math.max(0, Math.min(i, n - 2))); } : undefined} />
   );
-  const stepsItem = stepsOf ? b.weeks.flat().find((x) => x.date === stepsOf && !isTimed(x.type)) : undefined;
+  const stepsItem = stepsOf ? b.weeks.flat().find((x) => x.date === stepsOf && !isTimed(x.type) && !x.double) : undefined;
   const addWeekButton = (cls: string, label: string) => (
     <button type="button" onClick={() => { b.addWeek(fillAdded); setCur(n); }} className={cls}>{label}</button>
   );

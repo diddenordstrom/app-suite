@@ -1,5 +1,5 @@
 import { t, WEEKDAY_LONG, WEEKDAY_SHORT } from "./i18n";
-import { Input, cn } from "./ui";
+import { Input, Select, cn } from "./ui";
 import type { CrossDay, Settings } from "@/shared/types";
 
 /*
@@ -8,7 +8,7 @@ import type { CrossDay, Settings } from "@/shared/types";
  * page; it edits the four settings that hold it (runDays, longRunDay, gymDays, crossDays).
  */
 
-export type WeekDays = Pick<Settings, "runDays" | "longRunDay" | "gymDays" | "crossDays">;
+export type WeekDays = Pick<Settings, "runDays" | "longRunDay" | "gymDays" | "crossDays" | "doubles">;
 type Role = "rest" | "run" | "long" | "gym" | "cross";
 const ROLES: Role[] = ["rest", "run", "long", "gym", "cross"];
 const CROSS_MIN = 45;
@@ -41,6 +41,7 @@ export function withRole(v: WeekDays, d: number, role: Role, order: number[]): W
   }
   const is = (r: Role) => order.filter((x) => roles.get(x) === r);
   return {
+    doubles: v.doubles,
     runDays: [...is("run"), ...is("long")].sort(),
     longRunDay: is("long")[0],
     gymDays: is("gym").sort(),
@@ -89,6 +90,16 @@ export function WeekDaysEditor({ value, onChange, weekStart }: { value: WeekDays
           </div>
         );
       })}
+      {/* Doubles only make sense with a gym day (docs/decisions/fartlek-gym-cross-days.md). */}
+      {value.gymDays.length > 0 && (
+        <label className="flex flex-wrap items-center gap-x-3 gap-y-1 pt-2 text-sm">
+          <span className="font-medium">{t("wd.doubles")}</span>
+          <Select className="h-9 w-auto" value={value.doubles} onChange={(e) => onChange({ ...value, doubles: e.target.value as WeekDays["doubles"] })}>
+            {(["off", "gym", ...(value.crossDays.length ? ["all"] : [])] as WeekDays["doubles"][]).map((m) => <option key={m} value={m}>{t(`wd.doubles.${m}`)}</option>)}
+          </Select>
+          <span className="basis-full text-xs text-muted-foreground">{t("wd.doublesHint")}</span>
+        </label>
+      )}
     </div>
   );
 }

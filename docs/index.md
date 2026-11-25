@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-25 · decision · Fartlek doubles after gym, and one week editor for the days ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek Skapa block asks for gym and cross-training days ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · lint · Long-run ceiling page marked partly overtaken ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek marathon long-run track built ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-25 · decision · Fartlek marathon long-run plan settled ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · note · Fartlek marathon plan for a low-volume runner: long runs over 30 km ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek: a block from today keeps the running week's build target ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek "add a run day" no longer loops in a running week ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
