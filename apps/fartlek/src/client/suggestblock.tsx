@@ -74,7 +74,11 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
   const rp = ok?.racePlan ?? null;
   const nowChunks = rp ? rp.chunks.slice(0, rp.now) : [];
   const name = typed ?? (rp && nowChunks[0] ? chunkName(nowChunks[0], rp) : t("blk.focusDefault"));
-  const title = step !== "start" && ok ? t("be.titleWeeks", { name: name.trim() || t("blk.focusDefault"), from: weekNumber(ok.startWeek), to: weekNumber(lastWeekOf(ok.seed)) }) : t("be.title");
+  // Two race blocks planned together (the last build and the form peak): the title names both, with their rhythms.
+  const titleName = nowChunks.length > 1
+    ? nowChunks.map((c, i) => chunkTitle(c, i === 0 ? name.trim() || t("blk.focusDefault") : c.kind === "peak" ? t("be.race.peakShort") : chunkName(c, rp!))).join(" + ")
+    : name.trim() || t("blk.focusDefault");
+  const title = step !== "start" && ok ? t("be.titleWeeks", { name: titleName, from: weekNumber(ok.startWeek), to: weekNumber(lastWeekOf(ok.seed)) }) : t("be.title");
   const picker = data ? <StartPicker value={data.startWeek} first={data.earliest} today={data.today} onChange={setStart} busy={loading} /> : null;
   return (
     <Dialog open onClose={onClose} title={title} className={step === "edit" ? "sm:max-w-[min(100rem,96vw)]" : "sm:max-w-3xl"}>
@@ -118,6 +122,16 @@ function StepDots({ step }: { step: 1 | 2 }) {
   );
   return <ol className="mb-4 flex flex-wrap gap-x-6 gap-y-2 border-b border-border pb-3 text-sm">{dot(1, t("be.step1"))}{dot(2, t("be.step2"))}</ol>;
 }
+
+/** A race block's rhythm from its roles, "3:1" or "2:2" (build weeks : the rest); none for a block of one kind of week. */
+const chunkRhythm = (c: RaceChunk) => {
+  const build = c.roles.filter((r) => r === "build").length;
+  return build > 0 && build < c.roles.length ? `${build}:${c.roles.length - build}` : null;
+};
+const chunkTitle = (c: RaceChunk, name: string) => {
+  const rhythm = chunkRhythm(c);
+  return rhythm ? t("be.race.chunkTitle", { name, rhythm }) : name;
+};
 
 /** A race plan's block name: "Formtopp <race>" for the form peak, "Uppbyggnad" and "I fas" for those before it. */
 const chunkName = (c: RaceChunk, rp: RacePlan) => (c.kind === "peak" ? t("be.race.peakName", { name: rp.race.name }) : t(c.kind === "build" ? "be.race.buildName" : "be.race.inPhaseName"));
