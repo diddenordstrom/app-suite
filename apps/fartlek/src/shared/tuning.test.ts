@@ -54,7 +54,7 @@ describe("overrides", () => {
   });
 
   it("refuses combinations that make no sense", () => {
-    expect(parseTuning({ daysFromKm: { d4: 45 } })).toBeNull();
+    expect(parseTuning({ daysFromKm: { d4: 50 } })).toBeNull();
     expect(parseTuning({ daysFromKm: { d4: 30, d5: 45 } })).toEqual({ daysFromKm: { d4: 30, d5: 45 } });
   });
 

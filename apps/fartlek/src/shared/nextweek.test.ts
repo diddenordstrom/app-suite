@@ -277,18 +277,21 @@ describe("easy runs follow the week's size, and the days it needs", () => {
   });
 
   it("spreads a big week over the days its volume calls for, so a long long run doesn't make long easy runs", () => {
-    // 46 km with an 18.5 km long run: easy runs may be 9.25 km, so two would do, but 46 km calls for five days.
-    const sh = shape({ km: 46, longKm: 18.5 });
+    // 54 km with a 22 km long run: easy runs may be 11 km, so two would do, but 54 km calls for five days.
+    const sh = shape({ km: 54, longKm: 22 });
     const easy = (runDays: number[]) => build(seed({ runDays }), sh).filter((i) => i.type === "easy");
     expect(easy([2, 3, 4, 5, 0])).toHaveLength(3);
-    expect(Math.max(...easy([2, 3, 4, 5, 0]).map((i) => i.km))).toBeLessThan(7);
+    expect(Math.max(...easy([2, 3, 4, 5, 0]).map((i) => i.km))).toBeLessThan(8);
     // With four days, a fifth changes the plan, so it is offered.
-    const weekOf = (runDays: number[]) => [{ weekStart: MONDAY, targetKm: 46, items: build(seed({ runDays }), sh) }];
-    expect(daysAdvice([2, 3, 5, 0], 0, weekOf([2, 3, 5, 0]), weekOf)?.free.length).toBeGreaterThan(0);
+    const weekOf = (km: number, longKm: number) => (runDays: number[]) => [{ weekStart: MONDAY, targetKm: km, items: build(seed({ runDays }), shape({ km, longKm })) }];
+    expect(daysAdvice([2, 3, 5, 0], 0, weekOf(54, 22)([2, 3, 5, 0]), weekOf(54, 22))?.free.length).toBeGreaterThan(0);
+    // A four-day runner at 46 km is not asked for a fifth day (5 days from 50 km).
+    expect(daysAdvice([2, 3, 5, 0], 0, weekOf(46, 18.5)([2, 3, 5, 0]), weekOf(46, 18.5))).toBeNull();
   });
 
   it("calls for more run days as the volume grows", () => {
-    expect([10, 24, 25, 39, 40, 54, 55, 69, 70, 120].map(daysFor)).toEqual([3, 3, 4, 4, 5, 5, 6, 6, 7, 7]);
+    // A 4-day runner around 40–46 km a week is not asked for a fifth day: 5 days from 50 km.
+    expect([10, 24, 25, 39, 40, 46, 49, 50, 54, 55, 69, 70, 120].map(daysFor)).toEqual([3, 3, 4, 4, 4, 4, 4, 5, 5, 6, 6, 7, 7]);
   });
 
   it("asks for another day when the biggest week calls for it, the free day furthest from the hard sessions first", () => {

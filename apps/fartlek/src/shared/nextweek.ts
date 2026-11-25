@@ -569,7 +569,7 @@ export function build(seed: Pick<WeekSeed, "weekStart" | "runDays" | "longRunDay
   const rest = total - used;
   const easyMax = Math.max(NEXT.easyMinKm, tune().easy.ofLong * items[0].km);
   // As many easy runs as keep each under its share of the long run, and at least as many as the week's volume
-  // calls for (`daysFor`: 5 run days from 40 km): otherwise a growing long run lets the easy runs grow with it,
+  // calls for (`daysFor`: 5 run days from 50 km): otherwise a growing long run lets the easy runs grow with it,
   // a free day never changes the plan, and the week is never offered the day it needs.
   const want = Math.max(1, Math.ceil(rest / easyMax - 1e-9), daysFor(total) - 1 - thr.length);
   while (easyDays.length && (easyDays.length > want || rest / easyDays.length < NEXT.easyMinKm)) easyDays = easyDays.slice(0, -1);
