@@ -13,6 +13,7 @@ import { thresholdOn } from "../../shared/threshold";
 import { blockEnd, checkEdges, raceHints, runPoints, spikeOf, summarizeBlock, type Push, type RunPoint } from "../../shared/blocks";
 import { applyBlockText, blockText, type ApplyOptions, type ApplyResult, type WeekState } from "../../shared/blocktext";
 import type { Msg } from "../../shared/types";
+import { RECOVERY, recoveryRoles, recoveryRow, type RecoveryRace } from "../../shared/blockplan";
 import { blockLines } from "../../shared/parser";
 import { BLOCK_KINDS, type Block } from "../../shared/types";
 import { body, date, idParam, num, oneOf, optStr, router, BadRequest } from "./util";
@@ -127,17 +128,47 @@ export function weeksBefore(ctx: Ctx, weekStart: ISODate, weeks: number) {
   });
 }
 
-/** The longest single run in [from, to]: runs done, and runs planned from today on (not skipped or dropped). */
-export function longestRun(ctx: Ctx, from: ISODate, to: ISODate): number {
+/**
+ * The longest single run in [from, to]: runs done, and runs planned from today on (not skipped or dropped).
+ * `skip`: days that don't count (a race, so the ladder doesn't step from it; docs/decisions/fartlek-post-race-recovery.md).
+ */
+export function longestRun(ctx: Ctx, from: ISODate, to: ISODate, skip: ISODate[] = []): number {
   let best = 0;
-  for (const a of repo.listActivities(ctx.db, ctx.userId, { from, to: to < ctx.today ? to : ctx.today })) if (a.isRun) best = Math.max(best, a.distanceM / 1000);
-  if (from <= ctx.today && ctx.today <= to) for (const w of openToday(ctx)) if (w.type !== "cross") best = Math.max(best, plannedKmOf(w));
+  const counts = (d: ISODate) => !skip.includes(d);
+  for (const a of repo.listActivities(ctx.db, ctx.userId, { from, to: to < ctx.today ? to : ctx.today })) if (a.isRun && counts(a.date)) best = Math.max(best, a.distanceM / 1000);
+  if (from <= ctx.today && ctx.today <= to) for (const w of openToday(ctx)) if (w.type !== "cross" && counts(w.date)) best = Math.max(best, plannedKmOf(w));
   if (to > ctx.today) {
     for (const w of repo.listWorkouts(ctx.db, ctx.userId, addDays(ctx.today, 1), to)) {
-      if (w.status === "planned" && w.date >= from && w.type !== "cross" && w.type !== "rest") best = Math.max(best, plannedKmOf(w));
+      if (w.status === "planned" && w.date >= from && w.type !== "cross" && w.type !== "rest" && counts(w.date)) best = Math.max(best, plannedKmOf(w));
     }
   }
   return Math.round(best * 10) / 10;
+}
+
+/** The A or B race of 10 km+ whose recovery reaches into the weeks from `startWeek` (docs/decisions/fartlek-post-race-recovery.md). */
+export function recoveryRaceFor(ctx: Ctx, startWeek: ISODate): (RecoveryRace & { name: string }) | null {
+  const from = addDays(startWeek, -RECOVERY.lookbackDays);
+  const before = startWeek > ctx.today ? startWeek : ctx.today;
+  const races = repo.listRaces(ctx.db, ctx.userId);
+  const listed = races.filter((r) => (r.priority === "A" || r.priority === "B") && r.distanceKm >= RECOVERY.minKm && r.date >= from && r.date < before)
+    .map((r) => ({ name: r.name, date: r.date, distanceKm: r.distanceKm, priority: r.priority as "A" | "B" }));
+  // A race session that isn't on the race list counts as B (the race list is where A is set); a dropped one was not run.
+  const onList = new Set(races.map((r) => r.date));
+  const sessions = repo.listWorkouts(ctx.db, ctx.userId, from, addDays(before, -1))
+    .filter((w) => w.type === "race" && w.status !== "dropped" && (w.distanceKm ?? 0) >= RECOVERY.minKm && !onList.has(w.date))
+    .map((w) => ({ name: w.notes ?? "", date: w.date, distanceKm: w.distanceKm ?? 0, priority: "B" as const }));
+  const last = addDays(startWeek, 6);
+  const open = [...listed, ...sessions].flatMap((r) => {
+    const row = recoveryRow(r);
+    if (!row) return [];
+    const reaches = recoveryRoles(r, startWeek, 1)[0] === "recovery" || daysBetween(r.date, last) < row.intervals;
+    return reaches ? [{ r, ends: addDays(r.date, row.intervals) }] : [];
+  });
+  if (!open.length) return null;
+  // Of several, the one whose gates close last.
+  const { r } = open.reduce((a, b) => (b.ends > a.ends ? b : a));
+  const peakKm = Math.max(0, ...weeksBefore(ctx, weekStartOf(r.date, ctx.settings.weekStart), 6).map((w) => w.km)) || null;
+  return { ...r, peakKm };
 }
 
 function coachInputs(ctx: Ctx, startWeek: ISODate, plan: TextPlan, crossMin: number) {

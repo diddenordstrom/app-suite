@@ -415,9 +415,25 @@ describe("api", () => {
     const first = await get<{ startWeek: string; defaultStart: string; reason?: string }>("/api/plan/block-suggest");
     expect(first.startWeek).toBe(addDays(lastEnd, 1));
     expect(first.defaultStart).toBe(first.startWeek);
-    // The week after the demo marathon (a Sunday): recover first, no build block yet.
-    const marathon = (await get<{ name: string; date: string }[]>("/api/races")).find((r) => r.name === "Demo Marathon")!;
-    expect((await get<{ reason?: string }>(`/api/plan/block-suggest?startWeek=${addDays(marathon.date, 1)}`)).reason).toBe("afterRace");
+    // The week after the demo marathon (a Sunday): the block starts with recovery weeks (docs/decisions/fartlek-post-race-recovery.md).
+    const marathon = (await get<{ name: string; date: string; priority: string }[]>("/api/races")).find((r) => r.name === "Demo Marathon")!;
+    type RecSug = Omit<Sug, "suggestion"> & { recovery: { priority: string; weeks: number } | null; suggestion: { weeks: { role: string; items: Item[] }[] } };
+    const after = await get<RecSug>(`/api/plan/block-suggest?startWeek=${addDays(marathon.date, 1)}&weeks=4`);
+    expect(after.ok).toBe(true);
+    expect(after.recovery?.priority).toBe(marathon.priority);
+    // An A marathon: four recovery weeks, so a 4-week block is all recovery.
+    expect(after.recovery?.weeks).toBe(4);
+    expect(after.suggestion.weeks.map((w) => w.role)).toEqual(["recovery", "recovery", "recovery", "recovery"]);
+    // Days 1–3 after a marathon: no running.
+    expect(after.suggestion.weeks[0].items.filter((it) => it.type !== "cross" && it.date <= addDays(marathon.date, 3))).toEqual([]);
+    {
+      const roles = after.suggestion.weeks.map((w) => w.role);
+      const wrote = await app.request("/api/plan/block-suggest", json({ startWeek: addDays(marathon.date, 1), weeks: after.suggestion.weeks.map((w) => w.items), roles, replace: after.replaces.map((w) => w.id) }));
+      expect(wrote.status).toBe(200);
+      const made = await wrote.json() as { id: number; ids: number[]; removed: unknown[]; targetsBefore: unknown[] };
+      expect((await get<{ blocks: { id: number; kind: string }[] }>("/api/blocks")).blocks.find((b) => b.id === made.id)?.kind).toBe("recovery");
+      expect((await app.request("/api/plan/block-suggest/undo", json({ id: made.id, ids: made.ids, restore: made.removed, targetsBefore: made.targetsBefore }))).status).toBe(200);
+    }
     expect((await get<Sug>(`/api/plan/block-suggest?startWeek=${blocks[blocks.length - 1].startWeek}&weeks=2`)).reason).toBe("block");
     expect((await app.request("/api/plan/block-suggest?startWeek=2035-03-06")).status).toBe(400);
 
@@ -482,6 +498,16 @@ describe("api", () => {
     expect(comp.diff.after.endsOn).toBe("2035-04-01");
     await app.request(`/api/blocks/${nextBlock.id}?workouts=1`, { method: "DELETE", headers: { origin: ORIGIN } });
     await app.request(`/api/blocks/${again.id}?workouts=1`, { method: "DELETE", headers: { origin: ORIGIN } });
+  });
+
+  it("re-plans the weeks after an A half inside a block as recovery, not lighter (docs/decisions/fartlek-post-race-recovery.md)", async () => {
+    const made = await (await app.request("/api/blocks", json({ kind: "base", name: "Half block", startWeek: "2037-01-05", text: "6 zone 2, 9 tröskel, 15 long run\n6 zone 2, 9 tröskel, 15 long run\n6 zone 2\n6 zone 2" }))).json() as { id: number };
+    const race = await (await app.request("/api/races", json({ date: "2037-01-18", name: "Test half", distanceKm: 21.1, priority: "A" }))).json() as { id: number };
+    const re = await get<{ ok: boolean; suggestion: { weeks: { role: string }[] } }>(`/api/blocks/${made.id}/replan`);
+    expect(re.ok).toBe(true);
+    expect(re.suggestion.weeks.map((w) => w.role)).toEqual(["taper", "race", "recovery", "recovery"]);
+    await app.request(`/api/races/${race.id}`, { method: "DELETE" });
+    await app.request(`/api/blocks/${made.id}`, { method: "DELETE" });
   });
 
   it("next week counts today's session that hasn't been run yet", async () => {

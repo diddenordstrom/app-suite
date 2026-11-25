@@ -44,7 +44,7 @@ So the runner gets a base engine up to 16 weeks before an A race and then plans 
 - **The race day, not the weekday, places the race week's sessions**: the last short sharpening session 3–4 days before, rest or a short easy run the day before, only easy after it. The same rule fits a Saturday, a Sunday or a weekday race.
 - **A B race gets a mini-taper, no taper week before it**: the race week at about 70 %, Monday–Wednesday shorter than usual with one short sharpening session, easy until the race. An A race gets the full two-week taper.
 - **"Ändra block"'s race limit goes**: today it edits a race's weeks by hand and hides "Räkna om resten"; with race planning in place, re-planning those weeks is allowed.
-- **Recovery after the race** waits; when built, its length follows the distance (rule of thumb: about a week easy after 5–10 km, 1–2 after a half, 2–4 after a marathon). Decided on 2026-11-24 in [post-race recovery](fartlek-post-race-recovery.md): recovery weeks at the start of the next block after an A or B race of 10 km+, gated by days since the race.
+- **Recovery after the race** waits; when built, its length follows the distance (rule of thumb: about a week easy after 5–10 km, 1–2 after a half, 2–4 after a marathon). Decided on 2026-11-24 in [post-race recovery](fartlek-post-race-recovery.md): recovery weeks at the start of the next block after an A or B race of 10 km+, gated by days since the race. Built 2026-11-24.
 
 ## Built (2026-11-16)
 
@@ -80,4 +80,4 @@ So the runner gets a base engine up to 16 weeks before an A race and then plans 
 ## Open
 
 - ~~How the base blocks more than 16 weeks out should end so the race plan starts on a block boundary.~~ Answered 2026-11-24 in [race plan skeleton](fartlek-race-plan-skeleton.md): `raceChunks` works for any number of weeks (the in-phase block at the front takes the remainder), so a plan can start at any week inside its window.
-- Distance-specific race blocks are decided in [race-specific phase](fartlek-race-specific-phase.md); recovery after the race in [post-race recovery](fartlek-post-race-recovery.md) (decided, not built).
+- Distance-specific race blocks are decided in [race-specific phase](fartlek-race-specific-phase.md); recovery after the race in [post-race recovery](fartlek-post-race-recovery.md) (built 2026-11-24).

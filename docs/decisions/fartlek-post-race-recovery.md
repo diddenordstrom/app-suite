@@ -1,6 +1,6 @@
 ---
 title: Fartlek starts the block after a 10 km+ race with recovery weeks gated by days since the race
-summary: After an A or B race of 10 km or longer the next block's first weeks get a new `recovery` role (volume as a share of the pre-race peak, distance and priority decide how many), quality returns by day gates in the order strides, threshold, intervals; the 14-day refusal goes; includes a step-by-step build plan
+summary: After an A or B race of 10 km or longer the next block's first weeks get a new `recovery` role (volume as a share of the pre-race peak, distance and priority decide how many), quality returns by day gates in the order strides, threshold, intervals; the 14-day refusal goes; built 2026-11-24 from the step-by-step build plan
 type: decision
 status: accepted
 updated: 2026-11-24
@@ -8,7 +8,7 @@ updated: 2026-11-24
 
 # Fartlek starts the block after a 10 km+ race with recovery weeks gated by days since the race
 
-Settled with the user on 2026-11-24, as a spec for a build session. It closes the recovery gap left open in [race blocks](fartlek-race-blocks.md) ("Recovery after the race waits"), named as the biggest gap in [race-specific phase](fartlek-race-specific-phase.md) (todo 1) and open in [goal-driven blocks](fartlek-block-goals.md). The [build plan](#build-plan) below is written so the work can be done without re-deriving anything; nothing of it is built yet.
+Settled with the user on 2026-11-24, as a spec for a build session. It closes the recovery gap left open in [race blocks](fartlek-race-blocks.md) ("Recovery after the race waits"), named as the biggest gap in [race-specific phase](fartlek-race-specific-phase.md) (todo 1) and open in [goal-driven blocks](fartlek-block-goals.md). The [build plan](#build-plan) below was written so the work could be done without re-deriving anything. **Built 2026-11-24**; what changed while building is under [Built](#built).
 
 ## Decided
 
@@ -63,9 +63,21 @@ Settled with the user on 2026-11-24, as a spec for a build session. It closes th
 - **The long run's way back.** After the recovery weeks the long-run ladder steps up from the longest run planned in them, about 8 % a week, which may be slower than the weekly volume's re-entry. Check in the scenarios before changing it.
 - **The threshold ladder after recovery** resumes at the rung the last threshold session left (`seed.rung`); whether it should step back a rung or two after a marathon is untested.
 
+## Built
+
+Built on 2026-11-24 as planned, steps 1–9. What was settled or changed while building:
+
+- **Rest days are not run days.** On days 1..`restDays` after the race the week is built with those weekdays left out of the run days (when another run day is left), so the week's runs land on the days that may be run. Without it the engine could put the week's only easy run on a rest day, where `gateAfterRace` then dropped it (the first week after a marathon came out at 3 km for a 6.5 km target). `gateAfterRace` still drops any run on a rest day.
+- **The threshold and strides gates in `weeksFor` only touch weeks with days after the race.** The step 3.3 rules as written would also have applied to weeks before the race (their day count is negative, under every gate) and removed the race week's sharpening session. They apply when the week is not a race week and its last day is after the race; strides are switched off for the whole week only when its first day is after the race too, else `gateAfterRace` takes them off the early days one by one.
+- **A gated week gets no race-phase session.** Where the threshold gate applies, the week's phase sessions are not passed to `build()`; `gateAfterRace` also turns any blueprint before the intervals gate into a plain long or easy run.
+- **`withRecovery`** keeps roles past the length of the recovery list (a block longer than the list it was given).
+- **`recoveryRaceFor` also feeds "Föreslå veckan"** through `seedFor`: the week seed carries `recovery` and the `longestKm` that skips the race day, and `weekAsBlock` gives the week the `recovery` role while one is due.
+- **The rhythm query is ignored, not removed,** when recovery weeks are in the block: the server applies `rhythm=1:1` only without them, so the client keeps one request.
+- **Scenarios:** "after a marathon" plans 6 → 20.5 → 29.5 → 36.5 km (rrrr) for a 45 km runner; "after a half, late" plans the 75 % week, then builds (rbbb). The long run after recovery climbs from the recovery weeks' longest run (9 → 10 → 11 → 12 km after the half), slower than the volume, as the open item on the long run's way back expected.
+
 ## Build plan
 
-Drafted 2026-11-24 from the code at that date. Line numbers drift, so search for the names. Paths are relative to `apps/fartlek/src`. One PR, or two (engine, then routes and UI), each with `npm run check` green, a gitmoji commit message (`✨`), and every UI string through `t()` in both `en` and `sv`. When it is built, mark this page built and extend it with what changed while building.
+Drafted 2026-11-24 from the code at that date, kept as the record of what was built (see [Built](#built) for what changed). Paths are relative to `apps/fartlek/src`.
 
 ### Step 1: types and the table (`shared/blockplan.ts`)
 

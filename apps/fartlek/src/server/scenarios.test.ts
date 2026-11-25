@@ -19,10 +19,23 @@ group("planning scenarios", () => {
   it("starts a block no higher than the week button's week, and at most a fifth lower", () => {
     // The block ramps up from a little under the proven load (BLOCK.ramp), so its first week may sit below the week button's.
     for (const x of results.values()) {
-      if (x.scenario.race) continue;
+      if (x.scenario.race || x.scenario.raceAgo) continue;
       expect(x.blocks[0].km[0], describe(x)).toBeLessThanOrEqual(x.week.km + 0.5);
       expect(x.blocks[0].km[0], describe(x)).toBeGreaterThanOrEqual(x.week.km * 0.8);
     }
+  });
+
+  it("starts the block after a 10 km+ race with recovery weeks (docs/decisions/fartlek-post-race-recovery.md)", () => {
+    const m = r("after a marathon");
+    expect(m.race!.roles, describe(m)).toBe("rrrr");
+    // 15 · 45 · 65 · 80 % of the pre-race peak, never more.
+    expect(m.race!.km[0], describe(m)).toBeLessThan(m.race!.km[1]);
+    expect(m.race!.km[3], describe(m)).toBeLessThanOrEqual(0.8 * 46 + 0.5);
+    const h = r("after a half, late");
+    // Ten days after the race: the second recovery week (75 %) is the only one left, then the build.
+    expect(h.race!.roles, describe(h)).toBe("rbbb");
+    expect(h.race!.km[0], describe(h)).toBeLessThanOrEqual(0.75 * 41 + 0.5);
+    expect(h.race!.km[1], describe(h)).toBeGreaterThan(h.race!.km[0]);
   });
 
   it("brings a runner returning from a dip back towards the 35 km run before, not a lighter week", () => {

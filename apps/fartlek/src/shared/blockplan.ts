@@ -1,7 +1,7 @@
-import { addDays, daysBetween, type ISODate } from "./dates";
+import { addDays, daysBetween, weekday, type ISODate } from "./dates";
 import { COACH, crossLoadPerDay, itemLoad } from "./coach";
 import { build, daysAdvice, type BackoffWhy, daysOf, type Shape as WeekShape, evaluate, growthBase, longFor, longRun, NEXT, weekCapWith, rung, spikeMax, thresholdReps, whyOf, withinQuality, type PastWeek, type Suggestion, type SuggestItem, type Thr, type Try, type TryId, type WeekEval, type WeekSeed, type WeekState } from "./nextweek";
-import type { StepRefs } from "./steps";
+import { stridesOf, type StepRefs } from "./steps";
 import type { Threshold } from "./types";
 import { tune } from "./tuning";
 import { blueprintById, blueprintTag, compileSlot, phaseWeekFor, type BlueprintId, type PhaseSlot } from "./blueprints";
@@ -29,8 +29,6 @@ export const BLOCK = {
   reentryGrowth: NEXT.reentryGrowth,
   /** An A or B race within this many weeks of the block's start: planned with race mode instead. */
   raceWindowWeeks: 16,
-  /** An A or B race this many days before the start: recover before a block is suggested. */
-  afterRaceDays: 14,
   /** A block can start in the running week, from today, while this many of its days are left (Monday–Thursday). */
   minDaysLeft: 4,
   /** Re-planning says the goal is adjusted only past this share of it. */
@@ -112,6 +110,8 @@ export interface BlockSeed {
   roles?: WeekRole[];
   /** The A or B race the weeks lead to (race planning, docs/decisions/fartlek-race-blocks.md). */
   race?: { date: ISODate; priority: "A" | "B" } | null;
+  /** The race the first weeks recover from, or a race inside the weeks whose days after it are gated. */
+  recovery?: RecoveryRace | null;
   /** The taper's depth, as shares of the peak week (first taper week, race week); set by the search in `suggestBlock`. */
   taper?: { first: number; race: number };
   /** The race-specific phase, when an A marathon or half is within 8 weeks of one of the weeks. */
@@ -121,9 +121,95 @@ export interface BlockSeed {
 /**
  * What a week is for. `build` and `lighter` as in any block; before a race, `taper` (the week before the race week)
  * and `race` (the week the race is in). A taper is not a lighter week: it cuts deeper, keeps the run days and a few
- * short fast reps, and the two are never stacked.
+ * short fast reps, and the two are never stacked. `recovery`: a week after an A or B race of 10 km or more, a share of
+ * the pre-race peak with quality gated by days since the race (docs/decisions/fartlek-post-race-recovery.md).
  */
-export type WeekRole = "build" | "lighter" | "taper" | "race";
+export type WeekRole = "build" | "lighter" | "taper" | "race" | "recovery";
+
+/** An A or B race of 10 km+ that recovery weeks follow (docs/decisions/fartlek-post-race-recovery.md). */
+export interface RecoveryRace {
+  date: ISODate;
+  distanceKm: number;
+  priority: "A" | "B";
+  /** Run km of the biggest week in the 6 weeks before the race week; null = take it from the plan or the tolerance. */
+  peakKm: number | null;
+}
+
+export interface RecoveryRow {
+  /** Recovery weeks, and the volume of each as a share of the pre-race peak week. `volume.length === weeks`. */
+  weeks: number;
+  volume: readonly number[];
+  /** Days 1..restDays after the race: no running (0 = none). */
+  restDays: number;
+  /** First day (days since the race, race day 0) each kind is allowed. */
+  strides: number;
+  /** The lighter week's session, NEXT.lighterThr (3 × 6 min). */
+  thresholdShort: number;
+  /** The ladder's rung. */
+  thresholdFull: number;
+  /** Not generated today; kept so a future generator (and race-phase blueprints) honours it. */
+  intervals: number;
+}
+export type RecoveryBucket = "10k" | "half" | "marathon";
+
+const RECOVERY_A: Record<RecoveryBucket, RecoveryRow> = {
+  "10k": { weeks: 1, volume: [0.7], restDays: 0, strides: 4, thresholdShort: 7, thresholdFull: 7, intervals: 10 },
+  half: { weeks: 2, volume: [0.5, 0.75], restDays: 0, strides: 6, thresholdShort: 11, thresholdFull: 11, intervals: 14 },
+  marathon: { weeks: 4, volume: [0.15, 0.45, 0.65, 0.8], restDays: 3, strides: 12, thresholdShort: 21, thresholdFull: 28, intervals: 28 },
+};
+const RECOVERY_B: Record<RecoveryBucket, RecoveryRow> = {
+  "10k": { weeks: 1, volume: [0.8], restDays: 0, strides: 2, thresholdShort: 4, thresholdFull: 4, intervals: 6 },
+  half: { weeks: 1, volume: [0.85], restDays: 0, strides: 4, thresholdShort: 7, thresholdFull: 7, intervals: 8 },
+  marathon: { weeks: 2, volume: [0.8, 0.9], restDays: 2, strides: 7, thresholdShort: 13, thresholdFull: 17, intervals: 17 },
+};
+
+/** Post-race recovery (docs/decisions/fartlek-post-race-recovery.md). An injury guard: not in TUNE. */
+export const RECOVERY = {
+  /** Races shorter than this get no recovery weeks. Buckets: < `halfFromKm` 10k, < `marathonFromKm` half, else marathon. */
+  minKm: 10, halfFromKm: 15, marathonFromKm: 30,
+  /** Long run of a recovery week: this share of the week's km, never over `longMaxKm`, never under NEXT.easyMinKm. */
+  longShare: 0.3, longMaxKm: 16,
+  /** How far back a race can be and still give recovery weeks (the longest row's weeks). */
+  lookbackDays: 28,
+  A: RECOVERY_A,
+  B: RECOVERY_B,
+} as const;
+
+/** The bucket of a race distance; null under RECOVERY.minKm. */
+export const recoveryBucket = (km: number): RecoveryBucket | null =>
+  km < RECOVERY.minKm ? null : km < RECOVERY.halfFromKm ? "10k" : km < RECOVERY.marathonFromKm ? "half" : "marathon";
+
+/** The row for a race; null for a C race or one under 10 km. */
+export function recoveryRow(r: Pick<RecoveryRace, "distanceKm"> & { priority: string }): RecoveryRow | null {
+  const b = recoveryBucket(r.distanceKm);
+  return b && (r.priority === "A" || r.priority === "B") ? RECOVERY[r.priority][b] : null;
+}
+
+/**
+ * Which recovery week a plan week is: the one holding the week's middle day (weekStart + 3). Recovery week k covers
+ * days 7k+1 .. 7k+7 after the race. Never negative (a week that holds the race reads 0).
+ */
+export const recoveryWeekOf = (raceDate: ISODate, weekStart: ISODate) =>
+  Math.max(0, Math.floor((daysBetween(raceDate, weekStart) + 2) / 7));
+
+/** "recovery" for each of `weeks` weeks from `startWeek` still inside the race's recovery, else null (left to the caller). */
+export function recoveryRoles(rec: Pick<RecoveryRace, "date" | "distanceKm"> & { priority: string }, startWeek: ISODate, weeks: number): (WeekRole | null)[] {
+  const row = recoveryRow(rec);
+  return Array.from({ length: weeks }, (_, i) => {
+    const ws = addDays(startWeek, i * 7);
+    return row && ws > rec.date && recoveryWeekOf(rec.date, ws) < row.weeks ? "recovery" : null;
+  });
+}
+
+/** Recovery weeks first (a race week inside them stays a race week, a taper week becomes recovery); the rest as given, or build. */
+export function withRecovery(roles: WeekRole[] | null, rec: (WeekRole | null)[]): WeekRole[] | null {
+  if (!rec.some(Boolean)) return roles;
+  const n = Math.max(rec.length, roles?.length ?? 0);
+  return Array.from({ length: n }, (_, i) => {
+    const r = rec[i];
+    return r && roles?.[i] !== "race" ? r : roles?.[i] ?? "build";
+  });
+}
 
 export interface PlannedWeek { weekStart: ISODate; lighter: boolean; role: WeekRole; reentry: boolean; cap: number; /** The km the week was asked to have (its sessions may add up to less when the days can't hold them). */ targetKm: number; items: SuggestItem[] }
 export interface BlockWeekEval extends WeekEval { weekStart: ISODate; lighter: boolean; role: WeekRole }
@@ -302,6 +388,14 @@ function volumes(seed: BlockSeed, scale: number, given: number[] = []): Volume[]
         : seed.race?.priority === "B" ? tune().taper.bRace : seed.taper?.race ?? tune().taper.race;
       const base = seed.race?.priority === "B" && role === "race" ? prev : peak;
       v = { km: fixed[i] ?? floorHalf(base * share), cap: base, reentry: false, lighter, role };
+    } else if (role === "recovery" && seed.recovery && recoveryRow(seed.recovery)) {
+      // A fixed share of the pre-race peak: never fitted, ramped or held to the week cap (docs/decisions/fartlek-post-race-recovery.md).
+      const row = recoveryRow(seed.recovery)!;
+      const k = Math.min(recoveryWeekOf(seed.recovery.date, addDays(seed.startWeek, i * 7)), row.volume.length - 1);
+      // The pre-race peak: a build week planned before it (a re-plan with the race inside), else the run peak, else the tolerance.
+      const plannedPeak = Math.max(0, ...out.filter((x) => x.role === "build").map((x) => x.km));
+      const peak = plannedPeak || seed.recovery.peakKm || seed.tolerance.peakKm || Math.max(0, ...window.slice(-3));
+      v = { km: fixed[i] ?? floorHalf(peak * row.volume[k]), cap: peak, reentry: false, lighter, role };
     } else if (lighter) {
       const prev = out.at(-1)?.km ?? window.at(-1) ?? 0;
       v = { km: fixed[i] ?? floorHalf(prev * tune().lighter.volume), cap: prev, reentry: false, lighter, role };
@@ -348,17 +442,31 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
   const steps: Record<string, number> = { ...(seed.phase?.steps ?? {}) };
   // The next rung: phase weeks go on from where the build weeks before the phase left the ladder.
   let ladderNext = 0;
+  // Post-race recovery (docs/decisions/fartlek-post-race-recovery.md): the days after a race of 10 km+ are gated by days since it.
+  const rec = seed.recovery ?? null;
+  const row = rec ? recoveryRow(rec) : null;
+  const dayOf = (d: ISODate) => (rec ? daysBetween(rec.date, d) : -1);
+  let recStarted = false;
   return vols.map((v, i) => {
     const ws = weekSeedOf(seed, i, 0, 0, [], false);
-    const phase = seed.phase && v.role !== "race" ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
+    const last = addDays(ws.weekStart, 6);
+    const recWeek = v.role === "recovery";
+    // The weeks after recovery step up from what recovery planned, not from the race or the long runs before it.
+    if (recWeek && !recStarted) { longest = 0; any = 0; recStarted = true; }
+    const phase = seed.phase && v.role !== "race" && !recWeek ? phaseWeekFor(seed.phase, ws.weekStart, seed.runDays, seed.longRunDay) : null;
     const long = longRun(longest, v.lighter, seed.refs.easyPace, any);
-    const longKm = long ? longFor(long.km, v.km, longest, v.lighter) : null;
+    const longKm = recWeek ? Math.max(NEXT.easyMinKm, Math.min(RECOVERY.longMaxKm, floorHalf(v.km * RECOVERY.longShare)))
+      : long ? longFor(long.km, v.km, longest, v.lighter) : null;
     const maxKm = any > 0 ? spikeMax(any) : null;
+    // After the race: until the full threshold gate only the short session, and none before the short gate.
+    const afterRace = !!row && v.role !== "race" && dayOf(last) > 0;
+    const thrGated = afterRace && (recWeek || dayOf(ws.weekStart) < row!.thresholdFull);
     // The phase's sessions: a held one (a share of the step) only in a lighter or taper week; where the week or the day can't hold the
     // blueprint (or its fallback) the plain session of the week stays instead, so the runner always gets a week.
     let thr: Thr[];
     let phased: WeekShape["phase"];
-    if (phase && seed.phase) {
+    if (thrGated) thr = dayOf(last) >= row!.thresholdShort ? [{ ...NEXT.lighterThr }] : [];
+    else if (phase && seed.phase) {
       const stepOf = (id: BlueprintId) => steps[id] ?? 0;
       const ctx = { weekKm: v.km, maxKm, paces: seed.phase.paces };
       const item = (c: NonNullable<ReturnType<typeof compileSlot>>) => {
@@ -384,9 +492,13 @@ function weeksFor(seed: BlockSeed, shape: Shape, kms?: number[]): PlannedWeek[] 
       thr = buildIdx[i] >= builds - shape.second ? [main, { ...NEXT.second }] : [main];
     }
     const tempo = shape.tempo && !v.lighter && thr.length === 1 && !phase ? seed.tempoPace : null;
-    const built = build(ws, { km: v.km, longKm, tempo, thr: withinQuality(thr, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
-      maxKm, ...(phased ? { phase: phased } : {}) });
-    const items = seed.race ? aroundRace(built, seed.race.date, ws.weekStart) : built;
+    const strides = afterRace && dayOf(ws.weekStart) > 0 && dayOf(last) < row!.strides ? { strides: 0 } : {};
+    // The rest days after the race are not run days, so the week's runs land on the days left (gateAfterRace still drops any).
+    const restDays = afterRace && row!.restDays > 0 ? Array.from({ length: 7 }, (_, k) => addDays(ws.weekStart, k)).filter((d) => dayOf(d) >= 1 && dayOf(d) <= row!.restDays).map(weekday) : [];
+    const runDays = restDays.length && seed.runDays.some((x) => !restDays.includes(x)) ? seed.runDays.filter((x) => !restDays.includes(x)) : seed.runDays;
+    const built = build(runDays === seed.runDays ? ws : { ...ws, runDays }, { km: v.km, longKm, tempo, thr: withinQuality(thr, v.km, seed.refs), crossMin: v.lighter ? 0 : shape.crossMin,
+      maxKm, ...strides, ...(phased && !thrGated ? { phase: phased } : {}) });
+    const items = gateAfterRace(seed.race ? aroundRace(built, seed.race.date, ws.weekStart) : built, rec, row);
     longest = Math.max(longest, ...items.filter((it) => it.type === "long").map((it) => it.km));
     any = Math.max(any, ...items.filter(isRun).map((it) => it.km));
     return { weekStart: ws.weekStart, lighter: v.lighter, role: v.role, reentry: v.reentry, cap: v.cap, targetKm: v.km, items };
@@ -419,6 +531,39 @@ function aroundRace(items: SuggestItem[], race: ISODate, weekStart: ISODate): Su
       continue;
     }
     out.push(it);
+  }
+  return out.sort((a, b) => a.date.localeCompare(b.date));
+}
+
+const easyOf = (it: SuggestItem): SuggestItem => ({ date: it.date, type: "easy", km: it.km, durationMin: null, steps: null });
+
+/**
+ * The days after a race of 10 km+ (docs/decisions/fartlek-post-race-recovery.md): no running on days 1..restDays,
+ * strides only from `strides`, threshold only from `thresholdShort` (moved later in the week when a later easy day can take it,
+ * else run easy), a race-phase session only from `intervals`. Race day and the days before it are aroundRace's.
+ */
+export function gateAfterRace(items: SuggestItem[], rec: Pick<RecoveryRace, "date"> | null, row: RecoveryRow | null): SuggestItem[] {
+  if (!rec || !row) return items;
+  const d = (it: SuggestItem) => daysBetween(rec.date, it.date);
+  const out: SuggestItem[] = [];
+  for (const it of items) {
+    if (d(it) <= 0) { out.push(it); continue; }
+    if (d(it) <= row.restDays && it.type !== "cross") continue;
+    let x = it;
+    // A race-phase session waits for the intervals gate: a long one becomes a plain long run, a quality one an easy run.
+    if (x.blueprint && d(x) < row.intervals) x = x.type === "long" ? { date: x.date, type: "long", km: x.km, durationMin: null, steps: null } : easyOf(x);
+    if (x.type === "easy" && stridesOf(x.steps) && d(x) < row.strides) x = { ...x, steps: null };
+    out.push(x);
+  }
+  // A threshold session before its gate swaps days with the latest easy run that may have it, else is run easy.
+  for (let k = 0; k < out.length; k++) {
+    const it = out[k];
+    if (it.type !== "threshold" || d(it) <= 0 || d(it) >= row.thresholdShort) continue;
+    const j = out.map((x, idx) => ({ x, idx })).filter(({ x }) => x.type === "easy" && d(x) >= row.thresholdShort).map(({ idx }) => idx).at(-1);
+    if (j == null) { out[k] = easyOf(it); continue; }
+    const easy = out[j];
+    out[j] = { ...it, date: easy.date };
+    out[k] = { ...easy, date: it.date, ...(easy.type === "easy" && stridesOf(easy.steps) && d(it) < row.strides ? { steps: null } : {}) };
   }
   return out.sort((a, b) => a.date.localeCompare(b.date));
 }
@@ -609,6 +754,8 @@ export function weekAsBlock(seed: WeekSeed): BlockSeed {
     longestKm: seed.longestKm, rung: seed.rung, tempoPace: seed.tempoPace ?? null, firstWeekMax: null,
     fixedKm: [seed.targetKm ?? null],
     ...(seed.phase ? { phase: seed.phase } : {}),
+    // A recovery week due takes over from a lighter week due (docs/decisions/fartlek-post-race-recovery.md).
+    ...(seed.recovery ? { recovery: seed.recovery, ...(recoveryRoles(seed.recovery, seed.weekStart, 1)[0] ? { roles: ["recovery"] as WeekRole[] } : {}) } : {}),
   };
 }
 
