@@ -90,6 +90,9 @@ export const trips = sqliteTable("trips", {
   status: text("status", { enum: ["active", "closed", "cancelled"] }).notNull().default("active"),
   startedAt: integer("started_at").notNull(),
   closedAt: integer("closed_at"),
+  /** Anonymous guests the bill was also split on; their combined share is `guestAmount` and never enters the ledger. */
+  guests: integer("guests").notNull().default(0),
+  guestAmount: integer("guest_amount").notNull().default(0),
 }, (t) => [index("trips_household_idx").on(t.householdId)]);
 
 export const tripLists = sqliteTable("trip_lists", {

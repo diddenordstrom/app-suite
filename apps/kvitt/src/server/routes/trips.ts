@@ -7,6 +7,7 @@ import type { EventBus } from "../events";
 import { arr, badRequest, conflict, forbidden, idParam, int, notFound, oneOf, optStr, readBody, type Body } from "../http";
 import type { AppEnv } from "../viewer";
 import { closedTrips, loadTrips } from "../views";
+import { MAX_GUESTS } from "../../shared/gifts";
 import { removeIfDone } from "../listStore";
 
 const OP_STATUSES = ["open", "checked", "skipped"] as const;
@@ -20,6 +21,15 @@ function parseAllocations(b: Body, allowed: Set<number>): { ownerId: number; amo
   });
   if (new Set(allocations.map((a) => a.ownerId)).size !== allocations.length) throw badRequest("duplicate ownerId");
   return allocations;
+}
+
+/** Guests on the bill: a count and their combined share, which may only be set when there are guests. */
+function parseGuests(b: Body): { guests: number; guestAmount: number } {
+  const guests = b.guests === undefined ? 0 : int(b.guests, "guests", 0);
+  if (guests > MAX_GUESTS) throw badRequest(`guests can be at most ${MAX_GUESTS}`);
+  const guestAmount = b.guestAmount === undefined ? 0 : int(b.guestAmount, "guestAmount", 0);
+  if (guests === 0 && guestAmount > 0) throw badRequest("guestAmount needs guests");
+  return { guests, guestAmount };
 }
 
 export function tripRoutes(db: Db, bus: EventBus) {
@@ -98,18 +108,20 @@ export function tripRoutes(db: Db, bus: EventBus) {
     // The shopper may split the bill on any active member, not only the owners of the trip's lists.
     const members = new Set(db.select({ id: memberships.id }).from(memberships)
       .where(and(eq(memberships.householdId, c.get("hid")), isNull(memberships.removedAt))).all().map((r) => r.id));
-    const allocations = parseAllocations(await readBody(c), members);
+    const body = await readBody(c);
+    const allocations = parseAllocations(body, members);
+    const guests = parseGuests(body);
     const now = Date.now();
     db.transaction((tx) => {
       tx.update(items).set({ status: "bought", updatedAt: now }).where(and(eq(items.tripId, t.id), eq(items.status, "checked"))).run();
       tx.update(items).set({ status: "open", tripId: null, updatedAt: now }).where(and(eq(items.tripId, t.id), ne(items.status, "bought"))).run();
       if (allocations.length) tx.insert(tripAllocations).values(allocations.map((a) => ({ tripId: t.id, ...a }))).run();
-      tx.update(trips).set({ status: "closed", closedAt: now }).where(eq(trips.id, t.id)).run();
+      tx.update(trips).set({ status: "closed", closedAt: now, ...guests }).where(eq(trips.id, t.id)).run();
       // Lists where everything got bought are done: they leave the lists page, and stay in this trip's history.
       for (const listId of listIdsOf(t.id)) removeIfDone(tx, listId, now);
     });
     bus.emit(c.get("hid"), "lists", "trips", "balances");
-    return c.json(loadTrips(db, [{ ...t, status: "closed", closedAt: now }])[0]);
+    return c.json(loadTrips(db, [{ ...t, status: "closed", closedAt: now, ...guests }])[0]);
   });
 
   /** Redo the split of a closed trip: the shopper or an admin, until a payment covers it (`locked`). */
@@ -123,13 +135,16 @@ export function tripRoutes(db: Db, bus: EventBus) {
       .where(and(eq(memberships.householdId, c.get("hid")), isNull(memberships.removedAt))).all().map((r) => r.id));
     // Someone who has since left may stay on the trip they were already part of.
     for (const a of db.select().from(tripAllocations).where(eq(tripAllocations.tripId, t.id)).all()) members.add(a.ownerId);
-    const allocations = parseAllocations(await readBody(c), members);
+    const body = await readBody(c);
+    const allocations = parseAllocations(body, members);
+    const guests = parseGuests(body);
     db.transaction((tx) => {
+      tx.update(trips).set(guests).where(eq(trips.id, t.id)).run();
       tx.delete(tripAllocations).where(eq(tripAllocations.tripId, t.id)).run();
       if (allocations.length) tx.insert(tripAllocations).values(allocations.map((a) => ({ tripId: t.id, ...a }))).run();
     });
     bus.emit(c.get("hid"), "trips", "balances");
-    return c.json(loadTrips(db, [t])[0]);
+    return c.json(loadTrips(db, [db.select().from(trips).where(eq(trips.id, t.id)).get()!])[0]);
   });
 
   app.post("/trips/:id/cancel", (c) => {

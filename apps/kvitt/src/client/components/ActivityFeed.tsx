@@ -25,7 +25,7 @@ export function ActivityFeed({ items }: { items: Activity[] }) {
           const id = a.kind === "trip" ? a.trip.id : a.kind === "expense" ? a.expense.id : a.settlement.id;
           if (a.kind === "trip") {
             icon = <CartIcon className="size-4" />;
-            amount = a.trip.allocations.reduce((s, x) => s + x.amount, 0);
+            amount = a.trip.allocations.reduce((s, x) => s + x.amount, 0) + a.trip.guestAmount;
             const w = who(a.trip.shopperId);
             text = `${a.trip.store ? t("activity.shoppedAt", { who: w, store: a.trip.store }) : t("activity.shopped", { who: w })} · ${tn("items", a.trip.boughtItems.length)}`;
           } else if (a.kind === "expense") {

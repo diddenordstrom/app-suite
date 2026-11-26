@@ -347,6 +347,13 @@ describe("bjudningar, guests and the green zone", () => {
     expect(closed.locked).toBe(false);
     await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: bobId, amount: 10000 }, { ownerId: carolId, amount: 10000 }] });
     expect((await balances()).pairs).toEqual([{ from: carolId, to: bobId, amount: 10000 }]);
+    // guests share the bill without a debt; their share is stored on the trip, not in the ledger
+    await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: carolId, amount: 10000 }], guestAmount: 100 }, 400);
+    await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [], guests: 21 }, 400);
+    const withGuest = await bob.patch<Trip>(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: bobId, amount: 5000 }, { ownerId: carolId, amount: 10000 }], guests: 1, guestAmount: 5000 });
+    expect(withGuest).toMatchObject({ guests: 1, guestAmount: 5000 });
+    expect((await balances()).pairs).toEqual([{ from: carolId, to: bobId, amount: 10000 }]);
+    await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: bobId, amount: 10000 }, { ownerId: carolId, amount: 10000 }] });
     // an admin (alice) may change it too; bad ids are refused
     await alice.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: 999999, amount: 1 }] }, 400);
     await alice.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: aliceId, amount: 5000 }, { ownerId: carolId, amount: 15000 }] });
