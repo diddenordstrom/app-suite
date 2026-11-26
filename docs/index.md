@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-26 · decision · Fartlek Statistik timeline frame can be dragged ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek Statistik shows totals first, comparison behind a switch ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt: add a member without the app ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt: guests on a shopping trip ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-26 · decision · Kvitt checkout prefills from item prices and can split on anyone ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Releases are automatic now that the repo is public ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt list items get an optional price ([log/2026-11.md](log/2026-11.md))
-- 2026-11-26 · decision · Fartlek Statistik page built ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

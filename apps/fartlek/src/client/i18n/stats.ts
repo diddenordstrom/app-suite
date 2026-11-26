@@ -32,6 +32,8 @@ export const en = {
   "stats.noBlock": "No block to compare",
   "stats.gapChip": "GAP · the threshold that held then",
   "stats.targetChip": "Target pace {pace} · A race {race}",
+  "stats.dragLabel": "Chosen period on the timeline: arrows move it a week, Shift and arrows change its length",
+  "stats.dragHint": "Drag the frame to move the period, its edges to change its length, or drag across the weeks to pick new ones.",
   "stats.pickWeek": "Choose week {week}",
   "stats.blockOngoing": "{name} · ongoing",
 
@@ -152,6 +154,8 @@ export const sv: Record<keyof typeof en, string> = {
   "stats.noBlock": "Inget block att jämföra",
   "stats.gapChip": "GAP · tröskel som gällde då",
   "stats.targetChip": "Målfart {pace} · A-lopp {race}",
+  "stats.dragLabel": "Vald period på tidslinjen: pilarna flyttar den en vecka, Skift och pilarna ändrar längden",
+  "stats.dragHint": "Dra i ramen för att flytta perioden, i kanterna för att ändra längden, eller dra över veckorna för att välja nya.",
   "stats.pickWeek": "Välj vecka {week}",
   "stats.blockOngoing": "{name} · pågår",
 

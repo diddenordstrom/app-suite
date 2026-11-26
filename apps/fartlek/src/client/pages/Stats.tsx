@@ -3,7 +3,7 @@
  * as plain totals. "Jämför" adds another period (B) to the same cards: a thin lavender bar and a
  * difference chip beside each figure, in neutral colours (the page shows change, it does not judge it).
  */
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
@@ -267,6 +267,9 @@ const PRESET_LABEL: Record<Preset, string> = {
 };
 
 const overlaps = (from: ISODate, to: ISODate, p: Period) => from <= p.to && to >= p.from;
+/** Week columns of the timeline, first and last inclusive. */
+type Span = { start: number; end: number };
+type DragKind = "move" | "start" | "end" | "draw";
 
 function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: StatsResponse; cmp: Comparison; choice: Choice; ctx: PeriodContext; mode: ColorMode; sides: Sides; onChoose: (c: Choice) => void }) {
   const fmt = useFmt();
@@ -283,7 +286,69 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
     const idx = weeks.map((w, i) => (overlaps(w.weekStart, addDays(w.weekStart, 6), p) ? i : -1)).filter((i) => i >= 0);
     return idx.length ? `${idx[0]! + 1} / span ${idx.at(-1)! - idx[0]! + 1}` : null;
   };
-  const colA = bracket(cmp.a), colB = sides.compare ? bracket(cmp.b) : null;
+  const colB = sides.compare ? bracket(cmp.b) : null;
+
+  // Dragging A's bracket: the body moves it, the edges stretch it, a drag over the weeks draws a new one.
+  // It snaps to whole weeks and never past this week; B follows the usual rule once it is let go.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<Span | null>(null);
+  const lastIdx = weeks.reduce((m, w, i) => (w.weekStart <= today ? i : m), 0);
+  const spanOf = (p: Period): Span | null => {
+    const idx = weeks.map((w, i) => (overlaps(w.weekStart, addDays(w.weekStart, 6), p) ? i : -1)).filter((i) => i >= 0);
+    return idx.length ? { start: idx[0]!, end: idx.at(-1)! } : null;
+  };
+  const spanA = drag ?? spanOf(cmp.a);
+  const colA = spanA ? `${spanA.start + 1} / span ${spanA.end - spanA.start + 1}` : null;
+  const commit = (sp: Span) => {
+    const from = weeks[sp.start]!.weekStart, end = addDays(weeks[sp.end]!.weekStart, 6);
+    onChoose(sp.start === sp.end ? { kind: "week", weekStart: from } : { kind: "custom", from, to: end > today ? today : end });
+  };
+  const idxAt = (x: number) => {
+    const r = gridRef.current!.getBoundingClientRect();
+    return Math.max(0, Math.min(lastIdx, Math.floor(((x - r.left) / r.width) * n)));
+  };
+  const startDrag = (e: ReactPointerEvent, kind: DragKind) => {
+    if (e.button !== 0 || !gridRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const at0 = idxAt(e.clientX);
+    const base = spanOf(cmp.a) ?? { start: at0, end: at0 };
+    let cur: Span = kind === "draw" ? { start: at0, end: at0 } : base;
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      const at = idxAt(ev.clientX);
+      if (at !== at0) moved = true;
+      if (kind === "move") {
+        const len = base.end - base.start;
+        const st = Math.max(0, Math.min(lastIdx - len, base.start + at - at0));
+        cur = { start: st, end: st + len };
+      } else if (kind === "start") cur = { start: Math.min(at, base.end), end: base.end };
+      else if (kind === "end") cur = { start: base.start, end: Math.max(at, base.start) };
+      else cur = { start: Math.min(at0, at), end: Math.max(at0, at) };
+      setDrag(cur);
+    };
+    const stop = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      setDrag(null);
+      // A plain click on a week picks that week; a click on the bracket changes nothing; a cancelled
+      // pointer (the phone took over to scroll the timeline) picks nothing.
+      if (ev.type === "pointerup" && (moved || kind === "draw")) commit(cur);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+  /** Arrows move the bracket a week; with Shift they stretch or shrink its end. */
+  const onBracketKey = (e: KeyboardEvent) => {
+    const sp = spanOf(cmp.a);
+    if (!sp || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    const d = e.key === "ArrowLeft" ? -1 : 1;
+    if (e.shiftKey) commit({ start: sp.start, end: Math.max(sp.start, Math.min(lastIdx, sp.end + d)) });
+    else if (sp.start + d >= 0 && sp.end + d <= lastIdx) commit({ start: sp.start + d, end: sp.end + d });
+  };
   const blockCols = n ? data.blocks.map((b) => {
     const start = Math.round(daysBetween(weeks[0]!.weekStart, b.startWeek) / 7);
     const s = Math.max(0, start), e = Math.min(n - 1, start + b.weeks - 1);
@@ -348,17 +413,33 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
       {n > 0 && (
         <div className="-mx-1 overflow-x-auto px-1">
           <div className="flex min-w-[620px] flex-col gap-1">
-            <div className="relative grid h-16 gap-1.5" style={cols}>
-              <div aria-hidden className="pointer-events-none absolute -bottom-0.5 -top-[3px] inset-x-0 grid gap-1.5" style={cols}>
-                {colB && <div className="rounded-[7px] border-[1.5px]" style={{ gridRow: 1, gridColumn: colB, borderColor: "var(--stats-b)", background: "color-mix(in oklab, var(--stats-b) 10%, transparent)" }} />}
-                {colA && <div className="rounded-[7px] border-[1.5px]" style={{ gridRow: 1, gridColumn: colA, borderColor: "var(--stats-a)", background: "color-mix(in oklab, var(--stats-a) 10%, transparent)" }} />}
+            <div ref={gridRef} className="relative grid h-16 touch-pan-x select-none gap-1.5" style={cols} onPointerDown={(e) => startDrag(e, "draw")}>
+              <div className="pointer-events-none absolute -bottom-0.5 -top-[3px] inset-x-0 z-10 grid gap-1.5" style={cols}>
+                {colB && <div aria-hidden className="rounded-[7px] border-[1.5px]" style={{ gridRow: 1, gridColumn: colB, borderColor: "var(--stats-b)", background: "color-mix(in oklab, var(--stats-b) 10%, transparent)" }} />}
+                {colA && (
+                  <div role="group" tabIndex={0} aria-label={t("stats.dragLabel")} onKeyDown={onBracketKey}
+                    onPointerDown={(e) => startDrag(e, "move")}
+                    className={cn("group pointer-events-auto relative touch-none rounded-[7px] border-[1.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      drag ? "cursor-grabbing" : "cursor-grab")}
+                    style={{ gridRow: 1, gridColumn: colA, borderColor: "var(--stats-a)", background: `color-mix(in oklab, var(--stats-a) ${drag ? 18 : 10}%, transparent)` }}>
+                    {(["start", "end"] as const).map((side) => (
+                      <span key={side} aria-hidden onPointerDown={(e) => startDrag(e, side)}
+                        className={cn("absolute inset-y-0 flex w-3 cursor-ew-resize touch-none items-center justify-center", side === "start" ? "-left-1.5" : "-right-1.5")}>
+                        <span className="h-6 w-1.5 rounded-full opacity-70 transition group-hover:opacity-100" style={{ background: "var(--stats-a)" }} />
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              {weeks.map((w) => {
+              {weeks.map((w, i) => {
                 const end = addDays(w.weekStart, 6);
-                const color = overlaps(w.weekStart, end, cmp.a) ? "var(--stats-a)" : sides.compare && overlaps(w.weekStart, end, cmp.b) ? "var(--stats-b)" : "var(--border)";
+                // While dragging, the bars inside the bracket follow it; B shows again once it is let go.
+                const inA = spanA ? i >= spanA.start && i <= spanA.end : false;
+                const color = inA ? "var(--stats-a)" : sides.compare && !drag && overlaps(w.weekStart, end, cmp.b) ? "var(--stats-b)" : "var(--border)";
                 return (
                   <button key={w.weekStart} type="button" disabled={w.weekStart > today} aria-label={t("stats.pickWeek", { week: w.week })}
-                    onClick={() => onChoose({ kind: "week", weekStart: w.weekStart })}
+                    // Pointer clicks are handled by the drag above (a click without moving picks the week); this is the keyboard's way.
+                    onClick={(e) => e.detail === 0 && onChoose({ kind: "week", weekStart: w.weekStart })}
                     className="flex h-full flex-col items-center justify-end rounded-md hover:bg-accent disabled:cursor-default">
                     <span className="w-2/5 rounded-t-[3px]" style={{ height: `${(w.km / maxKm) * 100}%`, background: color }} />
                   </button>
@@ -386,6 +467,7 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
         </div>
       )}
 
+      {n > 0 && <p className="text-xs text-muted-foreground">{t("stats.dragHint")}</p>}
       {sides.compare && <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>
         {tm(cmp.note)}
