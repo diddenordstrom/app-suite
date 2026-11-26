@@ -8,7 +8,7 @@ updated: 2026-11-26
 
 # Fartlek period stats: time in zone, threshold and target pace over any period
 
-Settled 2026-11-26, not built. The idea: look at training through one chosen period and see how the time was spent, instead of reading trends over a fixed window.
+Settled 2026-11-26. The server side (the stored per-run aggregate and GET /api/stats) is built; the page is being built. The idea: look at training through one chosen period and see how the time was spent, instead of reading trends over a fixed window.
 
 ## What exists
 
@@ -35,6 +35,18 @@ What is missing is one period that drives everything, and time spent at a pace r
 
 **Aggregate at sync.** Each run gets stored seconds per band (zones, below / at / above threshold, at target), filled when the activity is synced and recomputed when thresholds, zones or the target change. The page then sums rows instead of reading streams, and GAP, which is not stored in the stream, is used once while the stream is parsed. The target row has to be recomputed whenever the target moves, because it is judged against today's value.
 
+**How the aggregate is stored** (built). One row per run in `activity_bands` ([`server/bands.ts`](../../apps/fartlek/src/server/bands.ts), the computation in [`shared/bands.ts`](../../apps/fartlek/src/shared/bands.ts)), holding the seconds and the inputs they came from: a version, the threshold pace on the run's date, today's target pace, which zones (the runner's or the watch's) and the run's detail (status and parse version). A row whose inputs no longer match is computed again. A new threshold estimate redoes only the runs it covers, a new target or new zones redo every run, and a stream that arrives after the run was first counted gets used. Rows are filled after each sync and by a background backfill at startup. When the page is read they are also filled within a time budget, the page's periods first; whatever is left carries on in the background, and the response says how many runs of the two periods are still waiting. The stream is the kept FIT file at 1 s with GAP, else the stored ~5 s one, as for best efforts. Each sample counts its gap to the next one, capped at 30 s, as the zones do. Samples slower than 1 m/s count as standing still and fall in no pace band. A run without a stream gets the watch's zones and its duration, and no pace bands.
+
+**Target pace** is the goal pace of the next A race (on or after today) with a goal time. Without a goal, its locked race pace is used. The "at" band is ±3.5 % for now (`BAND_SHARE`).
+
+**The response** (`GET /api/stats?from&to&cmpFrom&cmpTo`, contract in [`shared/periodstats.ts`](../../apps/fartlek/src/shared/periodstats.ts)):
+- Totals per period, summed from the rows.
+- Plan against done, from the run sessions dated in the period. They are matched to runs the way the plan page matches them: done or short counts as done, and key sessions are the plan's key types (long, threshold, intervals and race).
+- The runs of both periods, each with the kind of session it matched.
+- Weekly run km over at least 12 Monday weeks covering both periods, and the blocks in that span.
+
+With no periods given, this month to today is compared with the same days of last month. With only A given, it is compared with the same number of days just before it. A period may be up to 400 days.
+
 **Running only.** Gym and cross-training stay out of the pace and zone bands, since their HR is judged against running zones today. They show as plain time. Later, once thresholds per sport exist ([roadmap](fartlek-roadmap.md)), the page can filter per sport.
 
 **Filtering the activity list** by the same measures: "runs with at least 10 min at threshold", "runs with time at target pace", "runs with time above threshold".
@@ -45,11 +57,11 @@ A new page, built beside Trends first. Trends stays until the new page covers wh
 
 ## Build order
 
-1. Period picker and the per-run aggregate (zones first, then threshold and target bands).
+1. Period picker and the per-run aggregate (zones first, then threshold and target bands). The aggregate and the endpoint are built.
 2. The key-figure view with the two-period difference.
 3. List filters, then moving cards over from Trends.
 
 ## Open
 
-- The exact "at" width (3 % or 5 %), tuned on real runs.
+- The exact "at" width (3 % or 5 %; 3.5 % for now), tuned on real runs.
 - Whether easy-pace and durability fit a period view or stay on a history page.
