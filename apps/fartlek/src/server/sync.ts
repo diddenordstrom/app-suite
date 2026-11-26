@@ -10,6 +10,7 @@ import { createGarminProvider } from "./providers/garmin";
 import { parseFit } from "./providers/fit";
 import type { Provider, ProviderActivity, ProviderDetail } from "./providers/types";
 import { ensureEfforts } from "./efforts";
+import { ensureBands } from "./bands";
 
 /**
  * Bump when the parsed detail changes shape. Activities stored with an older version are fetched
@@ -204,6 +205,7 @@ export function createSyncRunner(db: Db, config: Config, now: () => number = Dat
         const result = await syncProvider(db, userId, provider, { today: todayIn(getSettings(db, userId).timezone) });
         db.update(t.garminAccounts).set({ lastSyncAt: now(), lastError: null }).where(eq(t.garminAccounts.userId, userId)).run();
         ensureEfforts(db, userId, 3000);
+        ensureBands(db, userId, 3000);
         return { ok: true, result };
       } catch (e) {
         const error = (e as Error).message;

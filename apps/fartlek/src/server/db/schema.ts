@@ -107,6 +107,34 @@ export const bestEfforts = sqliteTable("best_efforts", {
   gap: integer("gap", { mode: "boolean" }).notNull().default(false),
 }, (t) => [primaryKey({ columns: [t.userId, t.activityId, t.durationS] }), index("best_efforts_user_date").on(t.userId, t.date)]);
 
+/**
+ * Seconds per measure of one run for the period stats (shared/bands.ts, docs/decisions/fartlek-period-stats.md),
+ * with the inputs they were computed from; a row whose inputs no longer match is computed again (server/bands.ts).
+ */
+export const activityBands = sqliteTable("activity_bands", {
+  userId: userRef(),
+  activityId: text("activity_id").notNull(),
+  date: text("date").notNull(),
+  totalS: real("total_s").notNull(),
+  z1: real("z1").notNull(), z2: real("z2").notNull(), z3: real("z3").notNull(), z4: real("z4").notNull(), z5: real("z5").notNull(),
+  belowS: real("below_s").notNull(),
+  atS: real("at_s").notNull(),
+  overS: real("over_s").notNull(),
+  targetS: real("target_s").notNull(),
+  /** BANDS_VERSION in server/bands.ts. */
+  version: integer("version").notNull(),
+  /** Threshold pace (s/km) that held on the run's date; null = none. */
+  thresholdPace: real("threshold_pace"),
+  /** Today's target pace (s/km) when computed; null = none. */
+  targetPace: real("target_pace"),
+  /** Which zones: the runner's bounds (`u:…`) or the watch's (`g`). */
+  zonesKey: text("zones_key").notNull(),
+  /** The run's detail when computed (`status/version`), so a stream that arrives later is used. */
+  detailKey: text("detail_key").notNull(),
+  /** Grade-adjusted speed was used. */
+  gap: integer("gap", { mode: "boolean" }).notNull().default(false),
+}, (t) => [primaryKey({ columns: [t.userId, t.activityId] }), index("activity_bands_user_date").on(t.userId, t.date)]);
+
 /** Garmin's running VO2max per day, shown as a trend in Trends. */
 export const vo2max = sqliteTable("vo2max", {
   userId: userRef(),

@@ -16,7 +16,7 @@ import type { Stream } from "../shared/types";
 export const EFFORTS_VERSION = 2;
 
 /** The run's best stream: the kept FIT file at 1 s with grade-adjusted speed, else the stored ~5 s stream. */
-function streamOf(db: Db, userId: number, activityId: string): Stream | null {
+export function streamOf(db: Db, userId: number, activityId: string): Stream | null {
   const fit = repo.getFit(db, userId, activityId);
   if (fit) {
     try {

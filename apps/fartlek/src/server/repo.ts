@@ -268,7 +268,7 @@ export function saveLog(db: Db, userId: number, activityId: string, log: Activit
 
 /** Every per-user table that holds training data (not the account, settings or Garmin connection). */
 export const TRAINING_TABLES = [
-  t.laps, t.streams, t.activityFiles, t.activitySplits, t.activityLogs, t.csTests, t.bestEfforts, t.vo2max, t.activities, t.workouts,
+  t.laps, t.streams, t.activityFiles, t.activitySplits, t.activityLogs, t.csTests, t.bestEfforts, t.activityBands, t.vo2max, t.activities, t.workouts,
   t.weekTargets, t.races, t.blocks, t.thresholds, t.painEntries, t.checkins, t.wellness, t.sessionTemplates, t.raceChecks,
   t.gymSets, t.gymSessions, t.racePlanWeeks,
 ];

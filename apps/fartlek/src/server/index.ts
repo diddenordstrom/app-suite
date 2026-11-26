@@ -7,6 +7,7 @@ import { loadConfig } from "./config";
 import { createDb } from "./db";
 import { openDemo } from "./demo";
 import { backfillEfforts } from "./efforts";
+import { backfillBands } from "./bands";
 
 const config = loadConfig();
 const db = createDb(config.databasePath);
@@ -28,6 +29,8 @@ if (fs.existsSync("dist/client")) {
 
 // Best efforts for runs synced before they existed (or after an extraction change), in the background.
 void backfillEfforts(db).catch((e) => console.warn(`efforts backfill: ${(e as Error).message}`));
+// Period-stats rows (time in zone and pace bands) the same way.
+void backfillBands(db).catch((e) => console.warn(`bands backfill: ${(e as Error).message}`));
 
 // The morning notification: a check each minute, only for users who turned it on.
 if (config.authMode !== "demo") services.morning.start();
