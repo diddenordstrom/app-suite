@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-26 · decision · Fartlek zones from threshold HR put the threshold in zone 4 ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek Statistik timeline frame can be dragged ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek Statistik shows totals first, comparison behind a switch ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt: add a member without the app ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-26 · decision · Kvitt: redo a trip's split from History until a payment covers it ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt checkout prefills from item prices and can split on anyone ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Releases are automatic now that the repo is public ([log/2026-11.md](log/2026-11.md))
-- 2026-11-26 · decision · Kvitt list items get an optional price ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -39,6 +39,7 @@
 - [Fartlek asks which days gym and cross-training go on, and plans runs around them](decisions/fartlek-gym-cross-days.md): Skapa block has a step between the rhythm and the simulation that asks for gym days and cross-training days with minutes; the engine puts those sessions there, plans no run on them, keeps the quality session off the day after gym when another day will do, and never offers them as extra run days _(decision · accepted · 2026-11-25)_
 - [Fartlek gym module: log sets in the gym, suggest sessions that suit the run week](decisions/fartlek-gym-module.md): A gym logger inside Fartlek (sets with last time's weight, swap or add an exercise in one tap, offline, Bolt import) and a rule-based choice of template from the run week; why it lives in Fartlek, how it compares with the gym apps that exist, what is built and what is left _(note · open · 2026-11-24)_
 - [Fartlek plans gym as its own session type, apart from cross-training](decisions/fartlek-gym-sessions.md): A planned "Gym" (strength) session matches only gym activities, and cross-train sessions never take a gym activity, so gym on Monday and swimming on Thursday each fill their own day _(decision · accepted · 2026-11-25)_
+- [Fartlek's five HR zones put threshold HR in zone 4](decisions/fartlek-hr-zones.md): Zones from threshold HR are 80 / 89 / 95 / 102 % (recovery, easy, tempo, threshold, over), replacing Friel's 84 / 89 / 94 / 99 %, which put the threshold in zone 5 once his seven zones were cut to five _(decision · accepted · 2026-11-26)_
 - [Fartlek finds interval laps against the threshold estimate](decisions/fartlek-interval-laps.md): Interval laps are ≥ 3 min and at most 10 % slower than the threshold estimate; without one, near the median of the work laps instead of the fastest lap _(decision · accepted · 2026-11-11)_
 - [Fartlek plans the key sessions first, with the long run on a 30-day ladder](decisions/fartlek-key-sessions-first.md): Week and block suggestions place the long run (longest run of 30 days + 1 km, never more than 10 % over it), then the next threshold rung, then fill with zone 2; one dial; the 35 % long-run share is gone; Home offers to fix a key session ahead after a missed one _(decision · accepted · 2026-11-14)_
 - [Fartlek gets its own landing page on the portfolio, built from live components](decisions/fartlek-landing-page.md): /fartlek on the portfolio renders Fartlek's real components on hand-tuned demo data (no screenshots), with a theme toggle; the Fartlek card says "Läs mer" instead of "Öppna appen"; "öppen källkod" (present tense) without a GitHub link; about/contact waits for the owner _(decision · accepted · 2026-11-23)_

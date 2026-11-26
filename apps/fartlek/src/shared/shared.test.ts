@@ -5,7 +5,7 @@ import { parseWeekLine, parseBlock, placeSessions } from "./parser";
 import { matchWeek } from "./matching";
 import { summarizeWeek, summarizeMonth } from "./compliance";
 import { activityLoad, edwardsTrimp, formPct, formState, pmc, plannedLoad } from "./load";
-import { easyScore, gradeEasy, zoneSecsFromStream, zonesFromMaxHr, paceInBand, intensityDistribution } from "./zones";
+import { easyScore, gradeEasy, zoneOf, zoneSecsFromStream, zonesFromLthr, zonesFromMaxHr, paceInBand, intensityDistribution } from "./zones";
 import { intervalLaps, rangeCheck, thresholdOn, sessionPoint, proposeThreshold } from "./threshold";
 import { painTrends, trendOf, readiness, goalPace, neededThreshold, countdown, type ReadinessInput } from "./recovery";
 import { displayName, parseSettings, DEFAULT_SETTINGS, type Activity, type Workout, type Wellness } from "./types";
@@ -155,6 +155,16 @@ describe("load", () => {
 
 describe("zones + threshold", () => {
   const stream = { t: [0, 5, 10, 15], hr: [130, 150, 170, null], speed: [3, 3, 4, 4], alt: [null, null, null, null] };
+  it("puts threshold HR in zone 4 when zones come from it", () => {
+    const z = zonesFromLthr(170);
+    expect(z).toEqual([136, 151, 162, 173]);
+    // zoneOf is 0-based: 3 = zone 4.
+    expect(zoneOf(170, z)).toBe(3);
+    expect(zoneOf(172, z)).toBe(3);
+    expect(zoneOf(145, z)).toBe(1);
+    expect(zoneOf(180, z)).toBe(4);
+  });
+
   it("zones from stream and easy score", () => {
     expect(zoneSecsFromStream(stream, zonesFromMaxHr(200))).toEqual([0, 5, 5, 5, 0]);
     expect(easyScore(null, stream, { easyHigh: 155 })).toBeCloseTo(2 / 3);
