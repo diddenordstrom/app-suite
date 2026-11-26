@@ -47,6 +47,8 @@ export interface HouseholdSettings {
 
 export interface Item {
   id: number; listId: number; text: string; quantity: string | null; note: string | null;
+  /** Optional price per piece in minor units; the total is price × the quantity's leading number (src/shared/items.ts). */
+  price: number | null;
   status: ItemStatus; tripId: number | null; position: number; updatedAt: number;
 }
 
@@ -118,7 +120,7 @@ export interface UpdateHouseholdBody { name?: string; currency?: string; zoneKr?
 export interface JoinBody { name: string }
 export interface UpdateMeBody { name?: string; swishNumber?: string | null }
 export interface ListBody { title: string; store?: string | null; color?: ListColor }
-export interface ItemBody { text: string; quantity?: string | null; note?: string | null }
+export interface ItemBody { text: string; quantity?: string | null; note?: string | null; price?: number | null }
 export interface StartTripBody { listIds: number[]; store?: string | null }
 /** Batched check-off ops; the client queues these offline and replays them. */
 export interface TripOpsBody { ops: { itemId: number; status: "open" | "checked" | "skipped" }[] }

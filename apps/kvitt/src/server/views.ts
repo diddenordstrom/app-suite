@@ -17,7 +17,7 @@ type ExpenseRow = typeof expenses.$inferSelect;
 type SettlementRow = typeof settlements.$inferSelect;
 
 export const toItem = (r: ItemRow): Item => ({
-  id: r.id, listId: r.listId, text: r.text, quantity: r.quantity, note: r.note,
+  id: r.id, listId: r.listId, text: r.text, quantity: r.quantity, note: r.note, price: r.price,
   status: r.status, tripId: r.tripId, position: r.position, updatedAt: r.updatedAt,
 });
 
