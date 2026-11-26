@@ -65,7 +65,7 @@ export function History() {
 const idOf = (a: Activity) => (a.kind === "trip" ? a.trip.id : a.kind === "expense" ? a.expense.id : a.settlement.id);
 const titleOf = (a: Activity) => (a.kind === "trip" ? t("history.shoppingTrip") : a.kind === "expense" ? a.expense.title : t("history.payment"));
 const SPLIT_LABEL: Record<Expense["splitMode"], MsgKey> = { equal: "expense.splitEqual", shares: "expense.splitShares", exact: "expense.splitExact" };
-const tripTotal = (t: Trip) => t.allocations.reduce((s, x) => s + x.amount, 0);
+const tripTotal = (t: Trip) => t.allocations.reduce((s, x) => s + x.amount, 0) + t.guestAmount;
 
 function useNames() {
   const h = useHousehold();
@@ -159,7 +159,10 @@ function TripDetail({ trip, onDone }: { trip: Trip; onDone: () => void }) {
       <p><Rich text={trip.store ? t("history.tripDetailAt", { who: who(trip.shopperId), store: trip.store, date: fmtDate(trip.closedAt ?? trip.startedAt) }) : t("history.tripDetail", { who: who(trip.shopperId), date: fmtDate(trip.closedAt ?? trip.startedAt) })} values={{ amount: <span className="font-medium">{h.fmt(tripTotal(trip))}</span> }} /></p>
       {canEdit && trip.locked && <p className="text-xs text-muted-foreground">{t("checkout.locked")}</p>}
       {editing ? <EditSplitForm key={trip.id} trip={trip} onDone={onDone} /> : (
-        <Lines rows={trip.allocations.map((x) => ({ key: x.ownerId, label: x.ownerId === trip.shopperId ? t("history.ownItems", { name: who(x.ownerId) }) : who(x.ownerId), amount: x.amount }))} />
+        <Lines rows={[
+          ...trip.allocations.map((x) => ({ key: x.ownerId, label: x.ownerId === trip.shopperId ? t("history.ownItems", { name: who(x.ownerId) }) : who(x.ownerId), amount: x.amount })),
+          ...(trip.guests > 0 ? [{ key: -1, label: t(trip.guests === 1 ? "checkout.guestRow1" : "checkout.guestRow", { count: trip.guests }), amount: trip.guestAmount }] : []),
+        ]} />
       )}
       {trip.boughtItems.length > 0 && (
         <div>

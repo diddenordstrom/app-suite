@@ -59,6 +59,7 @@ export function loadTrips(db: Db, rows: TripRow[]): Trip[] {
     listIds: tl.filter((x) => x.tripId === t.id).map((x) => x.listId).sort((a, b) => a - b),
     allocations: allocs.filter((a) => a.tripId === t.id).map((a) => ({ ownerId: a.ownerId, amount: a.amount })),
     boughtItems: t.status === "closed" ? bought.filter((i) => i.tripId === t.id).map(toItem) : [],
+    guests: t.guests, guestAmount: t.guestAmount,
     locked: locked.has(t.id),
   }));
 }

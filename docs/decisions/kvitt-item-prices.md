@@ -31,3 +31,14 @@ Lists are also used to track gifts and other planned purchases, so an item can s
 - **A closed trip's split can be edited from History** (amounts, who it is split on), by the shopper or an admin (an admin may change anyone's). `PATCH /trips/:id`.
 - **"Paid" means a later payment between the pair.** Balances are netted per pair and a trip has no paid flag of its own, so a trip is `locked` once a payment was registered, after the trip closed, between the shopper's wallet and the wallet of anyone it is split on. Then the split is read-only with a short note. See [`views.ts`](../../apps/kvitt/src/server/views.ts).
 - **Passed over:** a per-trip "paid" checkbox. It would need its own settling flow next to the netted payments and could disagree with the balances.
+
+## Guests on a trip
+
+- **A trip can be split on anonymous guests**, at checkout and when redoing a split in History: a "Gäster" stepper (0–20) like the expense form. Adding a guest re-splits the shopper's own share equally between the shopper, the people picked and the guests.
+- **A guest's share is stored on the trip** (`trips.guests`, `trips.guest_amount`, migration 0005), never as an allocation: it is not a debt and stays out of balances, like [guests on an expense](kvitt-bjudningar.md). The trip total counts it ("betalade 431,50 kr") and the summary says to ask them to Swish.
+
+## Someone outside the app
+
+- **An admin can add a member "utan app"** (Settings → Members): a normal member in splits and balances with no sign-in (`memberships.managed`, migration 0006). Because balances net per pair, what such a person owes builds up over every trip and expense by itself; the admin registers their payments as usual. A recovery link can still be created if they join later.
+- **They are not preselected in new expenses**, so an equal split never drags them in by accident; trips and the "Delas med" chips list them like anyone.
+- **Passed over:** named guests with their own running tab. It would duplicate the ledger; an anonymous guest ([above](#guests-on-a-trip)) stays for one-off heads, a member without the app for someone who keeps paying.

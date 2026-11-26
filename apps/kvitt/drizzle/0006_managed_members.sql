@@ -1,0 +1,1 @@
+ALTER TABLE `memberships` ADD `managed` integer DEFAULT false NOT NULL;

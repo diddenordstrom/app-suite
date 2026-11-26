@@ -81,6 +81,17 @@ export function householdRoutes(db: Db, config: Config, bus: EventBus) {
     return c.json({ inviteCode });
   });
 
+  /** Admin adds someone who is not in the app (a friend or sibling who pays their share), so balances and splits can include them. */
+  app.post("/members", async (c) => {
+    requireAdmin(c);
+    const name = str(await readBody(c), "name", 50);
+    const row = db.insert(memberships).values({
+      householdId: c.get("hid"), name, role: "member", token: randomToken(), managed: true, createdAt: Date.now(),
+    }).returning().get();
+    bus.emit(c.get("hid"), "household");
+    return c.json(toMember(row));
+  });
+
   /** Active member of this household, else 404. */
   const activeMember = (hid: number, mid: number) => {
     const m = db.select().from(memberships).where(and(eq(memberships.id, mid), eq(memberships.householdId, hid))).get();

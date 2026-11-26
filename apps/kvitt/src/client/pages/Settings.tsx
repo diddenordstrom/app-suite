@@ -137,7 +137,30 @@ function Members() {
       <ul className="divide-y divide-border">
         {h.members.map((m) => <MemberRow key={m.id} m={m} />)}
       </ul>
+      {h.isAdmin && <AddManaged />}
     </Section>
+  );
+}
+
+/** Someone who is not in the app but pays their share: a normal member in balances and splits, with no sign-in. */
+function AddManaged() {
+  const h = useHousehold();
+  const [name, setName] = useState("");
+  const { run, busy, error } = useAction();
+  const add = (e: FormEvent) => {
+    e.preventDefault();
+    if (!name.trim()) return;
+    void run(async () => { await h.call("POST", "/members", { name: name.trim() }, ["household"]); setName(""); });
+  };
+  return (
+    <form onSubmit={add} className="mt-3 space-y-1">
+      <div className="flex gap-2">
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder={t("settings.addManagedName")} aria-label={t("settings.addManaged")} />
+        <Button type="submit" variant="outline" disabled={busy || !name.trim()} className="shrink-0">{t("settings.addManagedBtn")}</Button>
+      </div>
+      <p className="text-xs text-muted-foreground">{t("settings.addManagedHint")}</p>
+      <ErrorText>{error}</ErrorText>
+    </form>
   );
 }
 
@@ -155,6 +178,7 @@ function MemberRow({ m }: { m: Member }) {
       <div className="flex flex-wrap items-center gap-2">
         <span className="mr-auto text-sm">{m.name}{self && <span className="text-muted-foreground">{t("settings.youSuffix")}</span>}</span>
         {m.role === "admin" && <Badge>{t("role.admin")}</Badge>}
+        {m.managed && <Badge>{t("role.managed")}</Badge>}
         {h.isAdmin && !self && (
           <>
             <Button variant="outline" className="h-8 px-3 text-xs" onClick={recover} disabled={busy}>{t("settings.newRecovery")}</Button>
