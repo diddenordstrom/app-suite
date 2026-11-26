@@ -57,6 +57,8 @@ export interface StatsResponse {
   target: (PaceBand & { raceName: string; distanceKm: number; goalSeconds: number | null }) | null;
   /** Runs in period A, newest first. */
   runs: RunRow[];
+  /** Runs in period B, newest first (for "Dag mot dag" and the B ribbon). */
+  runsB: RunRow[];
   /** Weekly run km around both periods, for the timeline (Monday weeks, oldest first). */
   weeks: { weekStart: ISODate; week: number; km: number }[];
   /** Blocks overlapping the timeline. */
