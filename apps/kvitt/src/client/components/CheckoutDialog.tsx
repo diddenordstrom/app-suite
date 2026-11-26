@@ -130,14 +130,15 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone, edit }: { 
         </span>
         <Stepper value={guests} max={MAX_GUESTS} onChange={(n) => resplit(extra, n)} lessLabel={t("expense.guestsFewer")} moreLabel={t("expense.guestsMore")} />
       </div>
-      {pickable.length > 0 && (
+      {(pickable.length > 0 || rowIds.length + guests > 1) && (
         <div className="space-y-1">
-          <p className="text-xs text-muted-foreground">{t("checkout.splitOn")}</p>
+          {pickable.length > 0 && <p className="text-xs text-muted-foreground">{t("checkout.splitOn")}</p>}
           <div className="flex flex-wrap gap-2">
             {pickable.map((m) => (
               <Button key={m.id} type="button" variant={extra.includes(m.id) ? "primary" : "ghost"} aria-pressed={extra.includes(m.id)} className={extra.includes(m.id) ? undefined : "border border-border"} onClick={() => toggle(m.id)}>{m.name}</Button>
             ))}
-            {(rowIds.length + guests > 1) && <Button type="button" variant="ghost" onClick={splitAll}>{t("checkout.splitEqual")}</Button>}
+            {/* Also when everyone is already a row (nobody left to pick): the button splits the total equally. */}
+            {rowIds.length + guests > 1 && <Button type="button" variant="outline" onClick={splitAll}>{t("checkout.splitEqual")}</Button>}
           </div>
         </div>
       )}
