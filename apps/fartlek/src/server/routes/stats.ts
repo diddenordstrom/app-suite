@@ -105,8 +105,10 @@ export function statsFor(db: Db, userId: number, q: Parameters<typeof parsePerio
   };
   const A = side(a), B = side(b);
 
-  // Timeline: Monday weeks over both periods, at least TIMELINE_WEEKS back from the latest one.
-  const last = weekStartOf(a.to > b.to ? a.to : b.to, "monday");
+  // Timeline: Monday weeks over both periods and up to this week (so a period dragged back can be dragged
+  // forward again), at least TIMELINE_WEEKS back from the latest one.
+  const latest = [a.to, b.to, ctx.today].reduce((x, y) => (y > x ? y : x));
+  const last = weekStartOf(latest, "monday");
   const lo = weekStartOf(a.from < b.from ? a.from : b.from, "monday");
   const firstWeek = addDays(last, -7 * (TIMELINE_WEEKS - 1)) < lo ? addDays(last, -7 * (TIMELINE_WEEKS - 1)) : lo;
   const end = addDays(last, 6);

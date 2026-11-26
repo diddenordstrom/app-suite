@@ -1270,6 +1270,10 @@ describe("period stats", () => {
     // Only A: compared with as many days just before it.
     const one = await (await a.request("/api/stats?from=2026-11-08&to=2026-11-14")).json() as Stats;
     expect(one.b.period).toEqual({ from: "2026-11-01", to: "2026-11-07" });
+    // An old period still gets a timeline up to this week, so it can be dragged forward again.
+    const old = await (await a.request(`/api/stats?from=${addDays(today, -200)}&to=${addDays(today, -190)}`)).json() as Stats;
+    expect(old.weeks.at(-1)!.weekStart).toBe(weekStartOf(today, "monday"));
+    expect(old.weeks[0]!.weekStart <= addDays(today, -211)).toBe(true);
   });
 
   it("the demo has stats: bands for every run, a threshold and a target", async () => {

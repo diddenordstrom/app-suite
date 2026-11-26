@@ -18,7 +18,9 @@ const totals = (period: { from: string; to: string }, runs: RunRow[]): PeriodTot
   const s = runs.reduce((x, r) => x + r.durationS, 0);
   return {
     period, runs: runs.length, durationS: runs.reduce((x, r) => x + r.durationS, 0), distanceKm: runs.reduce((x, r) => x + r.distanceKm, 0), longestKm: Math.max(0, ...runs.map((r) => r.distanceKm)),
-    easyShare: runs.length ? 0.8 : null, totalS: s, zones: [s * 0.1, s * 0.7, s * 0.1, s * 0.1, 0], belowS: s, atS: 0, overS: 0, targetS: 0,
+    easyShare: runs.length ? 0.8 : null, totalS: s, zones: [s * 0.1, s * 0.7, s * 0.1, s * 0.1, 0],
+    belowS: runs.reduce((x, r) => x + r.bands.belowS, 0), atS: runs.reduce((x, r) => x + r.bands.atS, 0),
+    overS: runs.reduce((x, r) => x + r.bands.overS, 0), targetS: runs.reduce((x, r) => x + r.bands.targetS, 0),
     plan: { km: 40, doneKm: 30, sessions: 4, doneSessions: 3, key: 2, doneKey: 1, long: 1, doneLong: 0 },
   };
 };
@@ -35,8 +37,8 @@ const data: StatsResponse = {
   pending: 0,
 };
 
-const render = (d: StatsResponse) => renderToStaticMarkup(
-  <MemoryRouter><StatsView data={d} cmp={cmp} choice={{ kind: "preset", preset: "week" }} ctx={ctx} mode="zone" onMode={() => {}} onChoose={() => {}} /></MemoryRouter>,
+const render = (d: StatsResponse, compare = false) => renderToStaticMarkup(
+  <MemoryRouter><StatsView data={d} cmp={cmp} choice={{ kind: "preset", preset: "week" }} ctx={ctx} mode="zone" compare={compare} onMode={() => {}} onChoose={() => {}} /></MemoryRouter>,
 );
 
 describe("Statistik page", () => {
@@ -53,8 +55,30 @@ describe("Statistik page", () => {
   it("hides the target rows without a target and says when nothing was run", () => {
     const noTarget = render({ ...data, target: null });
     expect(noTarget).not.toMatch(/I målfart|At target pace/);
-    const empty = render({ ...data, runs: [], runsB: [], a: totals(cmp.a, []), b: totals(cmp.b, []) });
+    const empty = render({ ...data, runs: [], runsB: [], a: totals(cmp.a, []), b: totals(cmp.b, []) }, true);
     expect(empty).toMatch(/Inga pass i någon av perioderna|No runs in either period/);
+  });
+
+  it("shows plain totals by default and adds the other period only when comparing", () => {
+    const one = render(data);
+    // Time at threshold is a headline figure: 30 min in the run.
+    expect(one).toContain("0:30 h");
+    expect(one).not.toMatch(/Dag mot dag|mirrored below/);
+    expect(one).toMatch(/Dag för dag|Day by day/);
+    expect(one).toContain('aria-checked="false"');
+    expect(one).not.toContain("▼");
+    const both = render(data, true);
+    expect(both).toContain('aria-checked="true"');
+    expect(both).toMatch(/Dag mot dag|mirrored below/);
+    expect(both).toContain("▼");
+    // A difference chip: 30 min at threshold against 5.
+    expect(both).toMatch(/\+25 min/);
+  });
+
+  it("says when nothing was run in a single period", () => {
+    const empty = { ...data, runs: [], a: totals(cmp.a, []) };
+    expect(render(empty)).toMatch(/Inga pass i perioden|No runs in this period/);
+    expect(render(empty, true)).not.toMatch(/Inga pass i perioden|No runs in this period/);
   });
 
   it("says when stats are still being worked out", () => {

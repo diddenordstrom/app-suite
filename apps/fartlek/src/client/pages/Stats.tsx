@@ -1,9 +1,9 @@
 /**
- * Statistik (docs/decisions/fartlek-period-stats.md): one chosen period (A) against another (B),
- * mirrored: B on the left in lavender, A on the right in the signature. Every figure is the
- * difference between the two, in neutral colours: the page shows change, it does not judge it.
+ * Statistik (docs/decisions/fartlek-period-stats.md): how the time of a chosen period (A) was spent,
+ * as plain totals. "Jämför" adds another period (B) to the same cards: a thin lavender bar and a
+ * difference chip beside each figure, in neutral colours (the page shows change, it does not judge it).
  */
-import { useEffect, useMemo, useState, type CSSProperties, type ReactNode } from "react";
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
 import { Link } from "react-router-dom";
 import { useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
@@ -26,14 +26,15 @@ const STORE = "fartlek.stats";
 const THR_FILTER_S = 600;
 
 /** The choice and colour mode survive moving between pages (per browser; nothing depends on it). */
-function loadPrefs(): { choice: Choice; mode: ColorMode } {
+interface Prefs { choice: Choice; mode: ColorMode; compare: boolean }
+function loadPrefs(): Prefs {
   try {
     const v = JSON.parse(localStorage.getItem(STORE) ?? "null");
-    if (v?.choice?.kind) return { choice: v.choice as Choice, mode: v.mode === "band" ? "band" : "zone" };
+    if (v?.choice?.kind) return { choice: v.choice as Choice, mode: v.mode === "band" ? "band" : "zone", compare: v.compare === true };
   } catch { /* private mode or bad JSON: start fresh */ }
-  return { choice: DEFAULT_CHOICE, mode: "zone" };
+  return { choice: DEFAULT_CHOICE, mode: "zone", compare: false };
 }
-function savePrefs(p: { choice: Choice; mode: ColorMode }) {
+function savePrefs(p: Prefs) {
   try { localStorage.setItem(STORE, JSON.stringify(p)); } catch { /* storage blocked */ }
 }
 
@@ -65,8 +66,9 @@ export function Stats() {
   if (error) return <ErrorText>{error}</ErrorText>;
   if (!data) return <StatsSkeleton />;
   return (
-    <StatsView data={data} cmp={cmp} choice={choice} ctx={ctx} mode={prefs.mode} loading={loading}
+    <StatsView data={data} cmp={cmp} choice={choice} ctx={ctx} mode={prefs.mode} compare={prefs.compare} loading={loading}
       onMode={(mode) => setPrefs((p) => ({ ...p, mode }))}
+      onCompare={(compare) => setPrefs((p) => ({ ...p, compare }))}
       onChoose={(c) => setPrefs((p) => ({ ...p, choice: c }))} />
   );
 }
@@ -166,47 +168,69 @@ function diff(m: Measure) {
     title: `${m.label}: ${m.fmt(m.b)} → ${m.fmt(m.a)}${pct ? ` (${pct > 0 ? "+" : "−"}${Math.abs(pct)} %)` : ""}`,
   };
 }
-/** Bar widths for one row; `scale` is the largest value of the card so rows can be compared, else the row's own largest. */
-const widths = (m: Measure, scale?: number) => {
-  const max = scale ?? Math.max(m.a ?? 0, m.b ?? 0);
-  return { a: max ? `${((m.a ?? 0) / max) * 100}%` : "0%", b: max ? `${((m.b ?? 0) / max) * 100}%` : "0%" };
-};
+/** Bar widths for one row against `scale`, the largest value of the card, so rows can be compared. */
+const widths = (m: Measure, scale: number) => ({
+  a: scale ? `${((m.a ?? 0) / scale) * 100}%` : "0%",
+  b: scale ? `${((m.b ?? 0) / scale) * 100}%` : "0%",
+});
+
+/** The difference against B as a small chip, with B's own value after it. */
+function DiffChip({ m, name }: { m: Measure; name: string }) {
+  const d = diff(m);
+  return (
+    <span title={d.title} className="inline-flex flex-wrap items-baseline gap-x-1.5 text-xs tabular-nums">
+      <span className="rounded-full bg-muted px-1.5 py-px font-semibold" style={{ color: d.color }}>{d.text}</span>
+      <span className="text-muted-foreground">{name} {m.b == null ? "–" : m.fmt(m.b)}</span>
+    </span>
+  );
+}
 
 // ---- The page --------------------------------------------------------------------------------
 
-export function StatsView({ data, cmp, choice, ctx, mode, loading, onMode, onChoose }: {
+export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loading, onMode, onCompare, onChoose }: {
   data: StatsResponse;
   cmp: Comparison;
   choice: Choice;
   ctx: PeriodContext;
   mode: ColorMode;
+  /** Show period B beside A on every card. */
+  compare?: boolean;
   loading?: boolean;
   onMode: (m: ColorMode) => void;
+  onCompare?: (on: boolean) => void;
   onChoose: (c: Choice) => void;
 }) {
   const { today } = ctx;
   const nameA = labelText(cmp.labelA, today), nameB = labelText(cmp.labelB, today);
   const shortA = labelText(cmp.labelA, today, true), shortB = labelText(cmp.labelB, today, true);
-  const sides = { nameA, nameB, shortA, shortB };
-  const empty = data.a.runs === 0 && data.b.runs === 0;
+  const sides = { nameA, nameB, shortA, shortB, compare };
+  const empty = data.a.runs === 0 && (!compare || data.b.runs === 0);
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
-      <h1 className="sr-only">{t("nav.stats")}</h1>
-      <header className="grid grid-cols-[minmax(0,1fr)_3rem_minmax(0,1fr)] items-end sm:grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)]">
-        <div className="flex min-w-0 flex-col items-end gap-0.5 text-right">
-          <Eyebrow style={{ color: B_FG }}>{t("stats.compareWith")}</Eyebrow>
-          <span className="max-w-full truncate font-display text-3xl tracking-tight sm:text-[44px] sm:leading-[48px]" style={{ color: "var(--stats-b)" }}>{nameB}</span>
-          <span className="text-xs tabular-nums text-muted-foreground">{rangeText(cmp.b)} · {tn("stats.runs", data.b.runs)}</span>
+      <header className="flex flex-wrap items-end justify-between gap-3">
+        <div className="flex min-w-0 flex-col gap-0.5">
+          <Eyebrow>{t("nav.stats")}</Eyebrow>
+          <h1 className="max-w-full truncate font-display text-3xl tracking-tight sm:text-[40px] sm:leading-[44px]">{nameA}</h1>
+          <span className="flex flex-wrap items-center gap-x-2 text-xs tabular-nums text-muted-foreground">
+            <span>{rangeText(cmp.a)} · {tn("stats.runs", data.a.runs)}</span>
+            {compare && (
+              <span className="inline-flex items-center gap-1.5">
+                <span className="size-2 rounded-[2px]" style={{ background: "var(--stats-b)" }} />
+                {t("stats.versusPeriod", { name: nameB, range: rangeText(cmp.b) })} · {tn("stats.runs", data.b.runs)}
+              </span>
+            )}
+            {loading && <Spinner className="size-3" />}
+          </span>
         </div>
-        <div className="flex flex-col items-center pb-5">
-          <span className="font-display text-lg italic text-muted-foreground sm:text-[22px]">{t("stats.versus")}</span>
-        </div>
-        <div className="flex min-w-0 flex-col items-start gap-0.5">
-          <Eyebrow style={{ color: A_FG }}>{t("stats.chosen")}</Eyebrow>
-          <span className="max-w-full truncate font-display text-3xl tracking-tight sm:text-[44px] sm:leading-[48px]" style={{ color: "var(--stats-a)" }}>{nameA}</span>
-          <span className="flex items-center gap-2 text-xs tabular-nums text-muted-foreground">{rangeText(cmp.a)} · {tn("stats.runs", data.a.runs)}{loading && <Spinner className="size-3" />}</span>
-        </div>
+        <button type="button" role="switch" aria-checked={compare} onClick={() => onCompare?.(!compare)}
+          className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-medium transition",
+            compare ? "border-ring bg-accent text-accent-foreground" : "border-border bg-card text-foreground hover:bg-accent")}>
+          <span aria-hidden className={cn("relative h-4 w-7 rounded-full transition", compare ? "bg-primary" : "bg-muted")}>
+            <span className={cn("absolute top-0.5 size-3 rounded-full bg-card shadow-control transition-all", compare ? "left-[14px]" : "left-0.5")} />
+          </span>
+          {t("stats.compare", { name: shortB })}
+        </button>
       </header>
 
       {data.pending > 0 && (
@@ -215,9 +239,9 @@ export function StatsView({ data, cmp, choice, ctx, mode, loading, onMode, onCho
 
       <PeriodCard data={data} cmp={cmp} choice={choice} ctx={ctx} mode={mode} sides={sides} onChoose={onChoose} />
 
-      {empty ? <EmptyState title={t("stats.emptyTitle")}>{t("stats.emptyText")}</EmptyState> : (
+      {empty ? <EmptyState title={t(compare ? "stats.emptyTitle" : "stats.emptyTitleOne")}>{t("stats.emptyText")}</EmptyState> : (
         <>
-          <Kpis data={data} />
+          <Kpis data={data} sides={sides} />
           <div className="grid gap-4 lg:grid-cols-2">
             <ZoneCard data={data} sides={sides} />
             <BandCard data={data} sides={sides} />
@@ -233,7 +257,7 @@ export function StatsView({ data, cmp, choice, ctx, mode, loading, onMode, onCho
   );
 }
 
-type Sides = { nameA: string; nameB: string; shortA: string; shortB: string };
+type Sides = { nameA: string; nameB: string; shortA: string; shortB: string; compare: boolean };
 
 // ---- Period card: presets, the weave, the timeline -------------------------------------------
 
@@ -243,6 +267,9 @@ const PRESET_LABEL: Record<Preset, string> = {
 };
 
 const overlaps = (from: ISODate, to: ISODate, p: Period) => from <= p.to && to >= p.from;
+/** Week columns of the timeline, first and last inclusive. */
+type Span = { start: number; end: number };
+type DragKind = "move" | "start" | "end" | "draw";
 
 function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: StatsResponse; cmp: Comparison; choice: Choice; ctx: PeriodContext; mode: ColorMode; sides: Sides; onChoose: (c: Choice) => void }) {
   const fmt = useFmt();
@@ -259,7 +286,69 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
     const idx = weeks.map((w, i) => (overlaps(w.weekStart, addDays(w.weekStart, 6), p) ? i : -1)).filter((i) => i >= 0);
     return idx.length ? `${idx[0]! + 1} / span ${idx.at(-1)! - idx[0]! + 1}` : null;
   };
-  const colA = bracket(cmp.a), colB = bracket(cmp.b);
+  const colB = sides.compare ? bracket(cmp.b) : null;
+
+  // Dragging A's bracket: the body moves it, the edges stretch it, a drag over the weeks draws a new one.
+  // It snaps to whole weeks and never past this week; B follows the usual rule once it is let go.
+  const gridRef = useRef<HTMLDivElement>(null);
+  const [drag, setDrag] = useState<Span | null>(null);
+  const lastIdx = weeks.reduce((m, w, i) => (w.weekStart <= today ? i : m), 0);
+  const spanOf = (p: Period): Span | null => {
+    const idx = weeks.map((w, i) => (overlaps(w.weekStart, addDays(w.weekStart, 6), p) ? i : -1)).filter((i) => i >= 0);
+    return idx.length ? { start: idx[0]!, end: idx.at(-1)! } : null;
+  };
+  const spanA = drag ?? spanOf(cmp.a);
+  const colA = spanA ? `${spanA.start + 1} / span ${spanA.end - spanA.start + 1}` : null;
+  const commit = (sp: Span) => {
+    const from = weeks[sp.start]!.weekStart, end = addDays(weeks[sp.end]!.weekStart, 6);
+    onChoose(sp.start === sp.end ? { kind: "week", weekStart: from } : { kind: "custom", from, to: end > today ? today : end });
+  };
+  const idxAt = (x: number) => {
+    const r = gridRef.current!.getBoundingClientRect();
+    return Math.max(0, Math.min(lastIdx, Math.floor(((x - r.left) / r.width) * n)));
+  };
+  const startDrag = (e: ReactPointerEvent, kind: DragKind) => {
+    if (e.button !== 0 || !gridRef.current) return;
+    e.preventDefault();
+    e.stopPropagation();
+    const at0 = idxAt(e.clientX);
+    const base = spanOf(cmp.a) ?? { start: at0, end: at0 };
+    let cur: Span = kind === "draw" ? { start: at0, end: at0 } : base;
+    let moved = false;
+    const move = (ev: PointerEvent) => {
+      const at = idxAt(ev.clientX);
+      if (at !== at0) moved = true;
+      if (kind === "move") {
+        const len = base.end - base.start;
+        const st = Math.max(0, Math.min(lastIdx - len, base.start + at - at0));
+        cur = { start: st, end: st + len };
+      } else if (kind === "start") cur = { start: Math.min(at, base.end), end: base.end };
+      else if (kind === "end") cur = { start: base.start, end: Math.max(at, base.start) };
+      else cur = { start: Math.min(at0, at), end: Math.max(at0, at) };
+      setDrag(cur);
+    };
+    const stop = (ev: PointerEvent) => {
+      window.removeEventListener("pointermove", move);
+      window.removeEventListener("pointerup", stop);
+      window.removeEventListener("pointercancel", stop);
+      setDrag(null);
+      // A plain click on a week picks that week; a click on the bracket changes nothing; a cancelled
+      // pointer (the phone took over to scroll the timeline) picks nothing.
+      if (ev.type === "pointerup" && (moved || kind === "draw")) commit(cur);
+    };
+    window.addEventListener("pointermove", move);
+    window.addEventListener("pointerup", stop);
+    window.addEventListener("pointercancel", stop);
+  };
+  /** Arrows move the bracket a week; with Shift they stretch or shrink its end. */
+  const onBracketKey = (e: KeyboardEvent) => {
+    const sp = spanOf(cmp.a);
+    if (!sp || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
+    e.preventDefault();
+    const d = e.key === "ArrowLeft" ? -1 : 1;
+    if (e.shiftKey) commit({ start: sp.start, end: Math.max(sp.start, Math.min(lastIdx, sp.end + d)) });
+    else if (sp.start + d >= 0 && sp.end + d <= lastIdx) commit({ start: sp.start + d, end: sp.end + d });
+  };
   const blockCols = n ? data.blocks.map((b) => {
     const start = Math.round(daysBetween(weeks[0]!.weekStart, b.startWeek) / 7);
     const s = Math.max(0, start), e = Math.min(n - 1, start + b.weeks - 1);
@@ -269,7 +358,7 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
 
   // The weave: each run a segment as long as the run; B's ribbon as long as B's time against A's.
   const runsA = [...data.runs].reverse(), runsB = [...data.runsB].reverse();
-  const totA = duration(runsA), totB = duration(runsB);
+  const totA = duration(runsA), totB = sides.compare ? duration(runsB) : 0;
   const max = Math.max(totA, totB, 1);
 
   return (
@@ -311,9 +400,11 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
       )}
 
       <div className="grid grid-cols-[minmax(2rem,max-content)_minmax(0,1fr)_3rem] items-center gap-x-2.5 gap-y-1.5">
-        <span className="max-w-24 truncate text-[11px] font-semibold" style={{ color: B_FG }}>{sides.shortB}</span>
-        <Ribbon runs={runsB} mode={mode} width={totB / max} />
-        <span className="text-right text-xs tabular-nums">{hm(totB)}</span>
+        {sides.compare && <>
+          <span className="max-w-24 truncate text-[11px] font-semibold" style={{ color: B_FG }}>{sides.shortB}</span>
+          <Ribbon runs={runsB} mode={mode} width={totB / max} />
+          <span className="text-right text-xs tabular-nums">{hm(totB)}</span>
+        </>}
         <span className="max-w-24 truncate text-[11px] font-semibold" style={{ color: A_FG }}>{sides.shortA}</span>
         <Ribbon runs={runsA} mode={mode} width={totA / max} />
         <span className="text-right text-xs font-semibold tabular-nums">{hm(totA)}</span>
@@ -322,17 +413,33 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
       {n > 0 && (
         <div className="-mx-1 overflow-x-auto px-1">
           <div className="flex min-w-[620px] flex-col gap-1">
-            <div className="relative grid h-16 gap-1.5" style={cols}>
-              <div aria-hidden className="pointer-events-none absolute -bottom-0.5 -top-[3px] inset-x-0 grid gap-1.5" style={cols}>
-                {colB && <div className="rounded-[7px] border-[1.5px]" style={{ gridRow: 1, gridColumn: colB, borderColor: "var(--stats-b)", background: "color-mix(in oklab, var(--stats-b) 10%, transparent)" }} />}
-                {colA && <div className="rounded-[7px] border-[1.5px]" style={{ gridRow: 1, gridColumn: colA, borderColor: "var(--stats-a)", background: "color-mix(in oklab, var(--stats-a) 10%, transparent)" }} />}
+            <div ref={gridRef} className="relative grid h-16 touch-pan-x select-none gap-1.5" style={cols} onPointerDown={(e) => startDrag(e, "draw")}>
+              <div className="pointer-events-none absolute -bottom-0.5 -top-[3px] inset-x-0 z-10 grid gap-1.5" style={cols}>
+                {colB && <div aria-hidden className="rounded-[7px] border-[1.5px]" style={{ gridRow: 1, gridColumn: colB, borderColor: "var(--stats-b)", background: "color-mix(in oklab, var(--stats-b) 10%, transparent)" }} />}
+                {colA && (
+                  <div role="group" tabIndex={0} aria-label={t("stats.dragLabel")} onKeyDown={onBracketKey}
+                    onPointerDown={(e) => startDrag(e, "move")}
+                    className={cn("group pointer-events-auto relative touch-none rounded-[7px] border-[1.5px] outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      drag ? "cursor-grabbing" : "cursor-grab")}
+                    style={{ gridRow: 1, gridColumn: colA, borderColor: "var(--stats-a)", background: `color-mix(in oklab, var(--stats-a) ${drag ? 18 : 10}%, transparent)` }}>
+                    {(["start", "end"] as const).map((side) => (
+                      <span key={side} aria-hidden onPointerDown={(e) => startDrag(e, side)}
+                        className={cn("absolute inset-y-0 flex w-3 cursor-ew-resize touch-none items-center justify-center", side === "start" ? "-left-1.5" : "-right-1.5")}>
+                        <span className="h-6 w-1.5 rounded-full opacity-70 transition group-hover:opacity-100" style={{ background: "var(--stats-a)" }} />
+                      </span>
+                    ))}
+                  </div>
+                )}
               </div>
-              {weeks.map((w) => {
+              {weeks.map((w, i) => {
                 const end = addDays(w.weekStart, 6);
-                const color = overlaps(w.weekStart, end, cmp.a) ? "var(--stats-a)" : overlaps(w.weekStart, end, cmp.b) ? "var(--stats-b)" : "var(--border)";
+                // While dragging, the bars inside the bracket follow it; B shows again once it is let go.
+                const inA = spanA ? i >= spanA.start && i <= spanA.end : false;
+                const color = inA ? "var(--stats-a)" : sides.compare && !drag && overlaps(w.weekStart, end, cmp.b) ? "var(--stats-b)" : "var(--border)";
                 return (
                   <button key={w.weekStart} type="button" disabled={w.weekStart > today} aria-label={t("stats.pickWeek", { week: w.week })}
-                    onClick={() => onChoose({ kind: "week", weekStart: w.weekStart })}
+                    // Pointer clicks are handled by the drag above (a click without moving picks the week); this is the keyboard's way.
+                    onClick={(e) => e.detail === 0 && onChoose({ kind: "week", weekStart: w.weekStart })}
                     className="flex h-full flex-col items-center justify-end rounded-md hover:bg-accent disabled:cursor-default">
                     <span className="w-2/5 rounded-t-[3px]" style={{ height: `${(w.km / maxKm) * 100}%`, background: color }} />
                   </button>
@@ -360,10 +467,11 @@ function PeriodCard({ data, cmp, choice, ctx, mode, sides, onChoose }: { data: S
         </div>
       )}
 
-      <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
+      {n > 0 && <p className="text-xs text-muted-foreground">{t("stats.dragHint")}</p>}
+      {sides.compare && <p className="flex items-center gap-1.5 text-xs text-muted-foreground">
         <svg viewBox="0 0 24 24" className="size-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" aria-hidden><circle cx="12" cy="12" r="9" /><path d="M12 8v5M12 16h.01" /></svg>
         {tm(cmp.note)}
-      </p>
+      </p>}
     </Card>
   );
 }
@@ -381,84 +489,70 @@ function Ribbon({ runs, mode, width }: { runs: RunRow[]; mode: ColorMode; width:
 
 // ---- Key figures -----------------------------------------------------------------------------
 
-function Kpis({ data }: { data: StatsResponse }) {
+function Kpis({ data, sides }: { data: StatsResponse; sides: Sides }) {
   const fmt = useFmt();
   const { a, b } = data;
-  const share = (v: number | null) => (v == null ? null : Math.round(v * 100));
-  const kpis: Measure[] = [
-    { label: t("stats.kpi.time"), a: data.a.durationS, b: data.b.durationS, fmt: (v) => `${hm(v)} h`, fmtDelta: hmDelta },
+  const kpis: (Measure & { accent?: string })[] = [
+    { label: t("stats.kpi.time"), a: a.durationS, b: b.durationS, fmt: (v) => `${hm(v)} h`, fmtDelta: hmDelta },
     { label: t("stats.kpi.distance"), a: a.distanceKm, b: b.distanceKm, fmt: (v) => fmt.dist(v) },
     { label: t("stats.kpi.runs"), a: a.runs, b: b.runs, fmt: String },
     { label: t("stats.kpi.longest"), a: a.longestKm, b: b.longestKm, fmt: (v) => fmt.dist(v) },
-    { label: t("stats.kpi.easy"), a: share(a.easyShare), b: share(b.easyShare), fmt: (v) => `${v} %`, fmtDelta: (v) => t("stats.pp", { n: v }) },
-    { label: t("stats.kpi.key"), a: a.plan.doneKey, b: b.plan.doneKey, fmt: String },
+    ...(data.threshold ? [{ label: t("stats.bands.at"), a: a.atS, b: b.atS, fmt: (v: number) => `${hm(v)} h`, fmtDelta: hmDelta, accent: BAND_COLORS.thr }] : []),
+    ...(data.target ? [{ label: t("stats.bands.atTarget"), a: a.targetS, b: b.targetS, fmt: (v: number) => `${hm(v)} h`, fmtDelta: hmDelta, accent: BAND_COLORS.mp }] : []),
   ];
   return (
     <section aria-label={t("stats.kpis")} className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-      {kpis.map((k) => {
-        const d = diff(k), w = widths(k);
-        return (
-          <Card key={k.label} title={d.title} className="flex flex-col gap-2 px-3.5 py-3">
-            <Eyebrow className="text-center">{k.label}</Eyebrow>
-            <span className="text-center font-display text-[22px] font-medium leading-[26px] tabular-nums" style={{ color: d.color }}>{d.text}</span>
-            <div className="grid grid-cols-[minmax(0,1fr)_2px_minmax(0,1fr)] items-center">
-              <div className="flex justify-end"><div className="h-1.5 rounded-l-[3px]" style={{ width: w.b, background: "var(--stats-b)" }} /></div>
-              <div className="h-3.5 bg-border" />
-              <div className="flex"><div className="h-1.5 rounded-r-[3px]" style={{ width: w.a, background: "var(--stats-a)" }} /></div>
-            </div>
-            <div className="flex items-baseline justify-between gap-1">
-              <span className="text-xs tabular-nums text-muted-foreground">{k.b == null ? "–" : k.fmt(k.b)}</span>
-              <span className="text-sm font-semibold tabular-nums">{k.a == null ? "–" : k.fmt(k.a)}</span>
-            </div>
-          </Card>
-        );
-      })}
+      {kpis.map((k) => (
+        <Card key={k.label} className="flex flex-col gap-1.5 px-3.5 py-3" style={k.accent ? { boxShadow: `inset 0 3px 0 ${k.accent}` } : undefined}>
+          <Eyebrow>{k.label}</Eyebrow>
+          <span className="font-display text-[26px] font-medium leading-[30px] tabular-nums">{k.a == null ? "–" : k.fmt(k.a)}</span>
+          {sides.compare && <DiffChip m={k} name={sides.shortB} />}
+        </Card>
+      ))}
     </section>
   );
 }
 
-// ---- Mirror cards ----------------------------------------------------------------------------
+// ---- Time per zone and per pace band -------------------------------------------------------
 
-function MirrorCard({ title, sub, sides, rows, foot, children }: { title: string; sub: ReactNode; sides: Sides; rows: Measure[]; foot?: ReactNode; children?: ReactNode }) {
-  // One scale for the whole card: zone 3 with 7 minutes must not look as big as zone 2 with 6 hours.
-  const scale = Math.max(0, ...rows.flatMap((r) => [r.a ?? 0, r.b ?? 0]));
+/**
+ * A row per measure: A's time as a bar in the measure's own colour (one scale for the whole card, so
+ * 7 minutes never look like 6 hours), its time and share of the run time. Comparing adds B as a thin
+ * lavender bar under it and the difference.
+ */
+function BarCard({ title, sub, sides, rows, total, foot, children }: { title: string; sub: ReactNode; sides: Sides; rows: Measure[]; total: number; foot?: ReactNode; children?: ReactNode }) {
+  const scale = Math.max(0, ...rows.flatMap((r) => [r.a ?? 0, sides.compare ? r.b ?? 0 : 0]));
   return (
-    <Card className="flex flex-col gap-2 px-0 pb-2.5 pt-4">
-      <div className="flex flex-col gap-0.5 px-5">
+    <Card className="flex flex-col gap-3 px-5 pb-3 pt-4">
+      <div className="flex flex-col gap-0.5">
         <h2 className="text-sm font-semibold">{title}</h2>
         <span className="text-xs text-muted-foreground">{sub}</span>
       </div>
       {children ?? (
-        <div>
-          <div className="grid min-h-6 grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)] items-center">
-            <Eyebrow className="truncate pr-3 text-right" style={{ color: B_FG }}>{sides.shortB}</Eyebrow>
-            <Eyebrow className="text-center">{t("stats.difference")}</Eyebrow>
-            <Eyebrow className="truncate pl-3" style={{ color: A_FG }}>{sides.shortA}</Eyebrow>
-          </div>
+        <div className="flex flex-col">
           {rows.map((r) => {
-            const d = diff(r), w = widths(r, scale);
+            const w = widths(r, scale);
             return (
-              <div key={r.label} title={d.title} className="grid min-h-10 grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)] items-center border-t border-border/50 hover:bg-accent">
-                <div className="flex min-w-0 items-center justify-end gap-2 pr-3">
-                  <span className="text-xs tabular-nums">{r.b == null ? "–" : r.fmt(r.b)}</span>
-                  <div className="flex w-[58%] justify-end"><div className="h-3 rounded-l-[3px] opacity-85" style={{ width: w.b, background: "var(--stats-b)" }} /></div>
+              <div key={r.label} className="grid grid-cols-[minmax(5.5rem,auto)_minmax(0,1fr)_auto] items-center gap-x-3 border-t border-border/50 py-2 first:border-t-0">
+                <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[13px] font-medium">
+                  <span className="size-2.5 rounded-[3px]" style={{ background: r.swatch ?? "var(--stats-a)" }} />{r.label}
+                </span>
+                <div className="flex flex-col gap-1">
+                  <div className="h-3 rounded-[3px]" style={{ width: w.a, minWidth: r.a ? 2 : 0, background: r.swatch ?? "var(--stats-a)" }} />
+                  {sides.compare && <div className="h-1.5 rounded-[2px]" style={{ width: w.b, minWidth: r.b ? 2 : 0, background: "var(--stats-b)" }} />}
                 </div>
-                <div className="flex flex-col items-center border-x border-border py-1">
-                  <span className="inline-flex items-center gap-1.5 whitespace-nowrap text-[11px] font-medium leading-[14px] text-muted-foreground">
-                    <span className="size-2 rounded-[2px]" style={{ background: r.swatch ?? "transparent" }} />{r.label}
+                <div className="flex flex-col items-end">
+                  <span className="whitespace-nowrap text-sm font-semibold tabular-nums">
+                    {r.a == null ? "–" : r.fmt(r.a)} <span className="text-xs font-normal text-muted-foreground">{pctOf(r.a ?? 0, total)} %</span>
                   </span>
-                  <span className="whitespace-nowrap font-display text-[17px] font-medium leading-[22px] tabular-nums" style={{ color: d.color }}>{d.text}</span>
-                </div>
-                <div className="flex min-w-0 items-center gap-2 pl-3">
-                  <div className="flex w-[58%]"><div className="h-3 rounded-r-[3px]" style={{ width: w.a, background: "var(--stats-a)" }} /></div>
-                  <span className="text-xs font-semibold tabular-nums">{r.a == null ? "–" : r.fmt(r.a)}</span>
+                  {sides.compare && <DiffChip m={r} name={sides.shortB} />}
                 </div>
               </div>
             );
           })}
         </div>
       )}
-      {foot && <span className="px-5 pt-1 text-xs text-muted-foreground">{foot}</span>}
+      {foot && <span className="text-xs text-muted-foreground">{foot}</span>}
     </Card>
   );
 }
@@ -466,14 +560,15 @@ function MirrorCard({ title, sub, sides, rows, foot, children }: { title: string
 function ZoneCard({ data, sides }: { data: StatsResponse; sides: Sides }) {
   const { a, b } = data;
   const zt = (z: BandSecs["zones"]) => z.reduce((s, v) => s + v, 0);
-  const has = zt(a.zones) + zt(b.zones) > 0;
+  const has = zt(a.zones) > 0 || (sides.compare && zt(b.zones) > 0);
   const rows: Measure[] = a.zones.map((s, i) => ({ label: t("stats.zone", { n: i + 1 }), a: s, b: b.zones[i]!, fmt: hm, fmtDelta: hmDelta, swatch: ZONE_COLORS[i] }));
   const hard = (z: BandSecs["zones"]) => pctOf(z[3] + z[4], zt(z));
+  const easy = (z: BandSecs["zones"]) => pctOf(z[0] + z[1], zt(z));
   return (
-    <MirrorCard title={t("stats.zones.title")} sub={t("stats.zones.sub")} sides={sides} rows={rows}
-      foot={has ? t("stats.zones.foot", { a: hard(a.zones), name: sides.shortB, b: hard(b.zones) }) : undefined}>
-      {has ? undefined : <p className="px-5 py-4 text-sm text-muted-foreground">{t("stats.zones.none")}</p>}
-    </MirrorCard>
+    <BarCard title={t("stats.zones.title")} sub={t("stats.zones.sub")} sides={sides} rows={rows} total={zt(a.zones)}
+      foot={has ? (sides.compare ? t("stats.zones.foot", { a: easy(a.zones), h: hard(a.zones), name: sides.shortB, b: easy(b.zones), hb: hard(b.zones) }) : t("stats.zones.footOne", { a: easy(a.zones), h: hard(a.zones) })) : undefined}>
+      {has ? undefined : <p className="py-2 text-sm text-muted-foreground">{t("stats.zones.none")}</p>}
+    </BarCard>
   );
 }
 
@@ -495,13 +590,11 @@ function BandCard({ data, sides }: { data: StatsResponse; sides: Sides }) {
     ] : []),
     ...(target ? [{ label: t("stats.bands.atTarget"), a: a.targetS, b: b.targetS, fmt: hm, fmtDelta: hmDelta, swatch: BAND_COLORS.mp }] : []),
   ];
-  const foot = target
-    ? t(threshold ? "stats.bands.foot" : "stats.bands.footNoThreshold", { a: pctOf(a.targetS, a.totalS), name: sides.shortB, b: pctOf(b.targetS, b.totalS) })
-    : threshold ? t("stats.bands.noTarget") : undefined;
+  const foot = target ? t(threshold ? "stats.bands.foot" : "stats.bands.footNoThreshold") : threshold ? t("stats.bands.noTarget") : undefined;
   return (
-    <MirrorCard title={t("stats.bands.title")} sub={sub} sides={sides} rows={rows} foot={foot}>
-      {rows.length ? undefined : <p className="px-5 py-4 text-sm text-muted-foreground">{t("stats.bands.none")}</p>}
-    </MirrorCard>
+    <BarCard title={t("stats.bands.title")} sub={sub} sides={sides} rows={rows} total={a.totalS} foot={foot}>
+      {rows.length ? undefined : <p className="py-2 text-sm text-muted-foreground">{t("stats.bands.none")}</p>}
+    </BarCard>
   );
 }
 
@@ -523,7 +616,7 @@ function DayByDay({ data, cmp, mode, sides, onMode }: { data: StatsResponse; cmp
   };
   const daysA = Array.from({ length: n }, (_, i) => day(cmp.a.from, mapA, i));
   const daysB = Array.from({ length: n }, (_, i) => day(cmp.b.from, mapB, i));
-  const max = Math.max(1, ...daysA.map((d) => d.dur), ...daysB.map((d) => d.dur));
+  const max = Math.max(1, ...daysA.map((d) => d.dur), ...(sides.compare ? daysB.map((d) => d.dur) : []));
   const cols = { gridTemplateColumns: `repeat(${n}, minmax(0, 1fr))`, gap: n > 40 ? 1 : 3 };
   const title = (d: (typeof daysA)[number]) =>
     `${fmtDay(d.date)} · ${d.runs.length ? `${d.runs.map((r) => r.name).join(", ")} · ${hm(d.dur)}` : t("stats.rest")}`;
@@ -537,8 +630,8 @@ function DayByDay({ data, cmp, mode, sides, onMode }: { data: StatsResponse; cmp
     <Card className="flex flex-col gap-3 px-5 py-4">
       <div className="flex flex-wrap items-start justify-between gap-2.5">
         <div className="flex flex-col gap-0.5">
-          <h2 className="text-sm font-semibold">{t("stats.days.title")}</h2>
-          <span className="text-xs text-muted-foreground">{t("stats.days.sub", { n, a: sides.shortA, b: sides.shortB })}</span>
+          <h2 className="text-sm font-semibold">{t(sides.compare ? "stats.days.title" : "stats.days.titleOne")}</h2>
+          <span className="text-xs text-muted-foreground">{sides.compare ? t("stats.days.sub", { n, a: sides.shortA, b: sides.shortB }) : t("stats.days.subOne", { n })}</span>
         </div>
         <SegmentedControl aria-label={t("stats.colorBy")} value={mode} onChange={onMode}
           options={[{ value: "zone", label: t("stats.mode.zone") }, { value: "band", label: t("stats.mode.band") }]} />
@@ -553,24 +646,28 @@ function DayByDay({ data, cmp, mode, sides, onMode }: { data: StatsResponse; cmp
             : <div key={d.date} title={title(d)} className="h-0.5 bg-muted" />)}
         </div>
         <div className="my-[3px] h-px bg-foreground opacity-35" />
-        <div className="grid h-[92px] items-start opacity-80" style={cols}>
-          {daysB.map((d) => d.dur
-            ? <Weave key={d.date} title={title(d)} vertical parts={partsOf(d.bands, mode)} className="min-h-0.5 rounded-b-[3px] bg-muted" style={{ height: `${(d.dur / max) * 100}%` }} />
-            : <div key={d.date} title={title(d)} className="h-0.5 bg-muted" />)}
-        </div>
+        {sides.compare && (
+          <div className="grid h-[92px] items-start opacity-80" style={cols}>
+            {daysB.map((d) => d.dur
+              ? <Weave key={d.date} title={title(d)} vertical parts={partsOf(d.bands, mode)} className="min-h-0.5 rounded-b-[3px] bg-muted" style={{ height: `${(d.dur / max) * 100}%` }} />
+              : <div key={d.date} title={title(d)} className="h-0.5 bg-muted" />)}
+          </div>
+        )}
         <div className="grid pt-1 text-center text-[10px] tabular-nums text-muted-foreground" style={cols}>
           {daysA.map((d, i) => (
             // Every day on wide screens (up to a month); on phones day 1 and every fifth day once it gets crowded.
-            <span key={d.date} title={`${title(d)}\n${title(daysB[i]!)}`} className={cn(every === 1 && n > 14 && i > 0 && (i + 1) % 5 !== 0 && "invisible sm:visible")}>
+            <span key={d.date} title={sides.compare ? `${title(d)}\n${title(daysB[i]!)}` : title(d)} className={cn(every === 1 && n > 14 && i > 0 && (i + 1) % 5 !== 0 && "invisible sm:visible")}>
               {i % every === 0 ? i + 1 : ""}
             </span>
           ))}
         </div>
       </div>
-      <div className="flex justify-between text-xs font-semibold">
-        <span style={{ color: A_FG }}>▲ {sides.shortA}</span>
-        <span style={{ color: B_FG }}>▼ {sides.shortB}</span>
-      </div>
+      {sides.compare && (
+        <div className="flex justify-between text-xs font-semibold">
+          <span style={{ color: A_FG }}>▲ {sides.shortA}</span>
+          <span style={{ color: B_FG }}>▼ {sides.shortB}</span>
+        </div>
+      )}
     </Card>
   );
 }
@@ -586,18 +683,19 @@ function PlanCard({ data, sides }: { data: StatsResponse; sides: Sides }) {
     { label: t("stats.plan.key"), done: pa.doneKey, planned: pa.key, doneB: pb.doneKey, plannedB: pb.key, f: String, unit: "" },
     { label: t("stats.plan.long"), done: pa.doneLong, planned: pa.long, doneB: pb.doneLong, plannedB: pb.long, f: String, unit: "" },
   ];
-  const any = rows.some((r) => r.planned > 0 || r.plannedB > 0);
+  const any = rows.some((r) => r.planned > 0 || (sides.compare && r.plannedB > 0));
   return (
     <Card className="flex flex-col gap-3.5 px-5 py-4">
       <div className="flex flex-col gap-0.5">
         <h2 className="text-sm font-semibold">{t("stats.plan.title")}</h2>
-        <span className="text-xs text-muted-foreground">{t("stats.plan.sub", { a: sides.shortA, b: sides.shortB })}</span>
+        {sides.compare && <span className="text-xs text-muted-foreground">{t("stats.plan.sub", { a: sides.shortA, b: sides.shortB })}</span>}
       </div>
       {!any && <p className="text-sm text-muted-foreground">{t("stats.plan.none")}</p>}
       {any && rows.map((r) => {
         const pct = r.planned > 0 ? Math.min(1, r.done / r.planned) : 0;
-        const prev = r.plannedB > 0 ? Math.min(1, r.doneB / r.plannedB) : null;
-        const note = r.planned > 0 && r.plannedB === 0 ? t("stats.plan.noteNoB", { pct: pctOf(r.done, r.planned), name: sides.shortB })
+        const prev = sides.compare && r.plannedB > 0 ? Math.min(1, r.doneB / r.plannedB) : null;
+        const note = !sides.compare ? (r.planned > 0 ? t("stats.plan.noteOne", { pct: pctOf(r.done, r.planned) }) : t("stats.plan.notPlannedOne"))
+          : r.planned > 0 && r.plannedB === 0 ? t("stats.plan.noteNoB", { pct: pctOf(r.done, r.planned), name: sides.shortB })
           : r.planned > 0
           ? t("stats.plan.note", { pct: pctOf(r.done, r.planned), name: sides.shortB, pctB: `${pctOf(r.doneB, r.plannedB)} %`, doneB: r.f(r.doneB), plannedB: r.f(r.plannedB) })
           : t("stats.plan.notPlanned", { name: sides.shortB, doneB: r.f(r.doneB), plannedB: r.f(r.plannedB) });
