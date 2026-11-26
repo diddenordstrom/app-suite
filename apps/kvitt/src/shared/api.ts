@@ -64,6 +64,8 @@ export interface Trip {
   listIds: number[];
   allocations: { ownerId: number; amount: number }[]; // empty while active
   boughtItems: Item[]; // populated for closed trips
+  /** A closed trip whose split can no longer change: someone it is split on has settled up with the shopper since. */
+  locked: boolean;
 }
 
 export interface Expense {
@@ -125,6 +127,8 @@ export interface StartTripBody { listIds: number[]; store?: string | null }
 /** Batched check-off ops; the client queues these offline and replays them. */
 export interface TripOpsBody { ops: { itemId: number; status: "open" | "checked" | "skipped" }[] }
 export interface CheckoutBody { allocations: { ownerId: number; amount: number }[] }
+/** PATCH /trips/:id on a closed trip: redo the split. Shopper or admin, until a payment covers it. */
+export type EditTripBody = CheckoutBody
 export interface ExpenseBody {
   title: string; amount: number; payerId: number; splitMode: SplitMode; date: string;
   category?: string | null; note?: string | null;

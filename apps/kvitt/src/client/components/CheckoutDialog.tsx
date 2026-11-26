@@ -1,5 +1,5 @@
 import { useState, type FormEvent } from "react";
-import type { CheckoutBody, Trip } from "@/shared/api";
+import type { CheckoutBody, EditTripBody, Trip } from "@/shared/api";
 import { parseAmount } from "@/shared/balances";
 import { useAction, useOnline } from "../hooks";
 import { useHousehold } from "../household";
@@ -18,13 +18,22 @@ export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip
   );
 }
 
-function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: Trip; ownerIds: number[]; prefill: Record<number, number>; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
+/** Redo the split of a closed trip (History): the same form, starting from what was saved. */
+export function EditSplitForm({ trip, onDone }: { trip: Trip; onDone: () => void }) {
+  return (
+    <CheckoutForm trip={trip} ownerIds={trip.allocations.map((a) => a.ownerId)} prefill={Object.fromEntries(trip.allocations.map((a) => [a.ownerId, a.amount]))}
+      boughtCount={trip.boughtItems.length} onDone={() => onDone()} edit />
+  );
+}
+
+function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone, edit }: { trip: Trip; ownerIds: number[]; prefill: Record<number, number>; boughtCount: number; onDone: (s: CheckoutSummary) => void; edit?: boolean }) {
   const h = useHousehold();
   const online = useOnline();
-  const { count: pending } = usePendingOps(h.hid);
+  const { count: livePending } = usePendingOps(h.hid);
+  const pending = edit ? 0 : livePending; // a closed trip has no check-offs left to sync
   // Amounts start from the prices on the checked items, so a priced list needs no typing.
   const [amounts, setAmounts] = useState<Record<number, string>>(() =>
-    Object.fromEntries(Object.entries(prefill).filter(([, v]) => v > 0).map(([id, v]) => [id, toInput(v)])));
+    Object.fromEntries(Object.entries(prefill).filter(([, v]) => v > 0 || edit).map(([id, v]) => [id, toInput(v)])));
   // Other members the shopper splits the bill on, even if none of their lists is in the trip.
   const [extra, setExtra] = useState<number[]>([]);
   const { run, busy, error, setError } = useAction();
@@ -65,18 +74,19 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
     if (bad) return setError(t("checkout.invalid", { name: h.name(bad.ownerId) }));
     const allocations = parsed.filter((p) => p.amount !== null).map((p) => ({ ownerId: p.ownerId, amount: p.amount! }));
     void run(async () => {
-      await h.call("POST", `/trips/${trip.id}/checkout`, { allocations } satisfies CheckoutBody, ["trips", "lists", "balances"]);
+      if (edit) await h.call("PATCH", `/trips/${trip.id}`, { allocations } satisfies EditTripBody, ["trips", "balances"]);
+      else await h.call("POST", `/trips/${trip.id}/checkout`, { allocations } satisfies CheckoutBody, ["trips", "lists", "balances"]);
       onDone({ tripId: trip.id, allocations, boughtCount });
     });
   };
 
   return (
     <form onSubmit={submit} className="space-y-4">
-      <p className="text-sm text-muted-foreground">{t("checkout.intro")}</p>
+      <p className="text-sm text-muted-foreground">{t(edit ? "checkout.editIntro" : "checkout.intro")}</p>
       {parsed.map((p) => {
         const self = p.ownerId === trip.shopperId;
         return (
-          <Field key={p.ownerId} label={self ? t("checkout.self") : h.name(p.ownerId)} hint={self ? t("checkout.selfHint") : undefined}>
+          <Field key={p.ownerId} label={self ? (h.me.id === trip.shopperId ? t("checkout.self") : t("history.ownItems", { name: h.name(p.ownerId) })) : h.name(p.ownerId)} hint={self ? t("checkout.selfHint") : undefined}>
             <Input inputMode="decimal" placeholder={`0 ${h.currency}`} value={amounts[p.ownerId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [p.ownerId]: e.target.value })} required={!self} />
           </Field>
         );
@@ -98,7 +108,7 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
       {!online && <p className="text-sm text-warning">{t("checkout.offline")}</p>}
       {online && pending > 0 && <p className="text-sm text-muted-foreground">{tn("checkout.syncing", pending)}</p>}
       <ErrorText>{error}</ErrorText>
-      <Button type="submit" className="w-full" disabled={busy || !online || pending > 0}>{t("checkout.submit", { amount: h.fmt(total) })}</Button>
+      <Button type="submit" className="w-full" disabled={busy || !online || pending > 0}>{t(edit ? "checkout.save" : "checkout.submit", { amount: h.fmt(total) })}</Button>
     </form>
   );
 }

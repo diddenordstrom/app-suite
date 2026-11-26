@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-26 · decision · Kvitt: redo a trip's split from History until a payment covers it ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt checkout prefills from item prices and can split on anyone ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Releases are automatic now that the repo is public ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt list items get an optional price ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-25 · decision · Fartlek: a marathoner's long run may reach 30 km on a lower week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek grows a low-volume runner by km, and a marathoner's long run takes up to half the week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek grows a low-volume runner by km ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek plan simulator: the whole road for a made-up runner ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

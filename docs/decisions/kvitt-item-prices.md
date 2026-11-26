@@ -25,3 +25,9 @@ Lists are also used to track gifts and other planned purchases, so an item can s
 
 - **Prices prefill the checkout.** Each owner's amount starts as the sum of their checked items' totals, so a fully priced trip needs no typing. The amounts stay editable (the receipt rules).
 - **The shopper can split on any active member**, not only the owners of the trip's lists, also when only their own lists are in the trip. "Delas med" shows a chip per member (tap to toggle) and adds a row per picked person; "Dela lika" re-splits after manual edits; each gets a debt to the shopper like a list owner does. Adding or removing a person re-splits the shopper's own share equally between the shopper and everyone added (one extra person is 50/50, two is thirds, any remainder öre stays with the shopper); other list owners keep their own amounts, and every amount stays editable. The server accepts any active member of the household as an allocation target.
+
+## Redoing a split afterwards
+
+- **A closed trip's split can be edited from History** (amounts, who it is split on), by the shopper or an admin (an admin may change anyone's). `PATCH /trips/:id`.
+- **"Paid" means a later payment between the pair.** Balances are netted per pair and a trip has no paid flag of its own, so a trip is `locked` once a payment was registered, after the trip closed, between the shopper's wallet and the wallet of anyone it is split on. Then the split is read-only with a short note. See [`views.ts`](../../apps/kvitt/src/server/views.ts).
+- **Passed over:** a per-trip "paid" checkbox. It would need its own settling flow next to the netted payments and could disagree with the balances.
