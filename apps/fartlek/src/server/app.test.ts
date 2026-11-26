@@ -7,7 +7,7 @@ import { createGarminProvider, dateChunks, mapActivity, mapVo2max, maxBodyBatter
 import { AUTO_SYNC_AFTER_MS, DETAIL_VERSION, createSyncRunner, syncProvider, syncVo2max } from "./sync";
 import { Encoder, Profile } from "@garmin/fitsdk";
 import { zipSync } from "fflate";
-import { parseFit } from "./providers/fit";
+import { parseFit, watchZonesFromFit } from "./providers/fit";
 import { getTableName, is } from "drizzle-orm";
 import { SQLiteTable } from "drizzle-orm/sqlite-core";
 import * as schema from "./db/schema";
@@ -953,7 +953,7 @@ describe("crypto", () => {
   });
 });
 
-function makeFit(): Uint8Array {
+function makeFit(zones?: { bounds: number[]; maxHr: number; thresholdHr: number }): Uint8Array {
   const enc = new Encoder();
   type M = Parameters<typeof enc.onMesg>[1];
   const start = new Date("2026-11-01T07:00:00Z");
@@ -967,6 +967,12 @@ function makeFit(): Uint8Array {
   });
   enc.onMesg(Profile.MesgNum.LAP, lap(0, 60, "manual") as unknown as M);
   enc.onMesg(Profile.MesgNum.LAP, lap(60, 60, "distance") as unknown as M);
+  if (zones) {
+    enc.onMesg(Profile.MesgNum.TIME_IN_ZONE, {
+      timestamp: new Date(start.getTime() + 120_000), referenceMesg: "session", referenceIndex: 0,
+      hrZoneHighBoundary: zones.bounds, maxHeartRate: zones.maxHr, thresholdHeartRate: zones.thresholdHr, hrCalcType: "percentMaxHr",
+    } as unknown as M);
+  }
   return enc.close();
 }
 
@@ -995,6 +1001,28 @@ describe("garmin provider", () => {
     expect(d.stream!.speed[0]).toBe(3.3);
     expect(d.stream!.cad![0]).toBe(171);
     expect(d.fit).toEqual(fit);
+  });
+
+  it("reads the watch's zones from a FIT file's time-in-zone message", () => {
+    // Garmin's defaults for max 195: zone 0 top first, then zones 1–5.
+    const fit = makeFit({ bounds: [98, 117, 137, 156, 176, 195], maxHr: 195, thresholdHr: 175 });
+    expect(watchZonesFromFit(zipSync({ "42_ACTIVITY.fit": fit }))).toEqual({ bounds: [117, 137, 156, 176], maxHr: 195, thresholdHr: 175 });
+    expect(watchZonesFromFit(makeFit())).toBeNull();
+  });
+
+  it("serves the watch's zones from the newest kept FIT file", async () => {
+    const db = createDb(":memory:");
+    const app = createApp(db, loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv));
+    expect(await (await app.request("/api/settings/watch-zones")).json()).toBeNull();
+    const add = (id: string, date: string, fit: Uint8Array) => {
+      db.$client.prepare(`insert into activities (user_id, id, name, type_key, start_time_local, date, distance_m, duration_s, is_run) values (1, ?, 'Run', 'running', ?, ?, 5000, 1500, 1)`)
+        .run(id, `${date} 07:00:00`, date);
+      repo.saveDetail(db, 1, id, { laps: [], stream: null, fit }, DETAIL_VERSION);
+    };
+    add("g:old", "2026-10-01", makeFit({ bounds: [90, 110, 130, 150, 170, 190], maxHr: 190, thresholdHr: 170 }));
+    add("g:new", "2026-11-01", makeFit({ bounds: [98, 117, 137, 156, 176, 195], maxHr: 195, thresholdHr: 175 }));
+    add("g:nozones", "2026-11-02", makeFit());
+    expect(await (await app.request("/api/settings/watch-zones")).json()).toEqual({ bounds: [117, 137, 156, 176], maxHr: 195, thresholdHr: 175, date: "2026-11-01" });
   });
 
   it("syncs through a fake Garmin: token once, pages, details, wellness, stops on unchanged page", async () => {

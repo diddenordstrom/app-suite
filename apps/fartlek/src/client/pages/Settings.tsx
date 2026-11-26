@@ -153,6 +153,15 @@ function HeartRateCard() {
   const thrHr = [...(thresholds.data ?? [])].reverse().find((x) => x.hr)?.hr ?? null;
   useEffect(() => { if (thrHr && !lthr) setLthr(String(thrHr)); }, [thrHr]); // eslint-disable-line react-hooks/exhaustive-deps
   const thrZone = settings.zones && thrHr ? zoneOf(thrHr, settings.zones) + 1 : null;
+  // The watch's own zones, read from the newest kept FIT file (null without one, e.g. in the demo).
+  const watch = useApi<{ bounds: ZoneBounds; maxHr: number | null; thresholdHr: number | null; date: string } | null>("/settings/watch-zones").data ?? null;
+  const [fromWatch, setFromWatch] = useState(false);
+  const useWatchZones = () => {
+    if (!watch) { setZones(["", "", "", ""]); void onSave(true); return; }
+    setZones(watch.bounds.map(String));
+    if (watch.thresholdHr) setLthr(String(watch.thresholdHr));
+    setFromWatch(true);
+  };
   const [zones, setZones] = useState<string[]>(["", "", "", ""]);
   const [easyLow, setEasyLow] = useState("");
   const [easyHigh, setEasyHigh] = useState("");
@@ -161,6 +170,7 @@ function HeartRateCard() {
     setZones(settings.zones ? settings.zones.map(String) : ["", "", "", ""]);
     setEasyLow(settings.easyLow?.toString() ?? "");
     setEasyHigh(settings.easyHigh?.toString() ?? "");
+    setFromWatch(false);
   }, [settings]);
   const custom = zones.every((z) => z.trim() !== "");
   const onSave = (useWatch = false) => save({
@@ -188,12 +198,21 @@ function HeartRateCard() {
           <Input className="h-8 w-24 text-xs" inputMode="numeric" placeholder="LTHR" value={lthr} onChange={(e) => setLthr(e.target.value)} />
           <Button variant="outline" className="h-8 text-xs" disabled={!lthr} onClick={() => setZones(zonesFromLthr(Number(lthr)).map(String))}>{t("hr.fromLthr")}</Button>
           {/* Clears and saves in one go: clearing alone looked like nothing happened when the fields were already empty. */}
-          {(settings.zones || zones.some((z) => z.trim())) && (
-            <Button variant="ghost" className="h-8 text-xs" disabled={busy} onClick={() => { setZones(["", "", "", ""]); void onSave(true); }}>{t("hr.useWatch")}</Button>
+          {(watch || settings.zones || zones.some((z) => z.trim())) && (
+            <Button variant="ghost" className="h-8 text-xs" disabled={busy} onClick={useWatchZones}>{t("hr.useWatch")}</Button>
           )}
         </div>
         <p className="mt-2 text-xs text-muted-foreground">{t("hr.model")}</p>
-        <p className="mt-1 text-xs text-muted-foreground">{settings.zones ? t("hr.usingOwn", { zones: settings.zones.join(" / ") }) : t("hr.usingWatch")}</p>
+        {fromWatch && watch && (
+          <p role="status" className="mt-1 text-xs font-medium text-foreground">
+            {t("hr.watchFilled", { date: fmtDay(watch.date, { day: "numeric", month: "short" }), zones: watch.bounds.join(" / ") })}
+            {watch.thresholdHr ? ` ${t("hr.watchLthr", { hr: watch.thresholdHr })}` : ""}
+          </p>
+        )}
+        <p className="mt-1 text-xs text-muted-foreground">
+          {settings.zones ? t("hr.usingOwn", { zones: settings.zones.join(" / ") })
+            : watch ? t("hr.usingWatchKnown", { zones: watch.bounds.join(" / ") }) : t("hr.usingWatch")}
+        </p>
         {thrZone != null && thrZone !== 4 && (
           <p role="status" className="mt-1 text-xs font-medium text-warning">{t("hr.thresholdOutside", { hr: thrHr!, zone: thrZone })}</p>
         )}

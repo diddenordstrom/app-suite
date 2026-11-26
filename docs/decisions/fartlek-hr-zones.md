@@ -28,6 +28,10 @@ Five zones, read the same way everywhere in the app and on the watch:
 
 The button used Joe Friel's running zones, 84 / 89 / 94 / 99 % of threshold HR. Friel has seven zones (1, 2, 3, 4, 5a, 5b, 5c) and the threshold starts zone 5a. Taking his first four bounds into a five-zone model put the threshold at the start of zone 5, so threshold work showed as zone 5 while the rest of the app (structured workouts, the period stats, "zone 4 is the HR threshold") reads zone 4 as threshold.
 
+## The watch's zones
+
+Garmin's activity list gives only time per zone, not the bounds, but each kept FIT file has a time-in-zone message with the watch's zone tops (`hr_zone_high_boundary`, from zone 0 up), max HR and threshold HR. `GET /api/settings/watch-zones` reads them from the newest kept FIT file of a run that has them ([`watchZonesFromFit`](../../apps/fartlek/src/server/providers/fit.ts)). "Använd klockans zoner" then fills the zone fields with them, and the LTHR field with the watch's threshold HR, for the runner to save; with no such file (the demo, or runs synced before files were kept) it clears the fields and uses the watch's time per zone, as before. Settings shows the watch's zones next to "Nu: klockans zoner" when they are known.
+
 ## Consequences
 
 - Saved zones are the runner's own numbers and do not change by themselves. Settings says when the latest threshold HR falls outside zone 4 with the saved zones and suggests pressing "From threshold HR".

@@ -25,6 +25,9 @@ export const en = {
   "hr.thresholdOutside": "Your threshold HR ({hr}) is in zone {zone} with these zones; it belongs in zone 4. Press \"From threshold HR\" and save.",
   "hr.useWatch": "Use watch zones",
   "hr.usingWatch": "Now: your watch's zones.",
+  "hr.usingWatchKnown": "Now: your watch's zones ({zones}).",
+  "hr.watchFilled": "Filled in from your watch (run on {date}): {zones}. Save to use them.",
+  "hr.watchLthr": "The watch's threshold HR, {hr}, is in the LTHR field.",
   "hr.usingOwn": "Now: your own zones ({zones}).",
   "hr.invalid": "Check the numbers: heart rates are 40–240, zones must rise, and the band's start must be below its end.",
 
@@ -130,6 +133,9 @@ export const sv: Record<keyof typeof en, string> = {
   "hr.thresholdOutside": "Din tröskelpuls ({hr}) ligger i zon {zone} med de här zonerna, men hör hemma i zon 4. Tryck \"Från tröskelpuls\" och spara.",
   "hr.useWatch": "Använd klockans zoner",
   "hr.usingWatch": "Nu: klockans zoner.",
+  "hr.usingWatchKnown": "Nu: klockans zoner ({zones}).",
+  "hr.watchFilled": "Ifyllt från klockan (passet {date}): {zones}. Spara för att använda dem.",
+  "hr.watchLthr": "Klockans tröskelpuls, {hr}, står i LTHR-fältet.",
   "hr.usingOwn": "Nu: dina egna zoner ({zones}).",
   "hr.invalid": "Kolla siffrorna: pulsen ska vara 40–240, zonerna måste öka och intervallets start måste vara under slutet.",
 
