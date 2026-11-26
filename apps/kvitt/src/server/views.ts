@@ -1,7 +1,7 @@
 /** Row → API shape mappers and loaders shared by several route files. */
 import { and, desc, eq, inArray } from "drizzle-orm";
 import type { Db } from "./db";
-import { expenses, expenseShares, items, settlements, tripAllocations, tripLists, trips } from "./db/schema";
+import { expenses, expenseShares, items, memberships, settlements, tripAllocations, tripLists, trips } from "./db/schema";
 import type { Expense, Item, Settlement, Trip } from "../shared/api";
 import type { CarCalc } from "../shared/car";
 
@@ -25,6 +25,27 @@ export const toSettlement = (r: SettlementRow): Settlement => ({
   id: r.id, fromId: r.fromId, toId: r.toId, amount: r.amount, note: r.note, createdAt: r.createdAt,
 });
 
+/**
+ * Closed trips whose split is locked: a payment between the shopper's wallet and the wallet of someone the trip
+ * is split on was registered after the trip closed. There is no "paid" flag per trip (balances are netted), so a
+ * later payment between the pair is the signal that the amount has been settled.
+ */
+function lockedTripIds(db: Db, rows: TripRow[], allocs: { tripId: number; ownerId: number }[]): Set<number> {
+  const closed = rows.filter((t) => t.status === "closed" && t.closedAt != null);
+  const out = new Set<number>();
+  if (closed.length === 0) return out;
+  const hids = [...new Set(closed.map((t) => t.householdId))];
+  const ms = db.select({ id: memberships.id, walletId: memberships.walletId }).from(memberships).where(inArray(memberships.householdId, hids)).all();
+  const lead = (id: number) => ms.find((m) => m.id === id)?.walletId ?? id;
+  const sets = db.select().from(settlements).where(inArray(settlements.householdId, hids)).all();
+  for (const t of closed) {
+    const shopper = lead(t.shopperId);
+    const debtors = new Set(allocs.filter((a) => a.tripId === t.id && lead(a.ownerId) !== shopper).map((a) => lead(a.ownerId)));
+    if (sets.some((s) => s.householdId === t.householdId && s.createdAt >= t.closedAt! && ((lead(s.fromId) === shopper && debtors.has(lead(s.toId))) || (lead(s.toId) === shopper && debtors.has(lead(s.fromId)))))) out.add(t.id);
+  }
+  return out;
+}
+
 export function loadTrips(db: Db, rows: TripRow[]): Trip[] {
   if (rows.length === 0) return [];
   const ids = rows.map((t) => t.id);
@@ -32,11 +53,13 @@ export function loadTrips(db: Db, rows: TripRow[]): Trip[] {
   const allocs = db.select().from(tripAllocations).where(inArray(tripAllocations.tripId, ids)).orderBy(tripAllocations.id).all();
   const bought = db.select().from(items)
     .where(and(inArray(items.tripId, ids), eq(items.status, "bought"))).orderBy(items.listId, items.position, items.id).all();
+  const locked = lockedTripIds(db, rows, allocs);
   return rows.map((t) => ({
     id: t.id, shopperId: t.shopperId, store: t.store, status: t.status, startedAt: t.startedAt, closedAt: t.closedAt,
     listIds: tl.filter((x) => x.tripId === t.id).map((x) => x.listId).sort((a, b) => a - b),
     allocations: allocs.filter((a) => a.tripId === t.id).map((a) => ({ ownerId: a.ownerId, amount: a.amount })),
     boughtItems: t.status === "closed" ? bought.filter((i) => i.tripId === t.id).map(toItem) : [],
+    locked: locked.has(t.id),
   }));
 }
 

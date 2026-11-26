@@ -338,6 +338,30 @@ describe("bjudningar, guests and the green zone", () => {
     ]);
   });
 
+  it("a closed trip's split can be redone by the shopper or an admin until a payment covers it", async () => {
+    const l = await bob.post<List>(`/h/${hid}/lists`, { title: "Bob's" });
+    const i = await bob.post<Item>(`/h/${hid}/lists/${l.id}/items`, { text: "Pan" });
+    const trip = await bob.post<Trip>(`/h/${hid}/trips`, { listIds: [l.id] });
+    await bob.post(`/h/${hid}/trips/${trip.id}/ops`, { ops: [{ itemId: i.id, status: "checked" }] });
+    const closed = await bob.post<Trip>(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: bobId, amount: 20000 }] });
+    expect(closed.locked).toBe(false);
+    await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: bobId, amount: 10000 }, { ownerId: carolId, amount: 10000 }] });
+    expect((await balances()).pairs).toEqual([{ from: carolId, to: bobId, amount: 10000 }]);
+    // an admin (alice) may change it too; bad ids are refused
+    await alice.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: 999999, amount: 1 }] }, 400);
+    await alice.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [{ ownerId: aliceId, amount: 5000 }, { ownerId: carolId, amount: 15000 }] });
+    expect((await balances()).pairs).toEqual(expect.arrayContaining([{ from: aliceId, to: bobId, amount: 5000 }, { from: carolId, to: bobId, amount: 15000 }]));
+    // an active trip is not editable this way
+    const l2 = await alice.post<List>(`/h/${hid}/lists`, { title: "A" });
+    await alice.post(`/h/${hid}/lists/${l2.id}/items`, { text: "x" });
+    const t2 = await alice.post<Trip>(`/h/${hid}/trips`, { listIds: [l2.id] });
+    await alice.patch(`/h/${hid}/trips/${t2.id}`, { allocations: [] }, 409);
+    // carol pays bob back: the split is locked
+    await alice.post(`/h/${hid}/settlements`, { fromId: carolId, toId: bobId, amount: 15000 });
+    expect((await alice.get<Trip[]>(`/h/${hid}/trips`)).find((x) => x.id === trip.id)?.locked).toBe(true);
+    await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [] }, 409);
+  });
+
   it("a gift creates no debt, may be unpriced, and stays out of stats but in the activity feed", async () => {
     const g = await expense({ title: "Middag hemma", gift: true, category: "home", participants: [{ memberId: bobId, weight: 1 }, { memberId: carolId, weight: 1 }] });
     expect(g).toMatchObject({ gift: true, amount: 0, guests: 0, guestAmount: 0 });
