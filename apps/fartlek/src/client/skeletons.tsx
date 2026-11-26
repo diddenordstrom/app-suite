@@ -72,3 +72,21 @@ export function BlocksSkeleton() {
     </SkeletonPage>
   );
 }
+
+/** Statistik: the mirrored header, the period card, the key figures and two mirror cards. */
+export function StatsSkeleton() {
+  return (
+    <SkeletonPage className="mx-auto max-w-6xl space-y-5">
+      <div className="grid grid-cols-[minmax(0,1fr)_4rem_minmax(0,1fr)] items-end">
+        <div className="flex flex-col items-end gap-2"><Skeleton className="h-3 w-20" /><Skeleton className="h-9 w-36" /></div>
+        <span />
+        <div className="space-y-2"><Skeleton className="h-3 w-20" /><Skeleton className="h-9 w-36" /></div>
+      </div>
+      <SkeletonCard lines={4} />
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {Array.from({ length: 6 }, (_, i) => <SkeletonCard key={i} lines={2} />)}
+      </div>
+      <div className="grid gap-4 lg:grid-cols-2"><SkeletonCard lines={5} /><SkeletonCard lines={4} /></div>
+    </SkeletonPage>
+  );
+}
