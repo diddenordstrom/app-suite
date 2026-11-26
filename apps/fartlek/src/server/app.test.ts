@@ -1186,3 +1186,109 @@ describe("garmin sleep score", () => {
   });
 });
 
+
+describe("period stats", () => {
+  const config = loadConfig({ AUTH_MODE: "dev" } as NodeJS.ProcessEnv);
+  type Stats = import("../shared/periodstats").StatsResponse;
+
+  /** A run with a 5 s stream at one pace and heart rate. */
+  function addRun(db: ReturnType<typeof createDb>, id: string, date: string, secs: number, pace: number, hr: number) {
+    const s = { t: [] as number[], hr: [] as number[], speed: [] as number[], alt: [] as number[] };
+    for (let x = 0; x < secs; x += 5) { s.t.push(x); s.hr.push(hr); s.speed.push(1000 / pace); s.alt.push(0); }
+    db.$client.prepare(`insert into activities (user_id, id, name, type_key, start_time_local, date, distance_m, duration_s, avg_hr, is_run, zone1, zone2, zone3, zone4, zone5)
+      values (1, ?, 'Run', 'running', ?, ?, ?, ?, ?, 1, 0, ?, 0, 0, 0)`).run(id, `${date} 07:00:00`, date, Math.round((secs / pace) * 1000), secs, hr, secs);
+    repo.saveDetail(db, 1, id, { laps: [], stream: s }, DETAIL_VERSION);
+  }
+
+  it("sums stored bands per period, judges an old run by its own threshold and recomputes the target when it moves", async () => {
+    const db = createDb(":memory:");
+    const a = createApp(db, config);
+    const g = async (p: string) => (await a.request(p)).json() as Promise<Stats>;
+    await a.request("/api/settings");
+    const today = todayIn("UTC");
+    const old = addDays(today, -60), recent = addDays(today, -3);
+    // Threshold 4:50 back then, 4:20 now.
+    await a.request("/api/thresholds", json({ effectiveDate: addDays(today, -90), paceSecPerKm: 290, hr: 168 }));
+    await a.request("/api/thresholds", json({ effectiveDate: addDays(today, -30), paceSecPerKm: 260, hr: 170 }));
+    // An A marathon at 5:00 /km (12660 s).
+    const race = (await (await a.request("/api/races", json({ name: "Goal race", date: addDays(today, 40), distanceKm: 42.195, goalSeconds: 12660, priority: "A" }))).json() as { id: number }[])[0];
+    addRun(db, "r:old", old, 600, 290, 165);
+    addRun(db, "r:new", recent, 600, 290, 165);
+    await a.request("/api/workouts", json({ date: recent, type: "threshold", distanceKm: 2 }));
+    await a.request("/api/workouts", json({ date: addDays(recent, 1), type: "long", distanceKm: 20 }));
+
+    const q = `from=${addDays(today, -6)}&to=${today}&cmpFrom=${addDays(old, -3)}&cmpTo=${addDays(old, 3)}`;
+    const s = await g(`/api/stats?${q}`);
+    expect(s.pending).toBe(0);
+    expect(s.threshold).toEqual({ pace: 260, low: 250.9, high: 269.1 });
+    expect(s.target).toMatchObject({ pace: 300, low: 289.5, raceName: "Goal race", goalSeconds: 12660 });
+    // Period A: the new run is slower than today's threshold band; B: the old run sat on the threshold of its day.
+    expect(s.a.durationS).toBe(s.runs.reduce((x, r) => x + r.durationS, 0));
+    expect(s.a).toMatchObject({ runs: 1, totalS: 600, belowS: 600, atS: 0, targetS: 600, easyShare: 1 });
+    expect(s.b).toMatchObject({ runs: 1, belowS: 0, atS: 600, overS: 0, targetS: 600 });
+    expect(s.runs.map((r) => [r.id, r.kind])).toEqual([["r:new", "threshold"]]);
+    expect(s.runsB.map((r) => r.id)).toEqual(["r:old"]);
+    expect(s.a.plan).toMatchObject({ sessions: 2, doneSessions: 1, key: 2, doneKey: 1, long: 1, doneLong: 0, km: 22 });
+    // Monday weeks back from the latest, covering both periods, oldest first.
+    expect(s.weeks.length).toBeGreaterThanOrEqual(12);
+    expect(s.weeks[0].weekStart <= addDays(old, -3)).toBe(true);
+    expect(s.weeks.every((w, i) => i === 0 || w.weekStart > s.weeks[i - 1].weekStart)).toBe(true);
+    expect(s.weeks.reduce((x, w) => x + w.km, 0)).toBeCloseTo(4.2, 5);
+
+    // A new goal moves today's target: every run's target time is computed again, the threshold bands stay.
+    await a.request(`/api/races/${race.id}`, json({ name: "Goal race", date: addDays(today, 40), distanceKm: 42.195, goalSeconds: 11400, priority: "A" }, "PUT"));
+    const rows = () => db.select().from(schema.activityBands).all();
+    expect(rows().every((r) => r.targetPace === 300.04)).toBe(true);
+    const s2 = await g(`/api/stats?${q}`);
+    expect(s2.target!.pace).toBe(270.2);
+    expect(s2.a.targetS).toBe(0);
+    expect(s2.b).toMatchObject({ atS: 600, targetS: 0 });
+    expect(rows().every((r) => Math.abs(r.targetPace! - 11400 / 42.195) < 0.01)).toBe(true);
+    // A new estimate on the old run's date judges it against that one.
+    await a.request("/api/thresholds", json({ effectiveDate: addDays(today, -61), paceSecPerKm: 320, hr: 160 }));
+    expect((await g(`/api/stats?${q}`)).b).toMatchObject({ atS: 0, overS: 600 });
+    // No A race left: no target, and no time at target.
+    await a.request(`/api/races/${race.id}`, { method: "DELETE", headers: { origin: ORIGIN } });
+    const s3 = await g(`/api/stats?${q}`);
+    expect(s3.target).toBeNull();
+    expect(s3.b.targetS).toBe(0);
+  });
+
+  it("validates the periods and defaults to this month against the same days of last month", async () => {
+    const a = createApp(createDb(":memory:"), config);
+    await a.request("/api/settings");
+    for (const q of ["from=2026-13-01&to=2026-12-31", "from=2026-11-10&to=2026-11-01", "from=2025-01-01&to=2026-11-01", "from=2026-11-01", "from=2026-11-01&to=2026-11-07&cmpFrom=2020-01-01&cmpTo=2020-01-07"]) {
+      expect((await a.request(`/api/stats?${q}`)).status, q).toBe(400);
+    }
+    const today = todayIn("UTC");
+    const s = await (await a.request("/api/stats")).json() as Stats;
+    expect(s.a.period).toEqual({ from: `${today.slice(0, 7)}-01`, to: today });
+    expect(s.b.period.from).toBe(addDays(`${today.slice(0, 7)}-01`, -1).slice(0, 7) + "-01");
+    expect(Number(s.b.period.to.slice(8))).toBeLessThanOrEqual(Number(today.slice(8)));
+    expect(s).toMatchObject({ runs: [], runsB: [], threshold: null, target: null, pending: 0 });
+    expect(s.a).toMatchObject({ runs: 0, totalS: 0, easyShare: null });
+    // Only A: compared with as many days just before it.
+    const one = await (await a.request("/api/stats?from=2026-11-08&to=2026-11-14")).json() as Stats;
+    expect(one.b.period).toEqual({ from: "2026-11-01", to: "2026-11-07" });
+  });
+
+  it("the demo has stats: bands for every run, a threshold and a target", async () => {
+    const db = createDb(":memory:");
+    const a = createApp(db, config);
+    await a.request("/api/demo", json({}));
+    const today = todayIn("UTC");
+    const s = await (await a.request(`/api/stats?from=${addDays(today, -27)}&to=${today}&cmpFrom=${addDays(today, -55)}&cmpTo=${addDays(today, -28)}`)).json() as Stats;
+    expect(s.pending).toBe(0);
+    expect(s.threshold).not.toBeNull();
+    expect(s.target?.raceName).toBe("Demo Marathon");
+    expect(s.a.runs).toBeGreaterThan(5);
+    expect(s.a.atS).toBeGreaterThan(0);
+    expect(s.a.belowS).toBeGreaterThan(s.a.atS);
+    expect(s.a.easyShare).toBeGreaterThan(0.5);
+    expect(s.a.plan.sessions).toBeGreaterThan(5);
+    expect(s.runs.some((r) => r.kind === "threshold")).toBe(true);
+    expect(s.blocks.length).toBeGreaterThan(0);
+    const runs = db.select().from(schema.activities).all().filter((x) => x.isRun).length;
+    expect(db.select().from(schema.activityBands).all()).toHaveLength(runs);
+  });
+});

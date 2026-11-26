@@ -17,4 +17,21 @@
   --chart-4: light-dark(#2a78d6, #4b95ec);
   --chart-5: light-dark(#c2417a, #ec6fa5);
   --radius: 0.5rem;
+
+  /* Statistik (pages/Stats.tsx): period A is the signature, period B the lavender chart colour. */
+  --stats-a: var(--signature);
+  --stats-a-foreground: var(--signature-foreground);
+  --stats-b: var(--chart-1);
+  --stats-b-foreground: light-dark(#5b48ad, #c4b5f6);
+  /* HR zones 1–5: lavender for easy, red for hard. */
+  --zone-1: light-dark(#e6e0f8, #4d4277);
+  --zone-2: light-dark(#b8a9e8, #7d6bc8);
+  --zone-3: light-dark(#8f78d4, #b98ad6);
+  --zone-4: light-dark(#c2452f, #ee8a8f);
+  --zone-5: light-dark(#7a2216, #ffc2a8);
+  /* Pace bands: easy (below threshold, outside target pace), target pace, at threshold, over. */
+  --band-easy: light-dark(#e6e0f8, #4d4277);
+  --band-mp: light-dark(#e8955c, #ffb38a);
+  --band-thr: light-dark(#6a56b3, #c4b5f6);
+  --band-over: light-dark(#b8321f, #ff6b5a);
 }

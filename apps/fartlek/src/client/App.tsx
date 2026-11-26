@@ -12,6 +12,7 @@ import { Plan } from "./pages/Plan";
 import { Races } from "./pages/Races";
 import { Activities, ActivityPage } from "./pages/Activities";
 import { Trends } from "./pages/Trends";
+import { Stats } from "./pages/Stats";
 import { Settings } from "./pages/Settings";
 import { Gym } from "./pages/Gym";
 import { GymHistory } from "./pages/GymHistory";
@@ -31,6 +32,7 @@ const nav = (): NavItem[] => [
   { to: "/", tour: "nav-home", label: t("nav.home"), icon: <Icon d="M3 11l9-7 9 7v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" /> },
   { to: "/plan", tour: "nav-plan", label: t("nav.plan"), icon: <Icon d="M4 5h16v15H4zM4 9h16M8 3v4M16 3v4" /> },
   { to: "/activities", tour: "nav-activities", label: t("nav.activities"), icon: <RunnerIcon /> },
+  { to: "/stats", tour: "nav-stats", label: t("nav.stats"), badge: t("nav.new"), icon: <Icon d="M4 20V10M10 20V4M16 20v-7M22 20H2" /> },
   { to: "/trends", tour: "nav-trends", label: t("nav.trends"), icon: <Icon d="M4 19V5M4 19h16M8 15l4-4 3 3 5-6" /> },
   { to: "/settings", tour: "nav-settings", label: t("nav.settings"), icon: <GearIcon className="size-5" />, desktopOnly: true },
 ];
@@ -65,6 +67,7 @@ export function App() {
           <Route path="/plan/races" element={<Races />} />
           <Route path="/activities" element={<Activities />} />
           <Route path="/activities/:id" element={<ActivityPage />} />
+          <Route path="/stats" element={<Stats />} />
           <Route path="/trends" element={<Trends />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/gym" element={<Gym />} />

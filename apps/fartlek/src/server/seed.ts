@@ -6,10 +6,12 @@ import { addDays, weekStartOf, type ISODate } from "../shared/dates";
 import { createDemoProvider, DEMO_PATTERN, demoWeekKm } from "./providers/demo";
 import { syncProvider } from "./sync";
 import { ctxFor } from "./analysis";
+import { ensureBands } from "./bands";
 import { parseSteps, plannedFromSteps, type StepRefs } from "../shared/steps";
 import { saveSession } from "./gym";
 import { templateEntries } from "../shared/gymplan";
 import { exercise } from "../shared/gym";
+import { zonesFromLthr } from "../shared/zones";
 
 const count = (db: Db, tbl: typeof t.workouts | typeof t.races | typeof t.blocks | typeof t.thresholds | typeof t.painEntries, userId: number) =>
   db.select({ n: sql<number>`count(*)` }).from(tbl).where(eq(tbl.userId, userId)).get()?.n ?? 0;
@@ -66,7 +68,8 @@ export function seedDemoPlan(db: Db, userId: number, today: ISODate) {
   });
 
   const s = repo.getSettings(db, userId);
-  if (s.maxHr == null && s.easyHigh == null) repo.saveSettings(db, userId, { ...s, maxHr: 190, easyLow: 135, easyHigh: 150 });
+  // Zones of the runner's own, from the demo threshold HR, so easy runs read as zones 1–2 (the watch's default zones put them in 3).
+  if (s.maxHr == null && s.easyHigh == null) repo.saveSettings(db, userId, { ...s, maxHr: 190, easyLow: 135, easyHigh: 150, zones: s.zones ?? zonesFromLthr(169) });
 }
 
 /** Generated history, a plan and races for one account (Settings → Load demo data, and every demo visitor). Only fills what is empty. */
@@ -75,6 +78,8 @@ export async function loadDemoData(db: Db, userId: number) {
   const result = await syncProvider(db, userId, createDemoProvider(userId, today), { today, maxDetails: 500 });
   seedDemoPlan(db, userId, today);
   seedDemoGym(db, userId, today);
+  // The period stats read stored rows; the demo's few months of 5 s streams take well under a second.
+  ensureBands(db, userId, 10_000);
   return result;
 }
 

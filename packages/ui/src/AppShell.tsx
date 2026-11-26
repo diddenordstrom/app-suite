@@ -3,7 +3,7 @@ import { NavLink } from "react-router-dom";
 import { cn } from "./cn";
 import { SuiteLink } from "./SuiteLink";
 
-export interface NavItem { to: string; label: string; icon: ReactNode; /** Hidden from the phone tab bar (reach it from the header instead). */ desktopOnly?: boolean; /** `data-tour` id, so a guided tour can point at this item. */ tour?: string }
+export interface NavItem { to: string; label: string; icon: ReactNode; /** Hidden from the phone tab bar (reach it from the header instead). */ desktopOnly?: boolean; /** `data-tour` id, so a guided tour can point at this item. */ tour?: string; /** A short tag after the label in the sidebar, e.g. "New". */ badge?: string }
 const desktopQuery = "(min-width: 48rem)";
 /** Whether the md+ layout (sidebar) is showing; `header` is mounted only where it is visible. */
 function useDesktop() {
@@ -52,7 +52,7 @@ export function AppShell({ title, logo: Logo, nav, header, footer, action, mainC
           </button>
         )}
         <nav className="flex flex-1 flex-col gap-1" data-testid="sidebar-nav">
-          {nav.map((n) => <NavLink key={n.to} to={n.to} end={n.to === "/"} className={link} data-tour={n.tour}>{n.icon}{n.label}</NavLink>)}
+          {nav.map((n) => <NavLink key={n.to} to={n.to} end={n.to === "/"} className={link} data-tour={n.tour}>{n.icon}{n.label}{n.badge && <span className="ml-auto rounded-full bg-signature-soft px-1.5 py-0.5 text-[10px] font-semibold leading-[14px] text-signature-foreground">{n.badge}</span>}</NavLink>)}
         </nav>
         {footer}
         <SuiteLink className="px-1" />

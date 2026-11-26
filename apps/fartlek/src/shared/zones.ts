@@ -3,7 +3,7 @@ import type { Activity, Settings, Stream, ZoneBounds } from "./types";
 export type ZoneSecs = [number, number, number, number, number];
 
 /** Seconds each sample stands for (gap to the next one, capped so pauses don't count). */
-function sampleSecs(t: number[], i: number): number {
+export function sampleSecs(t: number[], i: number): number {
   return i + 1 < t.length ? Math.min(t[i + 1] - t[i], 30) : 5;
 }
 
