@@ -20,3 +20,8 @@ Lists are also used to track gifts and other planned purchases, so an item can s
 
 - **A unit picker (st, kr, kg) instead of a plain quantity.** It would have made "200 kr" a quantity, but not 5 × 100 kr, and it turns the quantity into structured data the shopping flow does not need. A separate price field covers both cases with less UI.
 - **Feeding prices into balances.** A price is a note on the list, not an expense; settling up still goes through the checkout and expense forms.
+
+## Checkout
+
+- **Prices prefill the checkout.** Each owner's amount starts as the sum of their checked items' totals, so a fully priced trip needs no typing. The amounts stay editable (the receipt rules).
+- **The shopper can split on any active member**, not only the owners of the trip's lists, also when only their own lists are in the trip. "Delas med" shows a chip per member (tap to toggle) and adds a row per picked person; "Dela lika" re-splits after manual edits; each gets a debt to the shopper like a list owner does. Adding or removing a person re-splits the shopper's own share equally between the shopper and everyone added (one extra person is 50/50, two is thirds, any remainder öre stays with the shopper); other list owners keep their own amounts, and every amount stays editable. The server accepts any active member of the household as an allocation target.

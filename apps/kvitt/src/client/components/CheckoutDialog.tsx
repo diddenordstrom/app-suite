@@ -6,10 +6,11 @@ import { useHousehold } from "../household";
 import { usePendingOps } from "../tripQueue";
 import { t, tn } from "../i18n";
 import { Button, Dialog, ErrorText, Field, Input } from "../ui";
+import { toInput } from "./format";
 
 export interface CheckoutSummary { tripId: number; allocations: { ownerId: number; amount: number }[]; boughtCount: number }
 
-export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip: Trip; ownerIds: number[]; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
+export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip: Trip; ownerIds: number[]; prefill: Record<number, number>; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
   return (
     <Dialog open={props.open} onClose={props.onClose} title={t("checkout.title")}>
       {props.open && <CheckoutForm {...props} />}
@@ -17,14 +18,42 @@ export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip
   );
 }
 
-function CheckoutForm({ trip, ownerIds, boughtCount, onDone }: { trip: Trip; ownerIds: number[]; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
+function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: Trip; ownerIds: number[]; prefill: Record<number, number>; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
   const h = useHousehold();
   const online = useOnline();
   const { count: pending } = usePendingOps(h.hid);
-  const [amounts, setAmounts] = useState<Record<number, string>>({});
+  // Amounts start from the prices on the checked items, so a priced list needs no typing.
+  const [amounts, setAmounts] = useState<Record<number, string>>(() =>
+    Object.fromEntries(Object.entries(prefill).filter(([, v]) => v > 0).map(([id, v]) => [id, toInput(v)])));
+  // Other members the shopper splits the bill on, even if none of their lists is in the trip.
+  const [extra, setExtra] = useState<number[]>([]);
   const { run, busy, error, setError } = useAction();
+  const rowIds = [...ownerIds, ...extra];
+  /**
+   * Adding or removing a person re-splits the shopper's own share equally between the shopper and everyone
+   * added, so one extra person means 50/50. Other list owners keep their own amounts. Skipped when the
+   * shopper has no row of their own or an amount isn't a number.
+   */
+  const changeExtra = (next: number[]) => {
+    setExtra(next);
+    const me = trip.shopperId;
+    if (!ownerIds.includes(me)) return;
+    const parts = [me, ...extra].map((id) => { const raw = (amounts[id] ?? "").trim(); return raw ? parseAmount(raw) : 0; });
+    if (parts.some((p) => p === null)) return;
+    const pool = parts.reduce<number>((s, p) => s + p!, 0);
+    if (pool <= 0) return;
+    const ids = [me, ...next];
+    const each = Math.floor(pool / ids.length);
+    const out = { ...amounts };
+    ids.forEach((id, i) => { out[id] = toInput(i === 0 ? pool - each * (ids.length - 1) : each); });
+    for (const id of extra) if (!next.includes(id)) delete out[id];
+    setAmounts(out);
+  };
+  // Everyone who could be shared with: not the shopper, and not someone whose own list is in the trip.
+  const pickable = h.members.filter((m) => m.id !== trip.shopperId && (extra.includes(m.id) || !ownerIds.includes(m.id)));
+  const toggle = (id: number) => changeExtra(extra.includes(id) ? extra.filter((x) => x !== id) : [...extra, id]);
 
-  const parsed = ownerIds.map((id) => {
+  const parsed = rowIds.map((id) => {
     const raw = (amounts[id] ?? "").trim();
     return { ownerId: id, raw, amount: raw ? parseAmount(raw) : null };
   });
@@ -52,6 +81,17 @@ function CheckoutForm({ trip, ownerIds, boughtCount, onDone }: { trip: Trip; own
           </Field>
         );
       })}
+      {pickable.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">{t("checkout.splitOn")}</p>
+          <div className="flex flex-wrap gap-2">
+            {pickable.map((m) => (
+              <Button key={m.id} type="button" variant={extra.includes(m.id) ? "primary" : "ghost"} aria-pressed={extra.includes(m.id)} className={extra.includes(m.id) ? undefined : "border border-border"} onClick={() => toggle(m.id)}>{m.name}</Button>
+            ))}
+            {extra.length > 0 && <Button type="button" variant="ghost" onClick={() => changeExtra(extra)}>{t("checkout.splitEqual")}</Button>}
+          </div>
+        </div>
+      )}
       <div className="flex justify-between border-t border-border pt-3 font-medium">
         <span>{t("checkout.total")}</span><span className="tabular-nums">{h.fmt(total)}</span>
       </div>

@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { itemTotal } from "@/shared/items";
 import type { Item, ItemStatus, List, Trip } from "@/shared/api";
 import { useAction } from "../hooks";
 import { useHousehold } from "../household";
@@ -31,6 +32,10 @@ export function ActiveTrip({ trip, lists, onCheckedOut }: { trip: Trip; lists: L
   const owners = [...new Set(tripLists.map((l) => l.ownerId))].sort(
     (a, b) => Number(a === trip.shopperId) - Number(b === trip.shopperId) || h.name(a).localeCompare(h.name(b)),
   );
+
+  // What the checked items cost per owner, from their prices; prefills the checkout.
+  const prefill: Record<number, number> = {};
+  for (const l of tripLists) for (const i of l.items) if (statusOf(i) === "checked") prefill[l.ownerId] = (prefill[l.ownerId] ?? 0) + (itemTotal(i) ?? 0);
 
   const set = (item: Item, status: OpStatus) => queueOp(h.hid, trip.id, { itemId: item.id, status });
   const flip = useFlip<number>();
@@ -88,7 +93,7 @@ export function ActiveTrip({ trip, lists, onCheckedOut }: { trip: Trip; lists: L
           {canCancel && <Button variant="ghost" className="text-danger" onClick={cancel} disabled={busy}>{t("trip.cancel")}</Button>}
         </div>
       )}
-      <CheckoutDialog open={checkout} onClose={() => setCheckout(false)} trip={trip} ownerIds={owners} boughtCount={checked} onDone={(s) => { setCheckout(false); onCheckedOut(s); }} />
+      <CheckoutDialog open={checkout} onClose={() => setCheckout(false)} trip={trip} ownerIds={owners} prefill={prefill} boughtCount={checked} onDone={(s) => { setCheckout(false); onCheckedOut(s); }} />
     </div>
   );
 }

@@ -14,6 +14,7 @@ updated: 2026-11-11
   - A resource sync applies [deploy/komodo/app-suite.toml](../../deploy/komodo/app-suite.toml) on every push. It updates the stack's settings but never deploys it (`deploy = false`): it runs before CI has built the images, so a deploy from it pulled images that did not exist yet (2026-11-10, after the Fartlek/Kvitt rename).
   - The CI `deploy` job calls the stack's deploy webhook once the images are pushed, and it is the only trigger. The request is signed like a GitHub webhook.
   - Komodo pulls, writes `.env` from the stack's `environment` and runs compose.
+- **Releases are automatic.** The repo is public, so GitHub Actions runs the full release flow (test, image, deploy) on every merge to `main`; nobody releases by hand in Komodo. Komodo only plays the watchtower: it pulls the new images and runs compose, and it holds the secrets.
 - **Watchtower is gone.** Komodo's auto update, run daily by its Global Auto Update procedure, is the fallback for anything CI did not trigger.
 - **Secrets are Komodo variables marked secret**, referenced as `[[NAME]]` in the TOML. The TOML is in git; the values are only in Komodo's database, which Komodo backs up nightly.
 - **Routing:**

@@ -2,7 +2,7 @@
 import { Hono, type Context } from "hono";
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { Db } from "../db";
-import { items, lists, tripAllocations, tripLists, trips } from "../db/schema";
+import { items, lists, memberships, tripAllocations, tripLists, trips } from "../db/schema";
 import type { EventBus } from "../events";
 import { arr, badRequest, conflict, forbidden, idParam, int, notFound, oneOf, optStr, readBody, type Body } from "../http";
 import type { AppEnv } from "../viewer";
@@ -84,12 +84,13 @@ export function tripRoutes(db: Db, bus: EventBus) {
     const t = loadTrip(c);
     if (t.shopperId !== c.get("member").id) throw forbidden("only the shopper can check out");
     if (t.status !== "active") throw conflict("trip is not active");
-    const owners = new Set(db.select({ ownerId: lists.ownerId }).from(tripLists).innerJoin(lists, eq(lists.id, tripLists.listId))
-      .where(eq(tripLists.tripId, t.id)).all().map((r) => r.ownerId));
+    // The shopper may split the bill on any active member, not only the owners of the trip's lists.
+    const members = new Set(db.select({ id: memberships.id }).from(memberships)
+      .where(and(eq(memberships.householdId, c.get("hid")), isNull(memberships.removedAt))).all().map((r) => r.id));
     const allocations = arr((await readBody(c)).allocations, "allocations", 100).map((a) => {
       const x = (a ?? {}) as Body;
       const ownerId = int(x.ownerId, "ownerId", 1);
-      if (!owners.has(ownerId)) throw badRequest("ownerId must own one of the trip's lists");
+      if (!members.has(ownerId)) throw badRequest("ownerId must be an active member of the household");
       return { ownerId, amount: int(x.amount, "amount", 0) };
     });
     if (new Set(allocations.map((a) => a.ownerId)).size !== allocations.length) throw badRequest("duplicate ownerId");
