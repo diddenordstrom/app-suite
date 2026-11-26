@@ -6,10 +6,11 @@ import { useHousehold } from "../household";
 import { usePendingOps } from "../tripQueue";
 import { t, tn } from "../i18n";
 import { Button, Dialog, ErrorText, Field, Input } from "../ui";
+import { toInput } from "./format";
 
 export interface CheckoutSummary { tripId: number; allocations: { ownerId: number; amount: number }[]; boughtCount: number }
 
-export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip: Trip; ownerIds: number[]; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
+export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip: Trip; ownerIds: number[]; prefill: Record<number, number>; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
   return (
     <Dialog open={props.open} onClose={props.onClose} title={t("checkout.title")}>
       {props.open && <CheckoutForm {...props} />}
@@ -17,14 +18,20 @@ export function CheckoutDialog(props: { open: boolean; onClose: () => void; trip
   );
 }
 
-function CheckoutForm({ trip, ownerIds, boughtCount, onDone }: { trip: Trip; ownerIds: number[]; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
+function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: Trip; ownerIds: number[]; prefill: Record<number, number>; boughtCount: number; onDone: (s: CheckoutSummary) => void }) {
   const h = useHousehold();
   const online = useOnline();
   const { count: pending } = usePendingOps(h.hid);
-  const [amounts, setAmounts] = useState<Record<number, string>>({});
+  // Amounts start from the prices on the checked items, so a priced list needs no typing.
+  const [amounts, setAmounts] = useState<Record<number, string>>(() =>
+    Object.fromEntries(Object.entries(prefill).filter(([, v]) => v > 0).map(([id, v]) => [id, toInput(v)])));
+  // Other members the shopper splits the bill on, even if none of their lists is in the trip.
+  const [extra, setExtra] = useState<number[]>([]);
   const { run, busy, error, setError } = useAction();
+  const rowIds = [...ownerIds, ...extra];
+  const addable = h.members.filter((m) => m.id !== trip.shopperId && !rowIds.includes(m.id));
 
-  const parsed = ownerIds.map((id) => {
+  const parsed = rowIds.map((id) => {
     const raw = (amounts[id] ?? "").trim();
     return { ownerId: id, raw, amount: raw ? parseAmount(raw) : null };
   });
@@ -48,10 +55,21 @@ function CheckoutForm({ trip, ownerIds, boughtCount, onDone }: { trip: Trip; own
         const self = p.ownerId === trip.shopperId;
         return (
           <Field key={p.ownerId} label={self ? t("checkout.self") : h.name(p.ownerId)} hint={self ? t("checkout.selfHint") : undefined}>
-            <Input inputMode="decimal" placeholder={`0 ${h.currency}`} value={amounts[p.ownerId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [p.ownerId]: e.target.value })} required={!self} />
+            <div className="flex gap-2">
+              <Input inputMode="decimal" placeholder={`0 ${h.currency}`} value={amounts[p.ownerId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [p.ownerId]: e.target.value })} required={!self} />
+              {extra.includes(p.ownerId) && <Button type="button" variant="ghost" className="shrink-0" onClick={() => setExtra(extra.filter((id) => id !== p.ownerId))}>{t("checkout.remove")}</Button>}
+            </div>
           </Field>
         );
       })}
+      {addable.length > 0 && (
+        <div className="space-y-1">
+          <p className="text-xs text-muted-foreground">{t("checkout.splitOn")}</p>
+          <div className="flex flex-wrap gap-2">
+            {addable.map((m) => <Button key={m.id} type="button" variant="ghost" className="border border-border" onClick={() => setExtra([...extra, m.id])}>+ {m.name}</Button>)}
+          </div>
+        </div>
+      )}
       <div className="flex justify-between border-t border-border pt-3 font-medium">
         <span>{t("checkout.total")}</span><span className="tabular-nums">{h.fmt(total)}</span>
       </div>

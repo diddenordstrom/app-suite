@@ -124,7 +124,7 @@ describe("api", () => {
     await bob.post(`/h/${hid}/trips/${trip.id}/ops`, ops); // replay by anyone is harmless
     await carol.post(`/h/${hid}/trips/${trip.id}/ops`, { ops: [{ itemId: milk.id, status: "bogus" }] }, 400);
     await bob.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [] }, 403);
-    await carol.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: carolId, amount: 1 }] }, 400);
+    await carol.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: 999999, amount: 1 }] }, 400);
     await carol.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: aliceId, amount: -1 }] }, 400);
     const closed = await carol.post<Trip>(`/h/${hid}/trips/${trip.id}/checkout`, {
       allocations: [{ ownerId: aliceId, amount: 30000 }, { ownerId: bobId, amount: 20000 }],
@@ -323,6 +323,20 @@ describe("bjudningar, guests and the green zone", () => {
   const expense = (body: Record<string, unknown>, status = 200) =>
     alice.post<Expense>(`/h/${hid}/expenses`, { title: "x", payerId: aliceId, splitMode: "equal", date: today, ...body }, status);
   const balances = () => alice.get<BalancesResponse>(`/h/${hid}/balances`);
+
+  it("a shopper may split a trip on any member, also when only their own lists are in it", async () => {
+    const l = await alice.post<List>(`/h/${hid}/lists`, { title: "Mine" });
+    const it1 = await alice.post<Item>(`/h/${hid}/lists/${l.id}/items`, { text: "Gift", price: 25000 });
+    expect(it1.price).toBe(25000);
+    const trip = await alice.post<Trip>(`/h/${hid}/trips`, { listIds: [l.id] });
+    await alice.post(`/h/${hid}/trips/${trip.id}/ops`, { ops: [{ itemId: it1.id, status: "checked" }] });
+    await alice.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: 999999, amount: 100 }] }, 400);
+    await alice.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: bobId, amount: 12500 }, { ownerId: carolId, amount: 12500 }] });
+    expect((await balances()).pairs).toEqual([
+      { from: bobId, to: aliceId, amount: 12500 },
+      { from: carolId, to: aliceId, amount: 12500 },
+    ]);
+  });
 
   it("a gift creates no debt, may be unpriced, and stays out of stats but in the activity feed", async () => {
     const g = await expense({ title: "Middag hemma", gift: true, category: "home", participants: [{ memberId: bobId, weight: 1 }, { memberId: carolId, weight: 1 }] });
