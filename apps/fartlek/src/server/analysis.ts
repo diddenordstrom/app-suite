@@ -14,9 +14,13 @@ import { parseFit } from "./providers/fit";
 
 export interface Ctx { db: Db; userId: number; settings: Settings; today: ISODate; thresholds: Threshold[] }
 
+/** A clock pinned to a database (the simulator's in-memory one, simulate.ts); every other database reads the real date. */
+const pinned = new WeakMap<Db, () => ISODate>();
+export const pinToday = (db: Db, today: () => ISODate) => { pinned.set(db, today); };
+
 export function ctxFor(db: Db, userId: number): Ctx {
   const settings = repo.getSettings(db, userId);
-  return { db, userId, settings, today: todayIn(settings.timezone), thresholds: repo.listThresholds(db, userId) };
+  return { db, userId, settings, today: pinned.get(db)?.() ?? todayIn(settings.timezone), thresholds: repo.listThresholds(db, userId) };
 }
 
 /**

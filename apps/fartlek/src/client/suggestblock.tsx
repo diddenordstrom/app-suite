@@ -3,7 +3,7 @@ import { PhaseWarningsNote, RacePaceCard, RacePaceNote } from "./racepace";
 import { phaseWarnings, type RacePaceView } from "@/shared/racephase";
 import { api, useApi } from "./http";
 import { lang, t, tn, WEEKDAY_LONG } from "./i18n";
-import { useFmt } from "./prefs";
+import { useFmt, useSettings } from "./prefs";
 import { Badge, Button, Dialog, ErrorText, Field, Input, Select, Spinner, cn } from "./ui";
 import { blockName, fmtDay } from "./bits";
 import { MoreDays, PILL, signed, signedInt, SimLines, skipVerdict, type Line, type Tone } from "./suggestweek";
@@ -12,12 +12,14 @@ import { RaceRoad } from "./raceroad";
 import type { RaceRoad as Road } from "@/shared/raceplan";
 import { addDays, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { sessionText } from "@/shared/blocktext";
+import { isTimed } from "@/shared/nextweek";
 import { BLOCK, evaluateBlock, weekKm, type BlockEval, type BlockSeed, type BlockSuggestion, type BlockTry, type RaceChunk, type WeekRole } from "@/shared/blockplan";
 import { diffPlans, workoutWeeks, type DayChange, type PlanDiff } from "@/shared/planrange";
 import { COACH } from "@/shared/coach";
 import { FORM, formPct, formState } from "@/shared/load";
 import type { DaysAdvice, SuggestItem } from "@/shared/nextweek";
-import type { Block, BlockKind, Workout } from "@/shared/types";
+import type { Block, BlockKind, Settings, Workout } from "@/shared/types";
+import { gymBeforeLong, WeekDaysEditor, weekDaysValid, type WeekDays } from "./weekdays";
 
 /*
  * "Skapa block" and "Räkna om resten" (docs/decisions/fartlek-block-goals.md, docs/decisions/fartlek-skapa-block.md).
@@ -67,7 +69,7 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
   const [typed, setName] = useState<string | null>(null);
   // `rev` makes a new request after a run day was added, so the block is simulated again with it.
   const [rev, setRev] = useState(0);
-  const [step, setStep] = useState<"start" | "sim" | "days" | "edit">("start");
+  const [step, setStep] = useState<"start" | "extra" | "sim" | "days" | "edit">("start");
   const weeks = buildOf(rhythm) + 1 + extra;
   const { data, error, loading } = useApi<SugRes>(`/plan/block-suggest?weeks=${weeks}&rhythm=${rhythm}${start ? `&startWeek=${start}` : ""}&r=${rev}`);
   const ok = data?.ok ? (data as SugOk) : null;
@@ -78,20 +80,23 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
   const titleName = nowChunks.length > 1
     ? nowChunks.map((c, i) => chunkTitle(c, i === 0 ? name.trim() || t("blk.focusDefault") : c.kind === "peak" ? t("be.race.peakShort") : chunkName(c, rp!))).join(" + ")
     : name.trim() || t("blk.focusDefault");
-  const title = step !== "start" && ok ? t("be.titleWeeks", { name: titleName, from: weekNumber(ok.startWeek), to: weekNumber(lastWeekOf(ok.seed)) }) : t("be.title");
+  const title = step !== "start" && step !== "extra" && ok ? t("be.titleWeeks", { name: titleName, from: weekNumber(ok.startWeek), to: weekNumber(lastWeekOf(ok.seed)) }) : t("be.title");
   const picker = data ? <StartPicker value={data.startWeek} first={data.earliest} today={data.today} onChange={setStart} busy={loading} /> : null;
   return (
     <Dialog open onClose={onClose} title={title} className={step === "edit" ? "sm:max-w-[min(100rem,96vw)]" : "sm:max-w-3xl"}>
-      <StepDots step={step === "start" ? 1 : 2} />
+      {/* Letting the coach suggest asks about gym and cross-training in between (docs/decisions/fartlek-gym-cross-days.md). */}
+      <StepDots labels={mode === "suggest" ? [t("be.step1"), t("be.stepExtra"), t("be.step2")] : [t("be.step1"), t("be.step2")]}
+        at={step === "start" ? 0 : step === "extra" ? 1 : mode === "suggest" ? 2 : 1} />
       <ErrorText>{error}</ErrorText>
       {step === "start" && (
         <StartStep data={data} loading={loading} rhythm={rhythm} onRhythm={(r) => { setRhythm(r); setExtra(0); }} onChanged={() => setRev(rev + 1)}
           name={name} onName={setName} mode={mode} onMode={setMode} picker={picker} onClose={onClose}
-          onNext={() => setStep(mode === "suggest" ? "sim" : "edit")} />
+          onNext={() => setStep(mode === "suggest" ? "extra" : "edit")} />
       )}
-      {step !== "start" && (!data || loading) && <Spinner className="text-muted-foreground" />}
-      {ok && !loading && step !== "start" && ok.racePace?.question && <RacePaceCard view={ok.racePace} onAnswered={() => setRev(rev + 1)} />}
-      {ok && !loading && step !== "start" && !ok.racePace?.question && ok.racePace && step !== "sim" && <RacePaceNote view={ok.racePace} />}
+      {step === "extra" && <DaysStep onBack={() => setStep("start")} onNext={(changed) => { if (changed) setRev(rev + 1); setStep("sim"); }} />}
+      {step !== "start" && step !== "extra" && (!data || loading) && <Spinner className="text-muted-foreground" />}
+      {ok && !loading && step !== "start" && step !== "extra" && ok.racePace?.question && <RacePaceCard view={ok.racePace} onAnswered={() => setRev(rev + 1)} />}
+      {ok && !loading && step !== "start" && step !== "extra" && !ok.racePace?.question && ok.racePace && step !== "sim" && <RacePaceNote view={ok.racePace} />}
       {ok && !loading && !ok.racePace?.question && step === "sim" && <BlockSim seed={ok.seed} s={ok.suggestion} onDone={() => setStep(ok.advice ? "days" : "edit")} />}
       {ok && !loading && !ok.racePace?.question && step === "days" && ok.advice && (
         <MoreDays advice={ok.advice} onAdded={() => { setRev(rev + 1); setStep("sim"); }} onSkip={() => setStep("edit")} />
@@ -113,14 +118,63 @@ export function CreateBlockDialog({ onClose, onApplied }: { onClose: () => void;
   );
 }
 
-function StepDots({ step }: { step: 1 | 2 }) {
-  const dot = (n: 1 | 2, label: string) => (
-    <li aria-current={step === n ? "step" : undefined} className={cn("flex items-center gap-2", step === n ? "font-semibold text-foreground" : "text-muted-foreground")}>
-      <span className={cn("inline-flex size-6 items-center justify-center rounded-full text-xs", step === n ? "bg-primary text-primary-foreground" : step > n ? "bg-accent text-accent-foreground" : "border border-border")}>{step > n ? "✓" : n}</span>
-      {label}
-    </li>
+function StepDots({ labels, at }: { labels: string[]; at: number }) {
+  return (
+    <ol className="mb-4 flex flex-wrap gap-x-6 gap-y-2 border-b border-border pb-3 text-sm">
+      {labels.map((label, i) => (
+        <li key={label} aria-current={at === i ? "step" : undefined} className={cn("flex items-center gap-2", at === i ? "font-semibold text-foreground" : "text-muted-foreground")}>
+          <span className={cn("inline-flex size-6 items-center justify-center rounded-full text-xs", at === i ? "bg-primary text-primary-foreground" : at > i ? "bg-accent text-accent-foreground" : "border border-border")}>{at > i ? "✓" : i + 1}</span>
+          {label}
+        </li>
+      ))}
+    </ol>
   );
-  return <ol className="mb-4 flex flex-wrap gap-x-6 gap-y-2 border-b border-border pb-3 text-sm">{dot(1, t("be.step1"))}{dot(2, t("be.step2"))}</ol>;
+}
+
+/* ---------- Step 2: the week's days ---------- */
+
+const dayList = (days: number[]) => days.map((d) => WEEKDAY_LONG[d].toLowerCase()).join(", ");
+
+/**
+ * The runner's week: which days are run days, the long run, gym and cross-training (with minutes). The answer is the
+ * settings' days, so the next block starts from it; no run goes on a gym or cross-training day, and the engine keeps the
+ * quality session off the day after gym (docs/decisions/fartlek-gym-cross-days.md).
+ */
+function DaysStep({ onBack, onNext }: { onBack: () => void; onNext: (changed: boolean) => void }) {
+  const { settings, setSettings } = useSettings();
+  const [days, setDays] = useState<WeekDays>({ runDays: settings.runDays, longRunDay: settings.longRunDay, gymDays: settings.gymDays, crossDays: settings.crossDays, doubles: settings.doubles });
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const before = gymBeforeLong(days);
+  const next = async () => {
+    const changed = (["runDays", "longRunDay", "gymDays", "crossDays", "doubles"] as const).some((k) => JSON.stringify(days[k]) !== JSON.stringify(settings[k]));
+    if (!changed) { onNext(false); return; }
+    setBusy(true); setErr(null);
+    try {
+      setSettings(await api<Settings>("/settings", { method: "PUT", body: { ...settings, ...days } }));
+      onNext(true);
+    } catch (e) { setErr((e as Error).message); setBusy(false); }
+  };
+  return (
+    <div className="space-y-4">
+      <div className="space-y-1">
+        <p className="text-sm font-medium">{t("bx.intro")}</p>
+        <p className="text-sm text-muted-foreground">{t("bx.gym")}</p>
+      </div>
+      <WeekDaysEditor value={days} onChange={setDays} weekStart={settings.weekStart} />
+      <ul className="space-y-1 text-xs text-muted-foreground">
+        <li>{t("bx.gymNote")}</li>
+        {!days.gymDays.length && <li>{t("bx.noGym")}</li>}
+        {before != null && <li className="text-warning">{t("bx.beforeLong", { day: WEEKDAY_LONG[before] })}</li>}
+        <li>{t("bx.saved")}</li>
+      </ul>
+      <ErrorText>{err}</ErrorText>
+      <div className="flex justify-end gap-2">
+        <Button variant="outline" onClick={onBack} disabled={busy}>← {t("be.back")}</Button>
+        <Button onClick={() => void next()} disabled={busy || !weekDaysValid(days)}>{busy ? <Spinner /> : t("blk.button")}</Button>
+      </div>
+    </div>
+  );
 }
 
 /** A race block's rhythm from its roles, "3:1" or "2:2" (build weeks : the rest); none for a block of one kind of week. */
@@ -259,7 +313,7 @@ function StartStep({ data, loading, rhythm, onRhythm, onChanged, name, onName, m
 
       <div className="flex justify-end gap-2">
         <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-        <Button onClick={onNext} disabled={loading}>{loading ? <Spinner /> : mode === "suggest" ? t("blk.button") : `${t("be.mode.own")} →`}</Button>
+        <Button onClick={onNext} disabled={loading}>{loading ? <Spinner /> : mode === "suggest" ? `${t("be.next")} →` : `${t("be.mode.own")} →`}</Button>
       </div>
     </div>
   );
@@ -332,6 +386,8 @@ function useSimLines(seed: BlockSeed, s: BlockSuggestion): Line[] {
         ? t("blk.try.peak", { dist: fmt.dist(tol.peakKm), week: weekNumber(tol.peakWeek), tol: fmt.dist(tol.km) })
         : t("blk.try.noPeak", { pct: growthPct })),
       ...s.tries.flatMap((tr) => tryLine(tr, fmt) ?? []),
+      ...(seed.extra?.gym.length ? [info(t("blk.try.gym", { days: dayList(seed.extra.gym) }))] : []),
+      ...(seed.extra?.cross.length ? [info(t("blk.try.crossDays", { list: seed.extra.cross.map((c) => `${WEEKDAY_LONG[c.day].toLowerCase()} ${c.min} min`).join(", ") }))] : []),
       { text: t("blk.try.place", { day: longDay }), verdict: null, tone: "ok" },
     ];
   }, [seed, s, fmt]);
@@ -553,7 +609,7 @@ function Footer({ seed, s, weeks, edited, busy, replaces, onBack, onClose, onRes
 }) {
   const fmt = useFmt();
   const lines = useSimLines(seed, s);
-  const text = weeks.map((items, i) => `${t("plan.weekShort", { week: weekNumber(addDays(seed.startWeek, i * 7)) })}: ${items.map((x) => sessionText({ type: x.type, distanceKm: x.type === "cross" ? null : x.km, durationMin: x.durationMin, zone2: false, steps: x.steps }, fmt.units, stepLang)).join(", ") || "–"}`).join("\n");
+  const text = weeks.map((items, i) => `${t("plan.weekShort", { week: weekNumber(addDays(seed.startWeek, i * 7)) })}: ${items.map((x) => sessionText({ type: x.type, distanceKm: isTimed(x.type) ? null : x.km, durationMin: x.durationMin, zone2: false, steps: x.steps }, fmt.units, stepLang)).join(", ") || "–"}`).join("\n");
   return (
     <div className="flex flex-wrap items-start justify-between gap-3">
       <div className="flex min-w-0 flex-1 flex-wrap gap-x-5 gap-y-2 text-sm">

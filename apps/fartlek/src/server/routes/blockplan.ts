@@ -108,7 +108,7 @@ function blockSeedFor(ctx: Ctx, startWeek: ISODate, weeks: number, o: { goalKm: 
   const seed: BlockSeed = {
     startWeek, weeks, ctl: w.ctl, atl: w.atl, kmBefore: w.kmBefore, past: w.past,
     tolerance: tolerance(weeksBefore(ctx, startWeek, BLOCK.tolerance.lookbackWeeks)),
-    runDays: w.runDays, longRunDay: w.longRunDay, threshold: w.threshold, refs: w.refs, crossMin: w.crossMin,
+    runDays: w.runDays, longRunDay: w.longRunDay, threshold: w.threshold, refs: w.refs, crossMin: w.crossMin, ...(w.extra ? { extra: w.extra } : {}),
     lighterLast: o.lighterLast, goalKm: o.goalKm, buildWeeksDone: o.buildWeeksDone, hardBefore: hardOn(ctx, addDays(startWeek, -1)),
     // The same rule as "Föreslå veckan": a lighter week due before the block makes its first week lighter. Not when the block
     // starts from today in the running week: the days already over are the easing, so that week keeps its role (docs/decisions/fartlek-skapa-block.md).

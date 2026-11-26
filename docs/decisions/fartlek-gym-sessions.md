@@ -3,7 +3,7 @@ title: Fartlek plans gym as its own session type, apart from cross-training
 summary: A planned "Gym" (strength) session matches only gym activities, and cross-train sessions never take a gym activity, so gym on Monday and swimming on Thursday each fill their own day
 type: decision
 status: accepted
-updated: 2026-11-18
+updated: 2026-11-25
 ---
 
 # Fartlek plans gym as its own session type, apart from cross-training
@@ -23,4 +23,4 @@ Cross-train sessions took the first non-run activity of the week (`matchWeek`, s
 
 ## Open
 
-- The suggestion engine and Skapa block don't place gym sessions; the user adds them by hand in the week.
+- ~~The suggestion engine and Skapa block don't place gym sessions.~~ They do since 2026-11-25, on the days the runner gives: see [fartlek-gym-cross-days.md](fartlek-gym-cross-days.md).

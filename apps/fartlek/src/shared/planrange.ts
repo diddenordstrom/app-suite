@@ -1,7 +1,7 @@
 import { addDays, daysBetween, weekStartOf, type ISODate, type WeekStart } from "./dates";
 import { plannedKmOf } from "./compliance";
 import { evaluateBlock, suggestBlock, weekKm, type BlockEval, type BlockSeed, type BlockSuggestion } from "./blockplan";
-import type { SuggestItem } from "./nextweek";
+import { GYM_MIN, type SuggestItem } from "./nextweek";
 import type { Workout } from "./types";
 
 /*
@@ -61,9 +61,11 @@ export function planRange(seed: BlockSeed, req: PlanRequest): RangePlan {
 export function workoutWeeks(workouts: Workout[], startWeek: ISODate, weeks: number): SuggestItem[][] {
   const out: SuggestItem[][] = Array.from({ length: weeks }, () => []);
   for (const w of workouts) {
-    if (w.status !== "planned" || w.type === "rest" || w.type === "race" || w.type === "strength") continue;
+    if (w.status !== "planned" || w.type === "rest" || w.type === "race") continue;
     const i = Math.floor(daysBetween(startWeek, w.date) / 7);
     if (i < 0 || i >= weeks) continue;
+    // Gym is kept with the weeks (docs/decisions/fartlek-gym-cross-days.md): a plan that replaces them writes it back.
+    if (w.type === "strength") { out[i].push({ date: w.date, type: "strength", km: 0, durationMin: w.durationMin ?? GYM_MIN, steps: null }); continue; }
     const type = w.type === "cross" ? "cross" : w.type === "easy" || w.type === "long" ? w.type : "threshold";
     out[i].push({ date: w.date, type, km: type === "cross" ? 0 : plannedKmOf(w), durationMin: w.durationMin, steps: w.steps, ...(w.blueprint ? { blueprint: w.blueprint } : {}) });
   }

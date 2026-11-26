@@ -24,6 +24,12 @@ export interface Settings {
   runDays: number[];
   /** Day the long run goes on, 0 = Sunday. A preference: when it isn't a run day, the last run day is used. */
   longRunDay: number;
+  /** Days the runner gyms (docs/decisions/fartlek-gym-cross-days.md): Skapa block puts gym there and no run. Asked in the block planner. */
+  gymDays: number[];
+  /** Days and minutes of other sport (swimming, cycling), placed like gym. */
+  crossDays: CrossDay[];
+  /** A short easy run may go after gym, or after gym and cross-training, when the run days don't hold the week. Off by default. */
+  doubles: "off" | "gym" | "all";
   maxHr: number | null;
   /** Custom zones; null = use the watch's zones from Garmin. */
   zones: ZoneBounds | null;
@@ -31,18 +37,24 @@ export interface Settings {
   easyHigh: number | null;
 }
 
+export interface CrossDay { day: number; min: number }
+
 export const DEFAULT_SETTINGS: Settings = {
   units: "metric",
   weekStart: "monday",
   timezone: "UTC",
   runDays: [2, 4, 6, 0],
   longRunDay: 0,
+  gymDays: [],
+  crossDays: [],
+  doubles: "off",
   maxHr: null,
   zones: null,
   easyLow: null,
   easyHigh: null,
 };
 
+const isDay = (d: unknown) => Number.isInteger(d) && (d as number) >= 0 && (d as number) <= 6;
 const isHr = (v: unknown) => typeof v === "number" && Number.isInteger(v) && v >= 40 && v <= 240;
 
 export function parseSettings(input: unknown): Settings | null {
@@ -54,6 +66,10 @@ export function parseSettings(input: unknown): Settings | null {
   try { new Intl.DateTimeFormat("en", { timeZone: s.timezone }); } catch { return null; }
   if (!Array.isArray(s.runDays) || !s.runDays.every((d) => Number.isInteger(d) && d >= 0 && d <= 6)) return null;
   if (!Number.isInteger(s.longRunDay) || (s.longRunDay as number) < 0 || (s.longRunDay as number) > 6) return null;
+  if (!Array.isArray(s.gymDays) || !s.gymDays.every(isDay)) return null;
+  if (!Array.isArray(s.crossDays) || !s.crossDays.every((c) => c && typeof c === "object" && isDay(c.day) && Number.isInteger(c.min) && c.min >= 5 && c.min <= 600)) return null;
+  if (s.doubles !== "off" && s.doubles !== "gym" && s.doubles !== "all") return null;
+  const cross = new Map((s.crossDays as CrossDay[]).map((c) => [c.day, { day: c.day, min: c.min }]));
   for (const k of ["maxHr", "easyLow", "easyHigh"] as const) if (s[k] !== null && !isHr(s[k])) return null;
   if (s.zones !== null) {
     const z = s.zones;
@@ -66,6 +82,9 @@ export function parseSettings(input: unknown): Settings | null {
     timezone: s.timezone,
     runDays: [...new Set(s.runDays as number[])].sort(),
     longRunDay: s.longRunDay as number,
+    gymDays: [...new Set(s.gymDays as number[])].sort(),
+    crossDays: [...cross.values()].sort((a, b) => a.day - b.day),
+    doubles: s.doubles,
     maxHr: s.maxHr as number | null,
     zones: s.zones as ZoneBounds | null,
     easyLow: s.easyLow as number | null,

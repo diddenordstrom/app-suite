@@ -1,0 +1,1 @@
+ALTER TABLE `user_settings` ADD `doubles` text DEFAULT 'off' NOT NULL;

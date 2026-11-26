@@ -14,6 +14,11 @@ export const userSettings = sqliteTable("user_settings", {
   timezone: text("timezone").notNull().default("UTC"),
   runDays: text("run_days").notNull().default("0,2,4,6"),
   longRunDay: integer("long_run_day").notNull().default(0),
+  /** Gym weekdays, comma-separated ("1"), and other-sport days with minutes ("4:30,6:60"). */
+  gymDays: text("gym_days").notNull().default(""),
+  crossDays: text("cross_days").notNull().default(""),
+  /** "off", "gym" or "all": where a short easy run may go when the run days don't hold the week. */
+  doubles: text("doubles").notNull().default("off"),
   maxHr: integer("max_hr"),
   zones: text("zones"),
   easyLow: integer("easy_low"),

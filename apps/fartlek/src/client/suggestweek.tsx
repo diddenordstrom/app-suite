@@ -8,7 +8,7 @@ import { addDays, weekNumber, weekday, type ISODate } from "@/shared/dates";
 import { sessionText } from "@/shared/blocktext";
 import { COACH } from "@/shared/coach";
 import { FORM, formPct } from "@/shared/load";
-import { evaluate, growthBase, NEXT, type DaysAdvice, spikeMax, stepsKm, thresholdSteps, type SuggestItem, type SuggestType, type Suggestion, type Try, type WeekEval, type WeekSeed, type Why } from "@/shared/nextweek";
+import { DOUBLE, evaluate, GYM_MIN, growthBase, isTimed, markDoubles, NEXT, type DaysAdvice, spikeMax, stepsKm, thresholdSteps, type SuggestItem, type SuggestType, type Suggestion, type Try, type WeekEval, type WeekSeed, type Why } from "@/shared/nextweek";
 import { stepsText, stridesOf, withStrides, type WorkoutSteps } from "@/shared/steps";
 import { StepsPanel } from "./sessionbuilder";
 import { RacePaceCard, RacePaceNote } from "./racepace";
@@ -35,7 +35,7 @@ const STEP_MS = 650;
 
 /** Days of the week, each with at most one session (the suggestion never stacks two). */
 const byDay = (weekStart: ISODate, items: SuggestItem[]) =>
-  Array.from({ length: 7 }, (_, i) => { const d = addDays(weekStart, i); return { date: d, item: items.find((x) => x.date === d) ?? null }; });
+  Array.from({ length: 7 }, (_, i) => { const d = addDays(weekStart, i); return { date: d, item: items.find((x) => x.date === d && !x.double) ?? null, double: items.find((x) => x.date === d && x.double) ?? null }; });
 
 export function SuggestWeekDialog({ weekStart, light, onClose, onApplied }: { weekStart: ISODate; /** Build the week lighter (Monday's check-in after stress or tiredness). */ light?: boolean; onClose: () => void; onApplied: (a: Applied) => void }) {
   // `rev` makes a new request after a run day was added, so the simulation is run again with it.
@@ -68,32 +68,44 @@ export function SuggestWeekDialog({ weekStart, light, onClose, onApplied }: { we
 export function MoreDays({ advice, onAdded, onSkip }: { advice: DaysAdvice; onAdded: () => void; onSkip: () => void }) {
   const fmt = useFmt();
   const { settings, setSettings } = useSettings();
-  const [busy, setBusy] = useState<number | null>(null);
+  const [busy, setBusy] = useState<number | string | null>(null);
   const [err, setErr] = useState<string | null>(null);
-  const add = async (day: number) => {
-    setBusy(day); setErr(null);
+  const save = async (key: number | string, next: Settings) => {
+    setBusy(key); setErr(null);
     try {
-      const next = await api<Settings>("/settings", { method: "PUT", body: { ...settings, runDays: [...new Set([...settings.runDays, day])].sort() } });
-      setSettings(next);
+      setSettings(await api<Settings>("/settings", { method: "PUT", body: next }));
       onAdded();
     } catch (e) { setErr((e as Error).message); setBusy(null); }
   };
+  const add = (day: number) => save(day, { ...settings, runDays: [...new Set([...settings.runDays, day])].sort() });
+  // Doubles (docs/decisions/fartlek-gym-cross-days.md): offered beside the days, or alone when every day is taken.
+  const allow = (mode: "gym" | "all") => save(mode, { ...settings, doubles: mode });
+  const onlyDoubles = !advice.free.length;
   return (
     <div className="space-y-4 py-2">
-      <h3 className="text-lg font-semibold">{t("days.title")}</h3>
+      <h3 className="text-lg font-semibold">{t(onlyDoubles ? "days.titleDoubles" : "days.title")}</h3>
       <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
         {advice.why.includes("peak") && <li>{t("days.peak", { dist: fmt.dist(advice.peakKm, 0), have: advice.have, need: advice.need })}</li>}
         {advice.why.includes("fit") && <li>{t("days.fit", { have: advice.have, dist: fmt.dist(advice.shortKm, 0) })}</li>}
       </ul>
-      <p className="text-sm">{t("days.pick")}</p>
-      <div className="flex flex-wrap gap-2">
-        {advice.free.map((d, i) => (
-          <Button key={d} variant={i === 0 ? "primary" : "outline"} disabled={busy != null} onClick={() => void add(d)}>
-            {busy === d ? <Spinner /> : WEEKDAY_LONG[d]}
-          </Button>
-        ))}
-      </div>
-      <p className="text-xs text-muted-foreground">{t("days.note")}</p>
+      {!onlyDoubles && <>
+        <p className="text-sm">{t("days.pick")}</p>
+        <div className="flex flex-wrap gap-2">
+          {advice.free.map((d, i) => (
+            <Button key={d} variant={i === 0 ? "primary" : "outline"} disabled={busy != null} onClick={() => void add(d)}>
+              {busy === d ? <Spinner /> : WEEKDAY_LONG[d]}
+            </Button>
+          ))}
+        </div>
+        <p className="text-xs text-muted-foreground">{t("days.note")}</p>
+      </>}
+      {advice.doubles && <>
+        <p className="text-sm">{t(onlyDoubles ? "days.doublesOnly" : "days.doubles", { dist: fmt.dist(DOUBLE.km, 0) })}</p>
+        <div className="flex flex-wrap gap-2">
+          <Button variant={onlyDoubles ? "primary" : "outline"} disabled={busy != null} onClick={() => void allow("gym")}>{busy === "gym" ? <Spinner /> : t("days.doublesGym")}</Button>
+          {settings.crossDays.length > 0 && <Button variant="outline" disabled={busy != null} onClick={() => void allow("all")}>{busy === "all" ? <Spinner /> : t("days.doublesAll")}</Button>}
+        </div>
+      </>}
       <div><Button variant="outline" disabled={busy != null} onClick={onSkip}>{t("days.skip")}</Button></div>
       <ErrorText>{err}</ErrorText>
     </div>
@@ -175,17 +187,18 @@ function LineIcon({ tone }: { tone: Line["tone"] }) {
 
 /* ---------- The editor ---------- */
 
-const TYPES: SuggestType[] = ["easy", "threshold", "long", "cross"];
+const TYPES: SuggestType[] = ["easy", "threshold", "long", "cross", "strength"];
 
 /** Session edits shared by the week and block dialogs: change type, one step shorter or longer, a new easy run. */
 export function editType(x: SuggestItem, type: SuggestType, refs: WeekSeed["refs"]): SuggestItem {
   if (type === x.type) return x;
   if (type === "cross") return { date: x.date, type, km: 0, durationMin: 45, steps: null };
+  if (type === "strength") return { date: x.date, type, km: 0, durationMin: GYM_MIN, steps: null };
   if (type === "threshold") { const r = NEXT.ladder[0], steps = thresholdSteps(r.reps, r.min, r.rest); return { date: x.date, type, km: stepsKm(steps, refs), durationMin: null, steps }; }
-  return { date: x.date, type, km: x.type === "cross" ? 6 : x.km, durationMin: null, steps: null };
+  return { date: x.date, type, km: isTimed(x.type) ? 6 : x.km, durationMin: null, steps: null };
 }
 export function editStep(x: SuggestItem, dir: 1 | -1, refs: WeekSeed["refs"]): SuggestItem {
-  if (x.type === "cross") return { ...x, durationMin: Math.max(15, (x.durationMin ?? 45) + dir * 15) };
+  if (isTimed(x.type)) return { ...x, durationMin: Math.max(15, (x.durationMin ?? 45) + dir * 15) };
   const st = stridesOf(x.steps);
   if (st && st.base.km != null) {
     // An easy run with strides grows at the run, so the strides stay as they are.
@@ -208,22 +221,25 @@ function withCooldown(s: WorkoutSteps, by: number): WorkoutSteps {
 
 function Editor({ seed, s, replaces, onClose, onApplied }: { seed: WeekSeed; s: Suggestion; replaces: Workout[]; onClose: () => void; onApplied: (a: Applied) => void }) {
   const fmt = useFmt();
-  const [items, setItems] = useState<SuggestItem[]>(s.items);
+  const start = useMemo(() => markDoubles(s.items), [s.items]);
+  const [items, setRaw] = useState<SuggestItem[]>(start);
+  const setItems = (f: (xs: SuggestItem[]) => SuggestItem[]) => setRaw((xs) => markDoubles(f(xs)));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
   const ev = useMemo(() => evaluate(seed, items), [seed, items]);
   const days = byDay(seed.weekStart, items);
-  const edited = JSON.stringify(items) !== JSON.stringify(s.items);
+  const edited = JSON.stringify(items) !== JSON.stringify(start);
   const dayName = (d: ISODate) => WEEKDAY_LONG[weekday(d)].toLowerCase();
 
-  const update = (date: ISODate, fn: (it: SuggestItem) => SuggestItem | null) =>
-    setItems((xs) => xs.flatMap((x) => (x.date === date ? (fn(x) ? [fn(x)!] : []) : [x])));
+  // A day's own session, or its double (`second`): an easy run after gym.
+  const update = (date: ISODate, fn: (it: SuggestItem) => SuggestItem | null, second = false) =>
+    setItems((xs) => xs.flatMap((x) => (x.date === date && !!x.double === second ? (fn(x) ? [fn(x)!] : []) : [x])));
   const swap = (a: ISODate, b: ISODate) => setItems((xs) => xs.map((x) => (x.date === a ? { ...x, date: b } : x.date === b ? { ...x, date: a } : x)));
   const setType = (date: ISODate, type: SuggestType) => update(date, (x) => editType(x, type, seed.refs));
   const step = (date: ISODate, dir: 1 | -1) => update(date, (x) => editStep(x, dir, seed.refs));
   const add = (date: ISODate) => setItems((xs) => [...xs, newEasy(date)].sort((a, b) => a.date.localeCompare(b.date)));
   const [stepsOf, setStepsOf] = useState<ISODate | null>(null);
-  const editing = stepsOf ? items.find((x) => x.date === stepsOf && x.type !== "cross") ?? null : null;
+  const editing = stepsOf ? items.find((x) => x.date === stepsOf && !isTimed(x.type) && !x.double) ?? null : null;
 
   const apply = async () => {
     setBusy(true); setErr(null);
@@ -234,7 +250,7 @@ function Editor({ seed, s, replaces, onClose, onApplied }: { seed: WeekSeed; s: 
   };
 
   const drag = useDayDrag((from, to) => swap(from, to));
-  const blockText = items.map((x) => sessionText({ type: x.type, distanceKm: x.type === "cross" ? null : x.km, durationMin: x.durationMin, zone2: false, steps: x.steps }, fmt.units, stepLang)).join(", ");
+  const blockText = items.map((x) => sessionText({ type: x.type, distanceKm: isTimed(x.type) ? null : x.km, durationMin: x.durationMin, zone2: false, steps: x.steps }, fmt.units, stepLang)).join(", ");
 
   return (
     <div className="space-y-4">
@@ -245,8 +261,8 @@ function Editor({ seed, s, replaces, onClose, onApplied }: { seed: WeekSeed; s: 
       <WhyLine why={s.why} />
 
       <div className="grid gap-2 md:grid-cols-7">
-        {days.map(({ date, item }, i) => (
-          <DayCell key={date} date={date} item={item} refsKm={(x) => fmt.dist(x)} first={i === 0} last={i === 6}
+        {days.map(({ date, item, double }, i) => (
+          <DayCell key={date} date={date} item={item} double={double} onDoubleStep={(d) => update(date, (x) => editStep(x, d, seed.refs), true)} onDoubleRemove={() => update(date, () => null, true)} refsKm={(x) => fmt.dist(x)} first={i === 0} last={i === 6}
             over={drag.over === date && drag.from !== date} dragged={drag.from === date}
             onStart={(e) => drag.start(e, date)} onType={(v) => setType(date, v)} onStep={(d) => step(date, d)}
             onRemove={() => update(date, () => null)} onAdd={() => add(date)}
@@ -284,7 +300,7 @@ function Editor({ seed, s, replaces, onClose, onApplied }: { seed: WeekSeed; s: 
         <div className="flex flex-wrap items-center justify-end gap-2">
           {replaces.length > 0 && <span className="text-xs text-muted-foreground">{tn("next.replaces", replaces.length)}</span>}
           <Button variant="outline" onClick={onClose}>{t("common.cancel")}</Button>
-          {edited && <Button variant="outline" onClick={() => setItems(s.items)}>{t("next.restore")}</Button>}
+          {edited && <Button variant="outline" onClick={() => setRaw(start)}>{t("next.restore")}</Button>}
           <Button onClick={() => void apply()} disabled={busy || !items.length}>{busy ? <Spinner /> : t("next.apply")}</Button>
         </div>
       </div>
@@ -338,8 +354,11 @@ export function useDayDrag(onDrop: (from: ISODate, to: ISODate) => void) {
   return { from, over, label, start };
 }
 
-export function DayCell({ date, item, first, last, over, dragged, dayName, refsKm, onStart, onType, onStep, onRemove, onAdd, onLeft, onRight, onSteps, stepsOpen, tall = true }: {
-  date: ISODate; item: SuggestItem | null; first: boolean; last: boolean; over: boolean; dragged: boolean; dayName: string;
+export function DayCell({ date, item, double, onDoubleStep, onDoubleRemove, first, last, over, dragged, dayName, refsKm, onStart, onType, onStep, onRemove, onAdd, onLeft, onRight, onSteps, stepsOpen, tall = true }: {
+  date: ISODate; item: SuggestItem | null;
+  /** A short easy run after the day's gym or cross-training (docs/decisions/fartlek-gym-cross-days.md). */
+  double?: SuggestItem | null; onDoubleStep?: (d: 1 | -1) => void; onDoubleRemove?: () => void;
+  first: boolean; last: boolean; over: boolean; dragged: boolean; dayName: string;
   refsKm: (km: number) => string; onStart: (e: ReactPointerEvent) => void; onType: (t: SuggestType) => void; onStep: (d: 1 | -1) => void;
   onRemove: () => void; onAdd: () => void; onLeft: () => void; onRight: () => void;
   /** Open the session builder for the day (the "Steps ›" link); left out where the steps can't be edited. */
@@ -348,7 +367,7 @@ export function DayCell({ date, item, first, last, over, dragged, dayName, refsK
   tall?: boolean;
 }) {
   const color = item ? TYPE_COLOR[item.type] : undefined;
-  const amount = item ? (item.type === "cross" ? `${item.durationMin} min` : refsKm(item.km)) : "";
+  const amount = item ? (isTimed(item.type) ? `${item.durationMin} min` : refsKm(item.km)) : "";
   const strides = stridesOf(item?.steps ?? null);
   const reps = item?.steps && !strides ? item.steps.items.filter((x) => x.kind === "repeat") : [];
   // A long run's faster finish: its last step when that has a pace.
@@ -383,7 +402,7 @@ export function DayCell({ date, item, first, last, over, dragged, dayName, refsK
           {reps.length > 0 && <span className="col-span-2 row-start-2 text-xs text-muted-foreground">{stepsText({ v: 1, items: reps }, stepLang, "metric")}</span>}
           {strides && <span className="col-span-2 row-start-2 text-xs font-medium text-accent-foreground">{t("builder.stridesPlus", { n: strides.reps })}</span>}
           {finish && <span className="col-span-2 row-start-2 text-xs text-muted-foreground">{t("next.fastFinish", { text: finish })}</span>}
-          {onSteps && item.type !== "cross" && (
+          {onSteps && !isTimed(item.type) && (
             <button type="button" onClick={onSteps} onPointerDown={(e) => e.stopPropagation()} aria-expanded={!!stepsOpen}
               className={cn("col-span-2 justify-self-start text-left text-xs font-semibold text-primary hover:underline", stepsOpen && "underline")}>
               {t("builder.stepsLink")}
@@ -394,6 +413,17 @@ export function DayCell({ date, item, first, last, over, dragged, dayName, refsK
             <span className="whitespace-nowrap text-sm font-semibold tabular-nums">{amount}</span>
             <Button variant="ghost" className="size-8 shrink-0 p-0 text-base" aria-label={t("next.more", { day: dayName })} onClick={() => onStep(1)}>+</Button>
           </div>
+          {double && (
+            <div className="col-span-2 flex items-center gap-1 rounded-md bg-muted px-2 py-1 text-xs" onPointerDown={(e) => e.stopPropagation()}>
+              <span aria-hidden className="size-2 shrink-0 rounded-full" style={{ background: TYPE_COLOR.easy }} />
+              <span className="min-w-0 flex-1 truncate">{t("next.double", { dist: refsKm(double.km) })}</span>
+              {onDoubleStep && <>
+                <button type="button" className="size-6 rounded hover:bg-accent" aria-label={t("next.doubleLess", { day: dayName })} onClick={() => onDoubleStep(-1)}>−</button>
+                <button type="button" className="size-6 rounded hover:bg-accent" aria-label={t("next.doubleMore", { day: dayName })} onClick={() => onDoubleStep(1)}>+</button>
+              </>}
+              {onDoubleRemove && <button type="button" className="size-6 rounded hover:bg-accent" aria-label={t("next.doubleRemove", { day: dayName })} onClick={onDoubleRemove}>×</button>}
+            </div>
+          )}
           <div className="sr-only col-span-2 flex justify-between focus-within:not-sr-only">
             <Button variant="outline" className="h-8 px-2" disabled={first} aria-label={t("next.moveLeft", { day: dayName })} onClick={onLeft}>‹</Button>
             <Button variant="outline" className="h-8 px-2" disabled={last} aria-label={t("next.moveRight", { day: dayName })} onClick={onRight}>›</Button>

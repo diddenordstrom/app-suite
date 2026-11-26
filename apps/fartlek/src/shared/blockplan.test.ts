@@ -3,7 +3,7 @@ import { addDays, daysBetween, weekday } from "./dates";
 import { COACH } from "./coach";
 import { BLOCK, blockDaysAdvice, blockWeekCap, evaluateBlock, floorFor, gateAfterRace, projectVolumes, raceChunks, raceRoles, RECOVERY, recoveryBucket, recoveryRoles, recoveryRow, recoveryWeekOf, suggestBlock, suggestWeek, tolerance, weekKm, withRecovery, type BlockSeed, type RecoveryRace, type WeekRole } from "./blockplan";
 import { COACH as COACH_RACE } from "./coach";
-import { NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
+import { markDoubles, NEXT, spikeMax, thresholdReps, weekCap, type SuggestItem } from "./nextweek";
 import { planRange } from "./planrange";
 import { stridesOf, withStrides } from "./steps";
 import type { PhaseSeed } from "./racephase";
@@ -249,12 +249,24 @@ describe("block progression", () => {
     const s = suggestBlock(steady());
     const km = kms(s);
     const { from, to } = tune().ramp;
-    // Build weeks sit at 1.0, 1.05 and 1.1 of 30 km (the ramp's defaults, to the half km); the lighter week is 70 % of the one before.
+    // Under NEXT.lowVolumeKm each build week climbs NEXT.lowStepKm (docs/decisions/fartlek-low-volume-growth.md): 30, 32.5, 35,
+    // more than the ramp's 1.0, 1.05 and 1.1; the lighter week is 70 % of the one before.
     expect(km[0]).toBeCloseTo(30 * from, 0);
-    expect(km[1]).toBeCloseTo(30 * (from + to) / 2, 0);
-    expect(km[2]).toBeCloseTo(30 * to, 0);
+    expect(km[1]).toBeCloseTo(Math.max(30 * (from + to) / 2, 30 + NEXT.lowStepKm), 0);
+    expect(km[2]).toBeCloseTo(Math.max(30 * to, 30 + 2 * NEXT.lowStepKm), 0);
     expect(km[3]).toBeCloseTo(km[2] * tune().lighter.volume, 0);
     expect(s.weeks[3].lighter).toBe(true);
+  });
+
+  it("lets a low-volume runner climb a few km a week instead of a few per cent (docs/decisions/fartlek-low-volume-growth.md)", () => {
+    // Months at about 22 km: the ramp's 1.0 → 1.1 alone was 22 → 24 km, and the next block started over at 24.
+    const s = suggestBlock(steady({ kmBefore: [21, 22, 22], tolerance: { km: 22, peakKm: 22, peakWeek: "2026-11-09", weeksAgo: 1 }, ctl: 20, atl: 22, longestKm: 9 }));
+    const km = kms(s);
+    expect(km[1]).toBeGreaterThanOrEqual(24.5);
+    expect(km[2]).toBeGreaterThanOrEqual(27);
+    // The spike rule still holds each long run: never more than 10 % over the longest run before it, planned weeks included.
+    let longest = 9;
+    for (const w of s.weeks) for (const it of w.items.filter((x) => x.type === "long")) { expect(it.km).toBeLessThanOrEqual(spikeMax(longest) + 0.05); longest = Math.max(longest, it.km); }
   });
 
   it("puts a lone build week in the middle of the ramp", () => {
@@ -707,5 +719,88 @@ describe("blockDaysAdvice", () => {
     const five = { ...runner, runDays: [2, 3, 4, 6, 0] };
     expect(blockDaysAdvice(five, suggestBlock(five).weeks)).toBeNull();
     expect(blockDaysAdvice(five, running(five))).toBeNull();
+  });
+});
+
+describe("gym and other-sport days (docs/decisions/fartlek-gym-cross-days.md)", () => {
+  // The reference week: gym Monday, swimming Thursday, a bike ride Saturday; runs Tuesday, Wednesday, Friday and Sunday.
+  const extra = { gym: [1], cross: [{ day: 4, min: 45 }, { day: 6, min: 60 }] };
+  const runner = seed({ weeks: 4, ctl: 40, atl: 44, kmBefore: [36, 38, 40], tolerance: { km: 42, peakKm: 42, peakWeek: null, weeksAgo: 3 },
+    runDays: [2, 3, 5, 0], longestKm: 16, extra });
+
+  it("puts gym and other sport on their days, never a run there, and the quality session away from the day after gym", () => {
+    const s = suggestBlock(runner);
+    for (const w of s.weeks) {
+      const on = (wd: number) => w.items.filter((it) => weekday(it.date) === wd);
+      expect(on(1).map((it) => it.type)).toEqual(["strength"]);
+      expect(on(4).map((it) => [it.type, it.durationMin])).toEqual([["cross", 45]]);
+      expect(on(6).map((it) => [it.type, it.durationMin])).toEqual([["cross", 60]]);
+      const runs = w.items.filter((it) => it.type !== "strength" && it.type !== "cross");
+      expect(runs.every((it) => [2, 3, 5, 0].includes(weekday(it.date)))).toBe(true);
+      // One quality session: Wednesday or Friday, never Tuesday, the day after gym.
+      const thr = w.items.filter((it) => it.type === "threshold");
+      if (thr.length === 1) expect([3, 5]).toContain(weekday(thr[0].date));
+      // Gym and other sport add no run km.
+      expect(weekKm(w.items)).toBe(weekKm(runs));
+    }
+  });
+
+  it("keeps the quality session off the day after gym without gym days moving anything else", () => {
+    const plain = suggestBlock({ ...runner, extra: null, runDays: [2, 3, 5, 0] });
+    const thrDays = plain.weeks.flatMap((w) => w.items.filter((it) => it.type === "threshold").map((it) => weekday(it.date)));
+    // Gym on Tuesday instead: Wednesday is the day after it, so the session goes to Friday when it was on Wednesday.
+    const gymTue = suggestBlock({ ...runner, extra: { gym: [2], cross: [] }, runDays: [3, 5, 0] });
+    const after = gymTue.weeks.flatMap((w) => w.items.filter((it) => it.type === "threshold" && it.blueprint == null).map((it) => weekday(it.date)));
+    expect(thrDays.length).toBeGreaterThan(0);
+    expect(after.every((d) => d !== 3)).toBe(true);
+  });
+
+  it("never offers a gym or other-sport day as an extra run day", () => {
+    const big = { ...runner, kmBefore: [50, 52, 54], tolerance: { km: 56, peakKm: 56, peakWeek: null, weeksAgo: 1 }, longestKm: 20, runDays: [2, 0] };
+    const a = blockDaysAdvice(big, suggestBlock(big).weeks);
+    expect(a).not.toBeNull();
+    expect(a!.free.some((d) => [1, 4, 6].includes(d))).toBe(false);
+  });
+
+  // A week of about 55 km on four run days, every other day taken: Monday gym, Thursday swimming, Saturday a ride.
+  const full = { ...runner, kmBefore: [52, 54, 55], tolerance: { km: 58, peakKm: 58, peakWeek: null, weeksAgo: 1 }, longestKm: 20, ctl: 55, atl: 58 };
+  const doubles = (w: { items: SuggestItem[] }) => w.items.filter((it) => it.double);
+
+  it("puts no double anywhere while doubles are off, and offers them when no day is free", () => {
+    const s = suggestBlock(full);
+    expect(s.weeks.flatMap(doubles)).toEqual([]);
+    const a = blockDaysAdvice(full, s.weeks);
+    expect(a).toMatchObject({ free: [], doubles: true });
+  });
+
+  it("allowed after gym: a short easy run on the gym day when the run days don't hold the week, never on a cross-training day", () => {
+    const s = suggestBlock({ ...full, extra: { ...extra, doubles: "gym" } });
+    const d = s.weeks.filter((w) => w.role === "build").flatMap(doubles);
+    expect(d.length).toBeGreaterThan(0);
+    for (const it of d) {
+      expect(weekday(it.date)).toBe(1);
+      expect(it.type).toBe("easy");
+      expect(it.km).toBeLessThanOrEqual(5);
+      expect(it.steps).toBeNull();
+    }
+    // The gym session is still there, and the week asks no more.
+    expect(s.weeks[0].items.filter((it) => weekday(it.date) === 1).map((it) => it.type).sort()).toEqual(["easy", "strength"]);
+    expect(blockDaysAdvice({ ...full, extra: { ...extra, doubles: "gym" } }, s.weeks)).toBeNull();
+  });
+
+  it("never puts a double on the day before the long run", () => {
+    const sat = { gym: [6], cross: [], doubles: "all" as const };
+    const s = suggestBlock({ ...full, extra: sat, runDays: [2, 3, 5, 0] });
+    expect(s.weeks.flatMap(doubles)).toEqual([]);
+  });
+});
+
+describe("markDoubles", () => {
+  it("keeps gym as the day's own session and makes the run beside it the double", () => {
+    const run: SuggestItem = { date: MONDAY, type: "easy", km: 5, durationMin: null, steps: null };
+    const gym: SuggestItem = { date: MONDAY, type: "strength", km: 0, durationMin: 60, steps: null };
+    expect(markDoubles([run, gym])).toEqual([gym, { ...run, double: true }]);
+    // Alone on its day, a run is never a double.
+    expect(markDoubles([{ ...run, double: true }])).toEqual([run]);
   });
 });

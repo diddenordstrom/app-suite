@@ -1,0 +1,11 @@
+{
+  "note": "A runner who can run 80 minutes, about 40 km a week on five days, a marathon 12 weeks out (the shape of a typical free 12-week intermediate plan).",
+  "history": [38, 40, 42, 40, 38, 40, 42, 40, 41, 40, 42, 40],
+  "runDays": [2, 3, 5, 6, 0],
+  "longRunDay": 0,
+  "gymDays": [4],
+  "threshold": { "pace": 300, "hr": 170 },
+  "maxHr": 188,
+  "race": { "inWeeks": 12, "distanceKm": 42.195, "goalSeconds": 13800 },
+  "start": "2027-01-04"
+}

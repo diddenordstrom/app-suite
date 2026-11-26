@@ -1,58 +1,43 @@
 ---
-title: Fartlek asks which days gym and cross-training go on (plan, not built)
-summary: Plan for the block planner to ask how many gym sessions and which days, and which days and minutes for cross-training, so the engine places them there and keeps the run days apart from them
-type: note
-status: open
-updated: 2026-11-23
+title: Fartlek asks which days gym and cross-training go on, and plans runs around them
+summary: Skapa block has a step between the rhythm and the simulation that asks for gym days and cross-training days with minutes; the engine puts those sessions there, plans no run on them, keeps the quality session off the day after gym when another day will do, and never offers them as extra run days
+type: decision
+status: accepted
+updated: 2026-11-25
 ---
 
 # Fartlek asks which days gym and cross-training go on
 
-Raised by the user on 2026-11-18, after [gym became its own session type](fartlek-gym-sessions.md). **Nothing here is built;** this is the plan to pick up another day. The estimate comes from what was seen of the code in that session, not from a full read of the planner, so check the engine first.
+Raised by the user on 2026-11-18, after [gym became its own session type](fartlek-gym-sessions.md); built 2026-11-25.
 
-## Idea
+## The wizard
 
-- In Skapa block and Föreslå vecka, ask something like: "At least one gym session a week is recommended to keep knees, tendons and hips under control. Which day or days do you want to gym on?" (Swedish wording to be written; the app doesn't say how to train, only that and when.)
-- For cross-training: "You chose 30 min of cross-training. Which days?", answered as minutes per day (30 min Thursday, 60 min Saturday).
-- The engine then places those sessions on the days given and plans runs around them, which ties in with the days the runner can run ([fartlek-run-days.md](fartlek-run-days.md)).
+"Skapa block" with "Låt coachen föreslå" now has three steps:
 
-## What exists
+1. **Utgångsläge**: where the runner stands and the rhythm (1:1, 2:1, 3:1), as before ([fartlek-skapa-block.md](fartlek-skapa-block.md)).
+2. **Din vecka**: every weekday gets one role: rest, run, long run, gym or cross-training (with minutes), with the recommendation of at least one strength session a week. There is always exactly one long-run day: picking it on another day makes the old one a run day. A gym day right before the long run gets a note, not a block. The same editor replaces the run-day chips and the long-run-day select on the settings page, so the week is one setting in two places.
+3. **Planera veckorna**: the simulation (with a line for the gym and cross-training days), the run-day question if needed, then the editor with gym and cross-training as sessions in every week.
 
-- `Block.crossMin` (minutes a week of other sport) and a cross item placed on a free day in [`shared/nextweek.ts`](../../apps/fartlek/src/shared/nextweek.ts) (`shape.crossMin`).
-- The "which day to add" dialog for run days (`MoreDays` in [`client/suggestweek.tsx`](../../apps/fartlek/src/client/suggestweek.tsx)): a question after the simulation, answer saved to the settings, simulate again.
-- `Settings.runDays`, and a note in [fartlek-block-progression.md](fartlek-block-progression.md) about days the runner can't run (gym, swimming).
-- The `strength` workout type and matching, with the engine skipping it (`workoutWeeks`).
+"Bygg själv" skips step 2: the weeks start empty.
 
-## Plan
+## Rules
 
-1. **Data (small to medium).** Per block, since the load changes through the year (two gym days a week in the winter, one in peak season to make room for running). Add `gymDays` (e.g. `[1]`) and `crossDays` (minutes per weekday, e.g. `{4: 30, 6: 60}`) to `Block`, next to `crossMin`: a migration and validation in the block routes. `crossMin` becomes the sum of `crossDays` or is replaced by it. Settings keep only a default (`gymDays`, `crossDays`) that a new block starts from and the question pre-fills, so the runner doesn't retype it each block.
-2. **Engine (medium, the hard part).** Place gym and cross on the stated days instead of a free day. Take those days out of the days runs may use, and make the "needs another run day" advice (`daysAdvice`) count only real run days. Avoid a threshold or interval session the day after gym and prefer an easy (zone 2) run there. This is a soft rule: the engine tries other days first and only breaks it when nothing else fits, so it never becomes an unsolvable week. Most existing scenarios in `server/scenarios.test.ts` depend on day placement, so expect to update them.
-3. **Dialog (medium).** A new step under the same conditions as the run-day question (not for a block already running; for a running block the days are edited on the block itself). Gym: chips for the days, "none" is a valid answer. Cross: one minutes field per chosen day, not free text. The answer goes on the block and the simulation runs again; the settings default is only updated if the runner says so.
-4. **Texts and docs.** `t()` keys in `en` and `sv`, this page updated to a decision, a log entry, `npm run docs:index`.
-
-Estimate: 1–2 days. Data and dialog are quick; the engine and its tests take most of it.
+- **Stored in the settings** (`runDays`, `longRunDay`, `gymDays`, `crossDays` as weekday + minutes), not per block. The question is asked every time a block is created and prefilled with the last answer, which covers a winter with two gym days and a race season with one without a field per block. "Räkna om resten" and "Föreslå veckan" use the same days. *Passed over:* per-block columns, as the first plan suggested: more data and migrations for something the question already covers.
+- **No run on those days.** The engine's run days are the settings' run days less the gym and cross-training days (all of them if that would leave none). The long-run day is never taken.
+- **Placed as sessions.** Gym as a 60-minute `strength` session, cross-training as a `cross` session of the minutes given, in every week (lighter weeks too). Their load comes from the sessions, so the other-sports habit (`crossMin`) is 0 while any days are set and isn't counted twice. Around a race: nothing on race day or the day before, and neither gym nor cross-training later in the race week; gym waits for the rest days after a long race like running does.
+- **Quality session not the day after gym, as a soft rule.** A day after gym counts as 1.5 days closer to the hard days when the threshold or race-phase session is placed, so it goes there only when every other day is worse. With only one free day it still goes there: the rule never makes a week unsolvable.
+- **Never offered as an extra run day.** "Vi rekommenderar en löpdag till" leaves gym and cross-training days out of the days it offers.
+- **Doubles, only when allowed.** A setting (`doubles`: off, after gym, after gym and cross-training; off by default) lets a short easy run (5 km, no strides, never quality) go on a gym day, or a cross-training day too, when a week wants more runs than its run days hold or its easy runs can't carry the rest. Only in build weeks, never the day before the long run. The user wanted gym only as the usual answer: cross-training (swimming) is the closest thing to a rest day in a hard week. When a week falls short and doubles are off, "Vi rekommenderar en löpdag till" also offers "Tillåt efter gym" (and "Efter gym och alternativträning"); when every day is taken it asks only that. The editors show a double as a small line under the day's gym session (shorter, longer, remove); `markDoubles` keeps the day's own session and its double apart.
+- Planned gym sessions are now part of the weeks the editor and re-plan read (`workoutWeeks`), so a re-plan writes them back instead of dropping them.
 
 ## Reference week
 
-The user's winter schedule, to use as a scenario test when the engine work starts:
-
-| Day | Session |
-|---|---|
-| Monday | gym |
-| Tuesday | zone 2 (easy after gym) |
-| Wednesday | rest, or threshold, depending on Friday |
-| Thursday | swimming (cross) |
-| Friday | zone 2, or threshold, depending on Wednesday |
-| Saturday | rest, or 60 min bike (cross) |
-| Sunday | long run |
-
-So: gym on Monday and cross on Thursday and Saturday, runs on Tuesday, Wednesday, Friday and Sunday. Only one of Wednesday and Friday carries the threshold session and the other is easy or rest, which means the engine picks between two candidate days rather than being told.
+Used as a test (`blockplan.test.ts`): gym Monday, swimming Thursday, a bike ride Saturday; runs Tuesday, Wednesday, Friday and Sunday. Every week gets gym on Monday and cross-training on Thursday and Saturday with no run, and the one threshold session lands on Wednesday or Friday, never Tuesday.
 
 ## Decisions on the way
 
-- Settled 2026-11-18 with the user: **the app doesn't suggest what to do in the gym**, only the recommendation and the question about days. No focus text, template or session note. *Reopened 2026-11-23:* the [gym module](fartlek-gym-module.md) now logs sessions and suggests a template on the gym page; the planner itself still only places the day.
-- Settled 2026-11-18: the engine tries to avoid a threshold session directly after gym and puts easy running there instead, as in the reference week.
+- Settled 2026-11-18 with the user: **the planner doesn't suggest what to do in the gym**, only the recommendation and the days. The [gym module](fartlek-gym-module.md) suggests a template on the gym page.
 
 ## Open questions
 
-- Whether gym, once placed, should block the day itself for the longest run or other key sessions (the reference week has none of that: gym on Monday, long run on Sunday).
+- Whether gym should also keep the long run off the day after it. Today the long-run day is fixed by the settings, so the dialog only warns.

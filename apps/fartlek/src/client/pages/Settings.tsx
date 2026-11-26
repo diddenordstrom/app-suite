@@ -7,12 +7,13 @@ import { Badge, BusyButton, Button, Card, CardTitle, ErrorText, Field, Input, Se
 import { PushSettings } from "@homelab/ui";
 import { onboardingTour } from "../guide";
 import { DeveloperCard } from "../devsettings";
+import { WeekDaysEditor, weekDaysValid } from "../weekdays";
 import { NEWS } from "../news";
 import { tShared } from "@homelab/i18n";
 import { SyncIcon, fmtAgo, fmtDay } from "../bits";
 import type { CsTest, GarminInfo } from "../types";
 import { addDays, todayIn } from "@/shared/dates";
-import { lang, LANGS, setLang, t, tn, WEEKDAY_LONG, WEEKDAY_SHORT, type Lang } from "../i18n";
+import { lang, LANGS, setLang, t, tn, type Lang } from "../i18n";
 import { parsePace } from "@/shared/format";
 import { parseClock } from "@/shared/criticalspeed";
 import { zonesFromLthr, zonesFromMaxHr } from "@/shared/zones";
@@ -108,7 +109,6 @@ function PreferencesCard() {
   const [s, setS] = useState(settings);
   useEffect(() => setS(settings), [settings]);
   const zones = (Intl as unknown as { supportedValuesOf?: (k: string) => string[] }).supportedValuesOf?.("timeZone") ?? [];
-  const order = settings.weekStart === "monday" ? [1, 2, 3, 4, 5, 6, 0] : [0, 1, 2, 3, 4, 5, 6];
   return (
     <Card className="space-y-3">
       <CardTitle>{t("prefs.title")}</CardTitle>
@@ -129,27 +129,11 @@ function PreferencesCard() {
           </Select>
         </Field>
       </div>
-      <Field label={t("prefs.runDays")} hint={t("prefs.runDaysHint")}>
-        {/* One row of seven on phones too: the grid shares the width, wider screens keep fixed buttons. */}
-        <div className="grid grid-cols-7 gap-1 sm:flex sm:flex-wrap">
-          {order.map((d) => {
-            const on = s.runDays.includes(d);
-            return (
-              <button key={d} type="button" aria-pressed={on} onClick={() => setS({ ...s, runDays: on ? s.runDays.filter((x) => x !== d) : [...s.runDays, d] })}
-                className={`h-11 min-w-0 rounded-md text-sm sm:h-9 sm:w-12 ${on ? "bg-primary text-primary-foreground" : "bg-muted text-muted-foreground"}`}>{WEEKDAY_SHORT[d]}</button>
-            );
-          })}
-        </div>
-      </Field>
-      <Field label={t("prefs.longRunDay")} hint={t("prefs.longRunDayHint")}>
-        <div>
-          <Select value={String(s.longRunDay)} onChange={(e) => setS({ ...s, longRunDay: Number(e.target.value) })} className="w-48">
-            {order.map((d) => <option key={d} value={d}>{WEEKDAY_LONG[d]}{s.runDays.includes(d) ? "" : ` (${t("prefs.notRunDay")})`}</option>)}
-          </Select>
-        </div>
+      <Field label={t("prefs.days")} hint={t("prefs.daysHint")}>
+        <WeekDaysEditor value={s} onChange={(v) => setS({ ...s, ...v })} weekStart={s.weekStart} />
       </Field>
       <div className="flex items-center gap-3">
-        <BusyButton busy={busy} onClick={() => save(s)}>{t("common.save")}</BusyButton>
+        <BusyButton busy={busy} disabled={!weekDaysValid(s)} onClick={() => save(s)}>{t("common.save")}</BusyButton>
         {saved && <Badge tone="success">{t("common.saved")}</Badge>}
         {s.timezone !== Intl.DateTimeFormat().resolvedOptions().timeZone && (
           <button className="text-xs text-muted-foreground underline" onClick={() => setS({ ...s, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone })}>{t("prefs.useDeviceTz")}</button>
