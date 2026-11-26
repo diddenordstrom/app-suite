@@ -29,6 +29,26 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
   const [extra, setExtra] = useState<number[]>([]);
   const { run, busy, error, setError } = useAction();
   const rowIds = [...ownerIds, ...extra];
+  /**
+   * Adding or removing a person re-splits the shopper's own share equally between the shopper and everyone
+   * added, so one extra person means 50/50. Other list owners keep their own amounts. Skipped when the
+   * shopper has no row of their own or an amount isn't a number.
+   */
+  const changeExtra = (next: number[]) => {
+    setExtra(next);
+    const me = trip.shopperId;
+    if (!ownerIds.includes(me)) return;
+    const parts = [me, ...extra].map((id) => { const raw = (amounts[id] ?? "").trim(); return raw ? parseAmount(raw) : 0; });
+    if (parts.some((p) => p === null)) return;
+    const pool = parts.reduce<number>((s, p) => s + p!, 0);
+    if (pool <= 0) return;
+    const ids = [me, ...next];
+    const each = Math.floor(pool / ids.length);
+    const out = { ...amounts };
+    ids.forEach((id, i) => { out[id] = toInput(i === 0 ? pool - each * (ids.length - 1) : each); });
+    for (const id of extra) if (!next.includes(id)) delete out[id];
+    setAmounts(out);
+  };
   const addable = h.members.filter((m) => m.id !== trip.shopperId && !rowIds.includes(m.id));
 
   const parsed = rowIds.map((id) => {
@@ -57,7 +77,7 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
           <Field key={p.ownerId} label={self ? t("checkout.self") : h.name(p.ownerId)} hint={self ? t("checkout.selfHint") : undefined}>
             <div className="flex gap-2">
               <Input inputMode="decimal" placeholder={`0 ${h.currency}`} value={amounts[p.ownerId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [p.ownerId]: e.target.value })} required={!self} />
-              {extra.includes(p.ownerId) && <Button type="button" variant="ghost" className="shrink-0" onClick={() => setExtra(extra.filter((id) => id !== p.ownerId))}>{t("checkout.remove")}</Button>}
+              {extra.includes(p.ownerId) && <Button type="button" variant="ghost" className="shrink-0" onClick={() => changeExtra(extra.filter((id) => id !== p.ownerId))}>{t("checkout.remove")}</Button>}
             </div>
           </Field>
         );
@@ -66,7 +86,7 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">{t("checkout.splitOn")}</p>
           <div className="flex flex-wrap gap-2">
-            {addable.map((m) => <Button key={m.id} type="button" variant="ghost" className="border border-border" onClick={() => setExtra([...extra, m.id])}>+ {m.name}</Button>)}
+            {addable.map((m) => <Button key={m.id} type="button" variant="ghost" className="border border-border" onClick={() => changeExtra([...extra, m.id])}>+ {m.name}</Button>)}
           </div>
         </div>
       )}
