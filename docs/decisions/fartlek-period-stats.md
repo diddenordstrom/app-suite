@@ -59,7 +59,8 @@ A new page, built beside Trends first. Trends stays until the new page covers wh
 
 1. Period picker and the per-run aggregate (zones first, then threshold and target bands). Built.
 2. The Statistik page (`client/pages/Stats.tsx`, route `/stats`, in the menu before Trender), from the design mock "C · rapport med spegel": mirrored header and key figures with the difference as the big number, a thin ribbon of all run time per period, a 12-week timeline where a week or a block can be clicked, mirror cards for zones and for threshold and target pace, day against day mirrored around a line, plan against actual with a tick for the other period, and the run list with filters and a small zone bar per run. Periods of different length are compared over the same number of days from each start ([`shared/periods.ts`](../../apps/fartlek/src/shared/periods.ts)), and the page says so. Built.
-3. Moving the remaining cards over from Trends, then removing Trends.
+3. Plain totals first, comparison on demand (2026-11-26, after using the page live). The mirrored page answered "what changed?" when the main question is "how much time did I spend at threshold, in each zone, at target pace?", and the differences as the big numbers were hard to read. The page now shows one period with its absolute times and shares as the big figures (run time, distance, runs, longest, time at threshold, time at target pace; a bar per zone and per pace band on one scale, with h:mm and per cent). A "Jämför med …" switch, off by default and remembered per browser, adds the other period to the same cards: a thin lavender bar and a difference chip with the other value beside each figure, day against day mirrored, the plan's tick and the second ribbon. One page with a switch rather than two designs to pick between, so the figures stay where they are and only gain context. Built.
+4. Moving the remaining cards over from Trends, then removing Trends.
 
 ## Open
 
