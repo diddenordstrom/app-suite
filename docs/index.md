@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-26 · decision · Fartlek Statistik page built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek period stats: per-run aggregate and GET /api/stats built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek period stats: GAP bands, threshold at the time, target as of today ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek period stats page proposed ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-25 · decision · Fartlek: a marathoner's long run may reach 30 km on a lower week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek grows a low-volume runner by km, and a marathoner's long run takes up to half the week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek grows a low-volume runner by km ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek plan simulator: the whole road for a made-up runner ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
