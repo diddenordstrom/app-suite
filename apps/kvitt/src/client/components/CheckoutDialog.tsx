@@ -49,7 +49,9 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
     for (const id of extra) if (!next.includes(id)) delete out[id];
     setAmounts(out);
   };
-  const addable = h.members.filter((m) => m.id !== trip.shopperId && !rowIds.includes(m.id));
+  // Everyone who could be shared with: not the shopper, and not someone whose own list is in the trip.
+  const pickable = h.members.filter((m) => m.id !== trip.shopperId && (extra.includes(m.id) || !ownerIds.includes(m.id)));
+  const toggle = (id: number) => changeExtra(extra.includes(id) ? extra.filter((x) => x !== id) : [...extra, id]);
 
   const parsed = rowIds.map((id) => {
     const raw = (amounts[id] ?? "").trim();
@@ -75,18 +77,18 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone }: { trip: 
         const self = p.ownerId === trip.shopperId;
         return (
           <Field key={p.ownerId} label={self ? t("checkout.self") : h.name(p.ownerId)} hint={self ? t("checkout.selfHint") : undefined}>
-            <div className="flex gap-2">
-              <Input inputMode="decimal" placeholder={`0 ${h.currency}`} value={amounts[p.ownerId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [p.ownerId]: e.target.value })} required={!self} />
-              {extra.includes(p.ownerId) && <Button type="button" variant="ghost" className="shrink-0" onClick={() => changeExtra(extra.filter((id) => id !== p.ownerId))}>{t("checkout.remove")}</Button>}
-            </div>
+            <Input inputMode="decimal" placeholder={`0 ${h.currency}`} value={amounts[p.ownerId] ?? ""} onChange={(e) => setAmounts({ ...amounts, [p.ownerId]: e.target.value })} required={!self} />
           </Field>
         );
       })}
-      {addable.length > 0 && (
+      {pickable.length > 0 && (
         <div className="space-y-1">
           <p className="text-xs text-muted-foreground">{t("checkout.splitOn")}</p>
           <div className="flex flex-wrap gap-2">
-            {addable.map((m) => <Button key={m.id} type="button" variant="ghost" className="border border-border" onClick={() => changeExtra([...extra, m.id])}>+ {m.name}</Button>)}
+            {pickable.map((m) => (
+              <Button key={m.id} type="button" variant={extra.includes(m.id) ? "primary" : "ghost"} aria-pressed={extra.includes(m.id)} className={extra.includes(m.id) ? undefined : "border border-border"} onClick={() => toggle(m.id)}>{m.name}</Button>
+            ))}
+            {extra.length > 0 && <Button type="button" variant="ghost" onClick={() => changeExtra(extra)}>{t("checkout.splitEqual")}</Button>}
           </div>
         </div>
       )}
