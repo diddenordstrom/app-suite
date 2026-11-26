@@ -43,6 +43,8 @@ export const memberships = sqliteTable("memberships", {
    * settlements move onto the lead; null = own wallet. A lead is never itself in another wallet.
    */
   walletId: integer("wallet_id").references((): AnySQLiteColumn => memberships.id),
+  /** Added by an admin for someone who is not in the app ("utan app"): in balances and splits like anyone, but not preselected in new expenses. */
+  managed: integer("managed", { mode: "boolean" }).notNull().default(false),
   createdAt: integer("created_at").notNull(),
   removedAt: integer("removed_at"),
 }, (t) => [index("memberships_household_idx").on(t.householdId), uniqueIndex("memberships_user_household_idx").on(t.userId, t.householdId)]);

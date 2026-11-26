@@ -15,6 +15,8 @@ export interface Member {
   id: number; name: string; role: Role; swishNumber: string | null; removed: boolean;
   /** Plånbok: the lead member whose wallet this one shares (balances and settling move onto the lead); null = own wallet. */
   walletId: number | null;
+  /** Added by an admin for someone outside the app; never signs in unless given a recovery link. */
+  managed: boolean;
 }
 
 /** GET /api/me — who am I across households. user is set for OIDC admins only. */

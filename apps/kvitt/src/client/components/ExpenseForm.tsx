@@ -42,7 +42,7 @@ export function ExpenseForm({ expense, onDone }: { expense?: Expense; onDone: ()
   const [parts, setParts] = useState<Record<number, Part>>(() => Object.fromEntries(people.map((m) => {
     const share = expense?.shares.find((s) => s.memberId === m.id);
     const weight = share ? (expense!.splitMode === "exact" ? toInput(share.amount) : String(share.weight)) : (expense?.splitMode === "exact" ? "" : "1");
-    return [m.id, { on: expense ? !!share : true, weight }];
+    return [m.id, { on: expense ? !!share : !m.managed, weight }];
   })));
   const { run, busy, error, setError } = useAction();
 

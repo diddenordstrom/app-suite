@@ -369,6 +369,22 @@ describe("bjudningar, guests and the green zone", () => {
     await bob.patch(`/h/${hid}/trips/${trip.id}`, { allocations: [] }, 409);
   });
 
+  it("an admin can add someone without the app, who then owes like any member and settles via a registered payment", async () => {
+    await bob.post(`/h/${hid}/members`, { name: "Lillebror" }, 403);
+    const kid = await alice.post<{ id: number; name: string; managed: boolean }>(`/h/${hid}/members`, { name: "Lillebror" });
+    expect(kid).toMatchObject({ name: "Lillebror", managed: true });
+    for (const amount of [20000, 10000]) {
+      const l = await alice.post<List>(`/h/${hid}/lists`, { title: "Mine" });
+      const i = await alice.post<Item>(`/h/${hid}/lists/${l.id}/items`, { text: "Pan" });
+      const trip = await alice.post<Trip>(`/h/${hid}/trips`, { listIds: [l.id] });
+      await alice.post(`/h/${hid}/trips/${trip.id}/ops`, { ops: [{ itemId: i.id, status: "checked" }] });
+      await alice.post(`/h/${hid}/trips/${trip.id}/checkout`, { allocations: [{ ownerId: aliceId, amount: 1 }, { ownerId: kid.id, amount }] });
+    }
+    expect((await balances()).pairs).toEqual([{ from: kid.id, to: aliceId, amount: 30000 }]);
+    await alice.post(`/h/${hid}/settlements`, { fromId: kid.id, toId: aliceId, amount: 30000 });
+    expect((await balances()).pairs).toEqual([]);
+  });
+
   it("a gift creates no debt, may be unpriced, and stays out of stats but in the activity feed", async () => {
     const g = await expense({ title: "Middag hemma", gift: true, category: "home", participants: [{ memberId: bobId, weight: 1 }, { memberId: carolId, weight: 1 }] });
     expect(g).toMatchObject({ gift: true, amount: 0, guests: 0, guestAmount: 0 });
