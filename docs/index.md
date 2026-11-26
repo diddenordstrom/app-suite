@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-26 · decision · Fartlek period stats page proposed ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · ingest · What Fartlek's planning engine rests on ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek: a marathoner's long run may reach 30 km on a lower week ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek grows a low-volume runner by km, and a marathoner's long run takes up to half the week ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-25 · decision · Fartlek plan simulator: the whole road for a made-up runner ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek doubles after gym, and one week editor for the days ([log/2026-11.md](log/2026-11.md))
 - 2026-11-25 · decision · Fartlek Skapa block asks for gym and cross-training days ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · lint · Long-run ceiling page marked partly overtaken ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -46,6 +46,7 @@
 - [Fartlek lets a low-volume runner grow by km, not only by per cent](decisions/fartlek-low-volume-growth.md): A build week may always grow 2.5 km (not only 10 %), and a block under 40 km climbs 2.5 km a build week from the tolerated load; the spike rule, the km-ramp limit and the form guard stay _(decision · accepted · 2026-11-26)_
 - [Fartlek marathon plan for a low-volume runner: long runs over 30 km need their own track](decisions/fartlek-marathon-long-run-plan.md): Why a marathon plan for a runner with a 35 km proven peak week never gets a long run past about 21 km, and what was decided: five long runs (three 30+ km, two 26–30 km) on a long-run track planned back from the race, 30 km as the target and 32 only when the cap allows, 55–60 km weeks with up to 50 % long run, a hard cap at 1.75 × proven peak that follows the proven peak as it grows _(decision · accepted · 2026-11-25)_
 - [Fartlek's morning notification: today's session and today's form](decisions/fartlek-morning-push.md): A push at a time the runner picks with today's sessions and form score; with Garmin it syncs first and waits up to two hours for last night's HRV or sleep _(decision · accepted · 2026-11-20)_
+- [Fartlek period stats: time in zone, threshold and target pace over any period](decisions/fartlek-period-stats.md): A new stats page for a chosen period (day, week, month, block, custom) with time in HR zone, time below / at / above threshold and time at the next A race's target pace, compared with another period; meant to replace Trends in time _(decision · open · 2026-11-26)_
 - [Fartlek starts the block after a 10 km+ race with recovery weeks gated by days since the race](decisions/fartlek-post-race-recovery.md): After an A or B race of 10 km or longer the next block's first weeks get a new `recovery` role (volume as a share of the pre-race peak, distance and priority decide how many), quality returns by day gates in the order strides, threshold, intervals; the 14-day refusal goes; built 2026-11-24 from the step-by-step build plan _(decision · accepted · 2026-11-24)_
 - [Fartlek plans the weeks up to an A or B race backwards (peak builds, then a two-week taper)](decisions/fartlek-race-blocks.md): Spec for race-mode block planning: from the race date, two taper weeks, up to three build weeks before them, a lighter week ahead of those, and the base engine's guards kept; replaces the "race within 16 weeks refuses" rule _(decision · accepted · 2026-11-24)_
 - [Fartlek plans the whole road to an A marathon or half as a skeleton of phases, with sessions one block at a time](decisions/fartlek-race-plan-skeleton.md): An A marathon or half up to 30 (half 20) weeks out gets a race plan, a skeleton of typed weeks (base, build, specific, taper, race, recovery) with a km target for every week to the end of post-race recovery; sessions are still made for the next block only; phase lengths are a function of the weeks to the race; skeleton targets live in their own table and never count as tolerance; built 2026-11-24 from the step-by-step build plan _(decision · accepted · 2026-11-24)_
