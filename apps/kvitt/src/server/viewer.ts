@@ -78,7 +78,7 @@ export function requireAdmin(c: Context<AppEnv>): Membership {
 }
 
 export const toMember = (m: Membership): Member => ({
-  id: m.id, name: m.name, role: m.role, swishNumber: m.swishNumber, removed: m.removedAt !== null, walletId: m.walletId,
+  id: m.id, name: m.name, role: m.role, swishNumber: m.swishNumber, removed: m.removedAt !== null, walletId: m.walletId, managed: m.managed,
 });
 
 export const recoveryUrl = (config: Config, token: string) => `${config.publicUrl}/api/recover/${token}`;

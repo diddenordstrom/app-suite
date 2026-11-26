@@ -4,14 +4,14 @@
 
 ## Recent activity
 
+- 2026-11-26 · decision · Kvitt: add a member without the app ([log/2026-11.md](log/2026-11.md))
+- 2026-11-26 · decision · Kvitt: guests on a shopping trip ([log/2026-11.md](log/2026-11.md))
+- 2026-11-26 · decision · Kvitt: redo a trip's split from History until a payment covers it ([log/2026-11.md](log/2026-11.md))
+- 2026-11-26 · decision · Kvitt checkout prefills from item prices and can split on anyone ([log/2026-11.md](log/2026-11.md))
+- 2026-11-26 · decision · Releases are automatic now that the repo is public ([log/2026-11.md](log/2026-11.md))
+- 2026-11-26 · decision · Kvitt list items get an optional price ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek Statistik page built ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek period stats: per-run aggregate and GET /api/stats built ([log/2026-11.md](log/2026-11.md))
-- 2026-11-26 · decision · Fartlek period stats: GAP bands, threshold at the time, target as of today ([log/2026-11.md](log/2026-11.md))
-- 2026-11-26 · decision · Fartlek period stats page proposed ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · ingest · What Fartlek's planning engine rests on ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek: a marathoner's long run may reach 30 km on a lower week ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek grows a low-volume runner by km, and a marathoner's long run takes up to half the week ([log/2026-11.md](log/2026-11.md))
-- 2026-11-25 · decision · Fartlek grows a low-volume runner by km ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 
@@ -68,6 +68,7 @@
 - [Fartlek workouts to the watch via intervals.icu](decisions/fartlek-watch-push.md): Structured workouts reach the Garmin watch through intervals.icu (API key now, OAuth later), not a .FIT download; how the push works and what it needs on the intervals.icu side _(decision · accepted · 2026-11-13)_
 - [Brygga, the FIRE calculator: a login-free app that keeps everything in the browser](decisions/fire-calculator.md): Plan for moving the FIRE/bridge calculator (draft 4) into the suite: no server data, single/duo mode, ISK and pension tax in the simulation, build order _(decision · accepted · 2026-11-09)_
 - [Kvitt: bjudningar, gäster och en grön zon](decisions/kvitt-bjudningar.md): How treats (bjudningar) stay out of the ledger, how an anonymous guest and a green zone work, the data and API changes, and build order _(decision · accepted · 2026-11-10)_
+- [Kvitt: an optional price on list items](decisions/kvitt-item-prices.md): Why a list item can carry a price per piece, how the total is counted from the quantity, and what was passed over _(decision · accepted · 2026-11-26)_
 - [Kvitt landing page on the portfolio](decisions/kvitt-landing-page.md): What /kvitt pitches (free, open source, one account per group, trip or ongoing), how it compares with Splitwise and Steven, and why its screen is drawn rather than live _(decision · accepted · 2026-11-22)_
 - [Kvitt never shows an empty list](decisions/kvitt-no-empty-lists.md): A list with nothing left to buy goes away: archived (soft-deleted) when trip history needs it, deleted otherwise _(decision · accepted · 2026-11-10)_
 - [Kvitt: plånböcker and bilutgifter for trips with friends](decisions/kvitt-wallets-and-car.md): How a couple counts as one in balances (plånbok), and how the car calculator in the expense form works, with what was passed over _(decision · accepted · 2026-11-22)_

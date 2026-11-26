@@ -15,6 +15,8 @@ export interface Member {
   id: number; name: string; role: Role; swishNumber: string | null; removed: boolean;
   /** Plånbok: the lead member whose wallet this one shares (balances and settling move onto the lead); null = own wallet. */
   walletId: number | null;
+  /** Added by an admin for someone outside the app; never signs in unless given a recovery link. */
+  managed: boolean;
 }
 
 /** GET /api/me — who am I across households. user is set for OIDC admins only. */
@@ -47,6 +49,8 @@ export interface HouseholdSettings {
 
 export interface Item {
   id: number; listId: number; text: string; quantity: string | null; note: string | null;
+  /** Optional price per piece in minor units; the total is price × the quantity's leading number (src/shared/items.ts). */
+  price: number | null;
   status: ItemStatus; tripId: number | null; position: number; updatedAt: number;
 }
 
@@ -61,7 +65,11 @@ export interface Trip {
   startedAt: number; closedAt: number | null;
   listIds: number[];
   allocations: { ownerId: number; amount: number }[]; // empty while active
+  /** Anonymous guests the bill was split on, and their combined share (not in `allocations`, never a debt: "ask them to Swish you"). */
+  guests: number; guestAmount: number;
   boughtItems: Item[]; // populated for closed trips
+  /** A closed trip whose split can no longer change: someone it is split on has settled up with the shopper since. */
+  locked: boolean;
 }
 
 export interface Expense {
@@ -118,11 +126,13 @@ export interface UpdateHouseholdBody { name?: string; currency?: string; zoneKr?
 export interface JoinBody { name: string }
 export interface UpdateMeBody { name?: string; swishNumber?: string | null }
 export interface ListBody { title: string; store?: string | null; color?: ListColor }
-export interface ItemBody { text: string; quantity?: string | null; note?: string | null }
+export interface ItemBody { text: string; quantity?: string | null; note?: string | null; price?: number | null }
 export interface StartTripBody { listIds: number[]; store?: string | null }
 /** Batched check-off ops; the client queues these offline and replays them. */
 export interface TripOpsBody { ops: { itemId: number; status: "open" | "checked" | "skipped" }[] }
-export interface CheckoutBody { allocations: { ownerId: number; amount: number }[] }
+export interface CheckoutBody { allocations: { ownerId: number; amount: number }[]; guests?: number; guestAmount?: number }
+/** PATCH /trips/:id on a closed trip: redo the split. Shopper or admin, until a payment covers it. */
+export type EditTripBody = CheckoutBody
 export interface ExpenseBody {
   title: string; amount: number; payerId: number; splitMode: SplitMode; date: string;
   category?: string | null; note?: string | null;

@@ -5,6 +5,7 @@ import { useAction } from "../hooks";
 import { useHousehold } from "../household";
 import { Button, cn, Dialog, EmptyState, ErrorText, SegmentedControl, PageSkeleton } from "../ui";
 import { PageHeader, Rich } from "../components/common";
+import { EditSplitForm } from "../components/CheckoutDialog";
 import { ExpenseForm } from "../components/ExpenseForm";
 import { categoryLabel } from "../components/treats";
 import { fmtDate, fmtDay } from "../components/format";
@@ -64,7 +65,7 @@ export function History() {
 const idOf = (a: Activity) => (a.kind === "trip" ? a.trip.id : a.kind === "expense" ? a.expense.id : a.settlement.id);
 const titleOf = (a: Activity) => (a.kind === "trip" ? t("history.shoppingTrip") : a.kind === "expense" ? a.expense.title : t("history.payment"));
 const SPLIT_LABEL: Record<Expense["splitMode"], MsgKey> = { equal: "expense.splitEqual", shares: "expense.splitShares", exact: "expense.splitExact" };
-const tripTotal = (t: Trip) => t.allocations.reduce((s, x) => s + x.amount, 0);
+const tripTotal = (t: Trip) => t.allocations.reduce((s, x) => s + x.amount, 0) + t.guestAmount;
 
 function useNames() {
   const h = useHousehold();
@@ -133,7 +134,7 @@ function Detail({ a, onDone }: { a: Activity; onDone: () => void }) {
   const { h } = useNames();
   if (a.kind === "expense")
     return a.expense.createdById === h.me.id ? <ExpenseForm key={a.expense.id} expense={a.expense} onDone={onDone} /> : <ExpenseDetail expense={a.expense} />;
-  if (a.kind === "trip") return <TripDetail trip={a.trip} />;
+  if (a.kind === "trip") return <TripDetail trip={a.trip} onDone={onDone} />;
   return <SettlementDetail settlement={a.settlement} onDone={onDone} />;
 }
 
@@ -148,12 +149,21 @@ function Lines({ rows }: { rows: { key: number; label: string; amount: number }[
   );
 }
 
-function TripDetail({ trip }: { trip: Trip }) {
+function TripDetail({ trip, onDone }: { trip: Trip; onDone: () => void }) {
   const { h, who } = useNames();
+  // The shopper, or an admin for anyone's trip, can redo the split until a payment covers it.
+  const canEdit = trip.status === "closed" && (trip.shopperId === h.me.id || h.isAdmin);
+  const editing = canEdit && !trip.locked;
   return (
     <div className="space-y-3 text-sm">
       <p><Rich text={trip.store ? t("history.tripDetailAt", { who: who(trip.shopperId), store: trip.store, date: fmtDate(trip.closedAt ?? trip.startedAt) }) : t("history.tripDetail", { who: who(trip.shopperId), date: fmtDate(trip.closedAt ?? trip.startedAt) })} values={{ amount: <span className="font-medium">{h.fmt(tripTotal(trip))}</span> }} /></p>
-      <Lines rows={trip.allocations.map((x) => ({ key: x.ownerId, label: x.ownerId === trip.shopperId ? t("history.ownItems", { name: who(x.ownerId) }) : who(x.ownerId), amount: x.amount }))} />
+      {canEdit && trip.locked && <p className="text-xs text-muted-foreground">{t("checkout.locked")}</p>}
+      {editing ? <EditSplitForm key={trip.id} trip={trip} onDone={onDone} /> : (
+        <Lines rows={[
+          ...trip.allocations.map((x) => ({ key: x.ownerId, label: x.ownerId === trip.shopperId ? t("history.ownItems", { name: who(x.ownerId) }) : who(x.ownerId), amount: x.amount })),
+          ...(trip.guests > 0 ? [{ key: -1, label: t(trip.guests === 1 ? "checkout.guestRow1" : "checkout.guestRow", { count: trip.guests }), amount: trip.guestAmount }] : []),
+        ]} />
+      )}
       {trip.boughtItems.length > 0 && (
         <div>
           <p className="mb-1 text-xs font-semibold text-muted-foreground uppercase">{t("history.bought")}</p>

@@ -62,7 +62,7 @@ export function TripPage() {
 
 function Summary({ summary, onDone }: { summary: CheckoutSummary; onDone: () => void }) {
   const h = useHousehold();
-  const total = summary.allocations.reduce((s, a) => s + a.amount, 0);
+  const total = summary.allocations.reduce((s, a) => s + a.amount, 0) + summary.guestAmount;
   const owed = summary.allocations.filter((a) => a.ownerId !== h.me.id && a.amount > 0);
   return (
     <Card className="mx-auto max-w-md space-y-4 text-center">
@@ -76,6 +76,7 @@ function Summary({ summary, onDone }: { summary: CheckoutSummary; onDone: () => 
           {owed.map((a) => <li key={a.ownerId}>{owesYou(h.name(a.ownerId), h.fmt(a.amount))}</li>)}
         </ul>
       )}
+      {summary.guests > 0 && summary.guestAmount > 0 && <p className="text-sm text-muted-foreground">{tr(summary.guests === 1 ? "expense.guestNote" : "expense.guestsNote", { amount: h.fmt(summary.guestAmount) })}</p>}
       <Button className="w-full" onClick={onDone}>{tr("trip.done")}</Button>
     </Card>
   );

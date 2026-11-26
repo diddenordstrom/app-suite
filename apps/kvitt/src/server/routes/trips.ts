@@ -2,14 +2,35 @@
 import { Hono, type Context } from "hono";
 import { and, desc, eq, inArray, isNull, ne } from "drizzle-orm";
 import type { Db } from "../db";
-import { items, lists, tripAllocations, tripLists, trips } from "../db/schema";
+import { items, lists, memberships, tripAllocations, tripLists, trips } from "../db/schema";
 import type { EventBus } from "../events";
 import { arr, badRequest, conflict, forbidden, idParam, int, notFound, oneOf, optStr, readBody, type Body } from "../http";
 import type { AppEnv } from "../viewer";
 import { closedTrips, loadTrips } from "../views";
+import { MAX_GUESTS } from "../../shared/gifts";
 import { removeIfDone } from "../listStore";
 
 const OP_STATUSES = ["open", "checked", "skipped"] as const;
+
+function parseAllocations(b: Body, allowed: Set<number>): { ownerId: number; amount: number }[] {
+  const allocations = arr(b.allocations, "allocations", 100).map((a) => {
+    const x = (a ?? {}) as Body;
+    const ownerId = int(x.ownerId, "ownerId", 1);
+    if (!allowed.has(ownerId)) throw badRequest("ownerId must be an active member of the household");
+    return { ownerId, amount: int(x.amount, "amount", 0) };
+  });
+  if (new Set(allocations.map((a) => a.ownerId)).size !== allocations.length) throw badRequest("duplicate ownerId");
+  return allocations;
+}
+
+/** Guests on the bill: a count and their combined share, which may only be set when there are guests. */
+function parseGuests(b: Body): { guests: number; guestAmount: number } {
+  const guests = b.guests === undefined ? 0 : int(b.guests, "guests", 0);
+  if (guests > MAX_GUESTS) throw badRequest(`guests can be at most ${MAX_GUESTS}`);
+  const guestAmount = b.guestAmount === undefined ? 0 : int(b.guestAmount, "guestAmount", 0);
+  if (guests === 0 && guestAmount > 0) throw badRequest("guestAmount needs guests");
+  return { guests, guestAmount };
+}
 
 export function tripRoutes(db: Db, bus: EventBus) {
   const app = new Hono<AppEnv>();
@@ -84,26 +105,46 @@ export function tripRoutes(db: Db, bus: EventBus) {
     const t = loadTrip(c);
     if (t.shopperId !== c.get("member").id) throw forbidden("only the shopper can check out");
     if (t.status !== "active") throw conflict("trip is not active");
-    const owners = new Set(db.select({ ownerId: lists.ownerId }).from(tripLists).innerJoin(lists, eq(lists.id, tripLists.listId))
-      .where(eq(tripLists.tripId, t.id)).all().map((r) => r.ownerId));
-    const allocations = arr((await readBody(c)).allocations, "allocations", 100).map((a) => {
-      const x = (a ?? {}) as Body;
-      const ownerId = int(x.ownerId, "ownerId", 1);
-      if (!owners.has(ownerId)) throw badRequest("ownerId must own one of the trip's lists");
-      return { ownerId, amount: int(x.amount, "amount", 0) };
-    });
-    if (new Set(allocations.map((a) => a.ownerId)).size !== allocations.length) throw badRequest("duplicate ownerId");
+    // The shopper may split the bill on any active member, not only the owners of the trip's lists.
+    const members = new Set(db.select({ id: memberships.id }).from(memberships)
+      .where(and(eq(memberships.householdId, c.get("hid")), isNull(memberships.removedAt))).all().map((r) => r.id));
+    const body = await readBody(c);
+    const allocations = parseAllocations(body, members);
+    const guests = parseGuests(body);
     const now = Date.now();
     db.transaction((tx) => {
       tx.update(items).set({ status: "bought", updatedAt: now }).where(and(eq(items.tripId, t.id), eq(items.status, "checked"))).run();
       tx.update(items).set({ status: "open", tripId: null, updatedAt: now }).where(and(eq(items.tripId, t.id), ne(items.status, "bought"))).run();
       if (allocations.length) tx.insert(tripAllocations).values(allocations.map((a) => ({ tripId: t.id, ...a }))).run();
-      tx.update(trips).set({ status: "closed", closedAt: now }).where(eq(trips.id, t.id)).run();
+      tx.update(trips).set({ status: "closed", closedAt: now, ...guests }).where(eq(trips.id, t.id)).run();
       // Lists where everything got bought are done: they leave the lists page, and stay in this trip's history.
       for (const listId of listIdsOf(t.id)) removeIfDone(tx, listId, now);
     });
     bus.emit(c.get("hid"), "lists", "trips", "balances");
-    return c.json(loadTrips(db, [{ ...t, status: "closed", closedAt: now }])[0]);
+    return c.json(loadTrips(db, [{ ...t, status: "closed", closedAt: now, ...guests }])[0]);
+  });
+
+  /** Redo the split of a closed trip: the shopper or an admin, until a payment covers it (`locked`). */
+  app.patch("/trips/:id", async (c) => {
+    const t = loadTrip(c);
+    const me = c.get("member");
+    if (t.shopperId !== me.id && me.role !== "admin") throw forbidden("only the shopper or an admin can change this trip");
+    if (t.status !== "closed") throw conflict("trip is not closed");
+    if (loadTrips(db, [t])[0]!.locked) throw conflict("a payment has been registered since, so the split can no longer change");
+    const members = new Set(db.select({ id: memberships.id }).from(memberships)
+      .where(and(eq(memberships.householdId, c.get("hid")), isNull(memberships.removedAt))).all().map((r) => r.id));
+    // Someone who has since left may stay on the trip they were already part of.
+    for (const a of db.select().from(tripAllocations).where(eq(tripAllocations.tripId, t.id)).all()) members.add(a.ownerId);
+    const body = await readBody(c);
+    const allocations = parseAllocations(body, members);
+    const guests = parseGuests(body);
+    db.transaction((tx) => {
+      tx.update(trips).set(guests).where(eq(trips.id, t.id)).run();
+      tx.delete(tripAllocations).where(eq(tripAllocations.tripId, t.id)).run();
+      if (allocations.length) tx.insert(tripAllocations).values(allocations.map((a) => ({ tripId: t.id, ...a }))).run();
+    });
+    bus.emit(c.get("hid"), "trips", "balances");
+    return c.json(loadTrips(db, [db.select().from(trips).where(eq(trips.id, t.id)).get()!])[0]);
   });
 
   app.post("/trips/:id/cancel", (c) => {

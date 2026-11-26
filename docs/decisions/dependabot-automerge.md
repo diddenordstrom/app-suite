@@ -25,4 +25,4 @@ One lockfile bump a week should not need a person when CI already proves it buil
 
 ## Open
 
-- A merged bump lands on `main` but is not released: releases stay manual in Komodo ([deploy-komodo](deploy-komodo.md)).
+- A merged bump on `main` is released like any other merge: CI builds the images and Komodo pulls them ([deploy-komodo](deploy-komodo.md)).
