@@ -27,7 +27,7 @@ What is missing is one period that drives everything, and time spent at a pace r
 
 - Total time, distance, number of runs, longest run.
 - **Time in zone**, zones 1–5.
-- **Time relative to threshold, in three bands: below, at and above.** Judged on **grade-adjusted pace**, with pace as the fallback when a stream has no GAP. "At" is **±3–5 %** of threshold pace (a runner with a 4:45 threshold aims at about 4:40–5:00; the width is tuned on real runs). On heart rate there is no separate threshold band: threshold on HR is **time in zone 4**, which the zone bars already show.
+- **Time relative to threshold, in three bands: below, at and above.** Judged on **grade-adjusted pace**, with pace as the fallback when a stream has no GAP. "At" is **±3–5 %** of threshold pace (a runner with a 4:45 threshold aims at about 4:40–5:00; the width is tuned on real runs). On heart rate there is no separate threshold band: threshold on HR is **time in zone 4**, which the zone bars already show ([zone model](fartlek-hr-zones.md)).
 - **Time at target pace**, judged on GAP with the same margin. The target is **today's target pace for the plan** (the plan's A race goal), not the one that held when the run was made: the row means "compare training data with X", where X is the pace being worked towards now. No A race or no goal time: the row is hidden.
 - Plan against actual for the period (planned km, done km, missed sessions).
 

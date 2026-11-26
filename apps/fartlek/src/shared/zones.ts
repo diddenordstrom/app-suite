@@ -27,9 +27,15 @@ export function zonesFromMaxHr(maxHr: number): ZoneBounds {
   return [0.6, 0.7, 0.8, 0.9].map((p) => Math.round(maxHr * p)) as ZoneBounds;
 }
 
-/** Friel-style running zones from lactate threshold HR. */
+/**
+ * Five running zones from lactate threshold HR, with the threshold inside zone 4 (as the watch's zones and
+ * the rest of the app read them): 1 recovery under 80 %, 2 easy 80–89 %, 3 tempo 89–95 %, 4 threshold
+ * 95–102 %, 5 over threshold. Friel's 84/89/94/99 % were used before; they belong to his seven zones
+ * (threshold starts zone 5a), so with five zones the threshold landed in zone 5.
+ */
+export const LTHR_ZONE_SHARES = [0.8, 0.89, 0.95, 1.02] as const;
 export function zonesFromLthr(lthr: number): ZoneBounds {
-  return [0.84, 0.89, 0.94, 0.99].map((p) => Math.round(lthr * p)) as ZoneBounds;
+  return LTHR_ZONE_SHARES.map((p) => Math.round(lthr * p)) as ZoneBounds;
 }
 
 export type EasyGrade = "good" | "ok" | "off";

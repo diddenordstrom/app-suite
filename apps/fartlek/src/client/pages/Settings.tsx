@@ -16,7 +16,7 @@ import { addDays, todayIn } from "@/shared/dates";
 import { lang, LANGS, setLang, t, tn, type Lang } from "../i18n";
 import { parsePace } from "@/shared/format";
 import { parseClock } from "@/shared/criticalspeed";
-import { zonesFromLthr, zonesFromMaxHr } from "@/shared/zones";
+import { zoneOf, zonesFromLthr, zonesFromMaxHr } from "@/shared/zones";
 import type { Settings as SettingsT, Threshold, ZoneBounds } from "@/shared/types";
 
 const numOrNull = (s: string) => (s.trim() === "" ? null : Math.round(Number(s)));
@@ -148,6 +148,11 @@ function HeartRateCard() {
   const { settings, save, busy, error, saved } = useSave();
   const [maxHr, setMaxHr] = useState("");
   const [lthr, setLthr] = useState("");
+  // The latest threshold HR from the threshold card: fills the LTHR field and checks where the saved zones put it.
+  const thresholds = useApi<Threshold[]>("/thresholds");
+  const thrHr = [...(thresholds.data ?? [])].reverse().find((x) => x.hr)?.hr ?? null;
+  useEffect(() => { if (thrHr && !lthr) setLthr(String(thrHr)); }, [thrHr]); // eslint-disable-line react-hooks/exhaustive-deps
+  const thrZone = settings.zones && thrHr ? zoneOf(thrHr, settings.zones) + 1 : null;
   const [zones, setZones] = useState<string[]>(["", "", "", ""]);
   const [easyLow, setEasyLow] = useState("");
   const [easyHigh, setEasyHigh] = useState("");
@@ -187,7 +192,11 @@ function HeartRateCard() {
             <Button variant="ghost" className="h-8 text-xs" disabled={busy} onClick={() => { setZones(["", "", "", ""]); void onSave(true); }}>{t("hr.useWatch")}</Button>
           )}
         </div>
-        <p className="mt-2 text-xs text-muted-foreground">{settings.zones ? t("hr.usingOwn", { zones: settings.zones.join(" / ") }) : t("hr.usingWatch")}</p>
+        <p className="mt-2 text-xs text-muted-foreground">{t("hr.model")}</p>
+        <p className="mt-1 text-xs text-muted-foreground">{settings.zones ? t("hr.usingOwn", { zones: settings.zones.join(" / ") }) : t("hr.usingWatch")}</p>
+        {thrZone != null && thrZone !== 4 && (
+          <p role="status" className="mt-1 text-xs font-medium text-warning">{t("hr.thresholdOutside", { hr: thrHr!, zone: thrZone })}</p>
+        )}
       </div>
       <div className="flex items-center gap-3">
         <BusyButton busy={busy} onClick={() => onSave()}>{t("common.save")}</BusyButton>
