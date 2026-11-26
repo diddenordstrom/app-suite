@@ -96,6 +96,7 @@ export function statsFor(db: Db, userId: number, q: Parameters<typeof parsePerio
     const sum = sumBands(list.map((r) => r.bands));
     const totals: PeriodTotals = {
       ...sum, period: p, runs: runs.length,
+      durationS: Math.round(runs.reduce((s, x) => s + x.durationS, 0)),
       distanceKm: round1(runs.reduce((s, x) => s + x.distanceM, 0) / 1000),
       longestKm: round1(Math.max(0, ...runs.map((x) => x.distanceM)) / 1000),
       easyShare: easyShareOf(sum), plan,

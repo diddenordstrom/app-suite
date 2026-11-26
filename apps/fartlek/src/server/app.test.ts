@@ -1223,6 +1223,7 @@ describe("period stats", () => {
     expect(s.threshold).toEqual({ pace: 260, low: 250.9, high: 269.1 });
     expect(s.target).toMatchObject({ pace: 300, low: 289.5, raceName: "Goal race", goalSeconds: 12660 });
     // Period A: the new run is slower than today's threshold band; B: the old run sat on the threshold of its day.
+    expect(s.a.durationS).toBe(s.runs.reduce((x, r) => x + r.durationS, 0));
     expect(s.a).toMatchObject({ runs: 1, totalS: 600, belowS: 600, atS: 0, targetS: 600, easyShare: 1 });
     expect(s.b).toMatchObject({ runs: 1, belowS: 0, atS: 600, overS: 0, targetS: 600 });
     expect(s.runs.map((r) => [r.id, r.kind])).toEqual([["r:new", "threshold"]]);

@@ -17,7 +17,7 @@ const run = (id: string, date: string, min: number, b: BandSecs, name = "Run"): 
 const totals = (period: { from: string; to: string }, runs: RunRow[]): PeriodTotals => {
   const s = runs.reduce((x, r) => x + r.durationS, 0);
   return {
-    period, runs: runs.length, distanceKm: runs.reduce((x, r) => x + r.distanceKm, 0), longestKm: Math.max(0, ...runs.map((r) => r.distanceKm)),
+    period, runs: runs.length, durationS: runs.reduce((x, r) => x + r.durationS, 0), distanceKm: runs.reduce((x, r) => x + r.distanceKm, 0), longestKm: Math.max(0, ...runs.map((r) => r.distanceKm)),
     easyShare: runs.length ? 0.8 : null, totalS: s, zones: [s * 0.1, s * 0.7, s * 0.1, s * 0.1, 0], belowS: s, atS: 0, overS: 0, targetS: 0,
     plan: { km: 40, doneKm: 30, sessions: 4, doneSessions: 3, key: 2, doneKey: 1, long: 1, doneLong: 0 },
   };

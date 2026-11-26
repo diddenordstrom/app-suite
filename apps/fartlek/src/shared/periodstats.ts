@@ -27,6 +27,8 @@ export interface Period { from: ISODate; to: ISODate }
 export interface PeriodTotals extends BandSecs {
   period: Period;
   runs: number;
+  /** Summed elapsed duration of the runs (Garmin's duration), the "Löptid" figure. */
+  durationS: number;
   distanceKm: number;
   longestKm: number;
   /** Share of time in zones 1–2, 0–1; null without zone data. */

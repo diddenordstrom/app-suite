@@ -166,8 +166,9 @@ function diff(m: Measure) {
     title: `${m.label}: ${m.fmt(m.b)} → ${m.fmt(m.a)}${pct ? ` (${pct > 0 ? "+" : "−"}${Math.abs(pct)} %)` : ""}`,
   };
 }
-const widths = (m: Measure) => {
-  const max = Math.max(m.a ?? 0, m.b ?? 0);
+/** Bar widths for one row; `scale` is the largest value of the card so rows can be compared, else the row's own largest. */
+const widths = (m: Measure, scale?: number) => {
+  const max = scale ?? Math.max(m.a ?? 0, m.b ?? 0);
   return { a: max ? `${((m.a ?? 0) / max) * 100}%` : "0%", b: max ? `${((m.b ?? 0) / max) * 100}%` : "0%" };
 };
 
@@ -385,7 +386,7 @@ function Kpis({ data }: { data: StatsResponse }) {
   const { a, b } = data;
   const share = (v: number | null) => (v == null ? null : Math.round(v * 100));
   const kpis: Measure[] = [
-    { label: t("stats.kpi.time"), a: duration(data.runs), b: duration(data.runsB), fmt: (v) => `${hm(v)} h`, fmtDelta: hmDelta },
+    { label: t("stats.kpi.time"), a: data.a.durationS, b: data.b.durationS, fmt: (v) => `${hm(v)} h`, fmtDelta: hmDelta },
     { label: t("stats.kpi.distance"), a: a.distanceKm, b: b.distanceKm, fmt: (v) => fmt.dist(v) },
     { label: t("stats.kpi.runs"), a: a.runs, b: b.runs, fmt: String },
     { label: t("stats.kpi.longest"), a: a.longestKm, b: b.longestKm, fmt: (v) => fmt.dist(v) },
@@ -419,6 +420,8 @@ function Kpis({ data }: { data: StatsResponse }) {
 // ---- Mirror cards ----------------------------------------------------------------------------
 
 function MirrorCard({ title, sub, sides, rows, foot, children }: { title: string; sub: ReactNode; sides: Sides; rows: Measure[]; foot?: ReactNode; children?: ReactNode }) {
+  // One scale for the whole card: zone 3 with 7 minutes must not look as big as zone 2 with 6 hours.
+  const scale = Math.max(0, ...rows.flatMap((r) => [r.a ?? 0, r.b ?? 0]));
   return (
     <Card className="flex flex-col gap-2 px-0 pb-2.5 pt-4">
       <div className="flex flex-col gap-0.5 px-5">
@@ -433,7 +436,7 @@ function MirrorCard({ title, sub, sides, rows, foot, children }: { title: string
             <Eyebrow className="truncate pl-3" style={{ color: A_FG }}>{sides.shortA}</Eyebrow>
           </div>
           {rows.map((r) => {
-            const d = diff(r), w = widths(r);
+            const d = diff(r), w = widths(r, scale);
             return (
               <div key={r.label} title={d.title} className="grid min-h-10 grid-cols-[minmax(0,1fr)_5.75rem_minmax(0,1fr)] items-center border-t border-border/50 hover:bg-accent">
                 <div className="flex min-w-0 items-center justify-end gap-2 pr-3">
