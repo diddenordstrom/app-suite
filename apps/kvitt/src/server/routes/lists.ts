@@ -4,7 +4,7 @@ import { and, asc, desc, eq, inArray, isNull, max, ne } from "drizzle-orm";
 import type { Db } from "../db";
 import { items, lists } from "../db/schema";
 import type { EventBus } from "../events";
-import { badRequest, forbidden, idParam, notFound, oneOf, optStr, readBody, str, type Body } from "../http";
+import { badRequest, forbidden, idParam, int, notFound, oneOf, optStr, readBody, str, type Body } from "../http";
 import type { AppEnv } from "../viewer";
 import { toItem } from "../views";
 import { removeIfDone } from "../listStore";
@@ -23,6 +23,7 @@ function itemFields(b: Body, partial: boolean) {
   if (quantity !== undefined) set.quantity = quantity;
   const note = optStr(b, "note", 300);
   if (note !== undefined) set.note = note;
+  if (b.price !== undefined) set.price = b.price === null ? null : int(b.price, "price");
   return set;
 }
 
@@ -124,7 +125,7 @@ export function listRoutes(db: Db, bus: EventBus) {
     const top = db.select({ p: max(items.position) }).from(items).where(eq(items.listId, l.id)).get()?.p ?? 0;
     const now = Date.now();
     const item = db.insert(items).values({
-      listId: l.id, text: fields.text!, quantity: fields.quantity ?? null, note: fields.note ?? null,
+      listId: l.id, text: fields.text!, quantity: fields.quantity ?? null, note: fields.note ?? null, price: fields.price ?? null,
       position: top + 1, createdAt: now, updatedAt: now,
     }).returning().get();
     touch(l.id, c.get("hid"));

@@ -1,4 +1,5 @@
 import type { ItemStatus, List } from "@/shared/api";
+import { itemTotal, listTotal } from "@/shared/items";
 import { Badge, cn } from "../ui";
 import { useHousehold } from "../household";
 import { t } from "../i18n";
@@ -7,7 +8,8 @@ import { listBg } from "./format";
 const PREVIEW = 8;
 
 export function ListCard({ list, inTrip, pending, onOpen }: { list: List; inTrip: boolean; pending: Map<number, ItemStatus>; onOpen: () => void }) {
-  const { name, me } = useHousehold();
+  const { name, me, fmt } = useHousehold();
+  const sum = listTotal(list.items);
   const items = list.items.slice(0, PREVIEW);
   const more = list.items.length - items.length;
   return (
@@ -29,7 +31,8 @@ export function ListCard({ list, inTrip, pending, onOpen }: { list: List; inTrip
             return (
               <li key={i.id} className={cn("flex gap-2", done && "text-muted-foreground line-through")}>
                 <span aria-hidden className="mt-1.5 size-2.5 shrink-0 rounded-sm border border-muted-foreground/60" />
-                <span className="min-w-0 break-words">{i.text}{i.quantity && <span className="text-muted-foreground"> · {i.quantity}</span>}</span>
+                <span className="min-w-0 flex-1 break-words">{i.text}{i.quantity && <span className="text-muted-foreground"> · {i.quantity}</span>}</span>
+                {i.price != null && <span className="shrink-0 text-muted-foreground">{fmt(itemTotal(i)!)}</span>}
               </li>
             );
           })}
@@ -37,6 +40,7 @@ export function ListCard({ list, inTrip, pending, onOpen }: { list: List; inTrip
       ) : (
         <p className="mt-2 text-sm text-muted-foreground">{t("lists.empty")}</p>
       )}
+      {sum.priced > 0 && <p className="mt-2 flex justify-between border-t border-border pt-1 text-sm font-medium"><span>{t("sheet.total")}</span><span>{fmt(sum.total)}</span></p>}
       {more > 0 && <p className="mt-1 text-xs text-muted-foreground">{t("lists.more", { count: more })}</p>}
       <p className="mt-2 text-xs text-muted-foreground">{list.ownerId === me.id ? t("lists.you") : name(list.ownerId)}</p>
     </button>

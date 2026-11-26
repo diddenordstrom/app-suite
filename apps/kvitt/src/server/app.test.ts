@@ -99,6 +99,11 @@ describe("api", () => {
     await alice.post(`/h/${hid}/lists`, { title: "x", color: "mauve" }, 400);
     const milk = await alice.post<Item>(`/h/${hid}/lists/${aList.id}/items`, { text: "Milk", quantity: "2 l" });
     const eggs = await alice.post<Item>(`/h/${hid}/lists/${aList.id}/items`, { text: "Eggs" });
+    expect(eggs.price).toBeNull();
+    expect(await alice.patch<Item>(`/h/${hid}/items/${eggs.id}`, { price: 4500 })).toMatchObject({ price: 4500, text: "Eggs" });
+    await alice.patch(`/h/${hid}/items/${eggs.id}`, { price: -1 }, 400);
+    await alice.patch(`/h/${hid}/items/${eggs.id}`, { price: 1.5 }, 400);
+    expect(await alice.patch<Item>(`/h/${hid}/items/${eggs.id}`, { price: null })).toMatchObject({ price: null });
     expect(eggs.position).toBeGreaterThan(milk.position);
     const bList = await bob.post<List>(`/h/${hid}/lists`, { title: "Bob stuff" });
     const bread = await bob.post<Item>(`/h/${hid}/lists/${bList.id}/items`, { text: "Bread" });

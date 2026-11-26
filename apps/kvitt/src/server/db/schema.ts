@@ -75,7 +75,7 @@ export const items = sqliteTable("items", {
   note: text("note"),
   status: text("status", { enum: ["open", "checked", "skipped", "bought"] }).notNull().default("open"),
   tripId: integer("trip_id").references(() => trips.id, { onDelete: "set null" }),
-  /** Optional per-item price in minor units, reserved for receipt scanning (D5). */
+  /** Optional price per piece in minor units (total = price × the quantity's leading number), e.g. what a gift cost. */
   price: integer("price"),
   position: real("position").notNull().default(0),
   createdAt: integer("created_at").notNull(),
