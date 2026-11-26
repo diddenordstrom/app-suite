@@ -38,6 +38,8 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone, edit }: { 
     Object.fromEntries(Object.entries(prefill).filter(([, v]) => v > 0 || edit).map(([id, v]) => [id, toInput(v)])));
   // Other members the shopper splits the bill on, even if none of their lists is in the trip.
   const [extra, setExtra] = useState<number[]>([]);
+  // What the trip came to when this form opened: "Dela lika" falls back to it when every field has been cleared.
+  const [openTotal] = useState(() => Object.values(prefill).reduce((s, v) => s + v, 0) + trip.guestAmount);
   // Anonymous guests (no account, no debt): a count and their combined share.
   const [guests, setGuests] = useState(trip.guests);
   const [guestAmt, setGuestAmt] = useState(trip.guests > 0 ? toInput(trip.guestAmount) : "");
@@ -79,6 +81,17 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone, edit }: { 
   });
   const guestAmount = guests > 0 && guestAmt.trim() ? parseAmount(guestAmt) : 0;
   const total = parsed.reduce((s, p) => s + (p.amount ?? 0), 0) + (guestAmount ?? 0);
+
+  /** "Dela lika": the whole total, split equally over every person on the form and the guests. */
+  const splitAll = () => {
+    const sum = total > 0 ? total : openTotal;
+    const slots = rowIds.length + guests;
+    if (sum <= 0 || slots === 0) return;
+    const each = Math.floor(sum / slots);
+    const first = rowIds.includes(trip.shopperId) ? trip.shopperId : rowIds[0]!; // the remainder öre
+    setAmounts(Object.fromEntries(rowIds.map((id) => [id, toInput(id === first ? sum - each * (slots - 1) : each)])));
+    if (guests > 0) setGuestAmt(toInput(each * guests));
+  };
 
   const submit = (e: FormEvent) => {
     e.preventDefault();
@@ -124,7 +137,7 @@ function CheckoutForm({ trip, ownerIds, prefill, boughtCount, onDone, edit }: { 
             {pickable.map((m) => (
               <Button key={m.id} type="button" variant={extra.includes(m.id) ? "primary" : "ghost"} aria-pressed={extra.includes(m.id)} className={extra.includes(m.id) ? undefined : "border border-border"} onClick={() => toggle(m.id)}>{m.name}</Button>
             ))}
-            {(extra.length > 0 || guests > 0) && <Button type="button" variant="ghost" onClick={() => resplit(extra, guests)}>{t("checkout.splitEqual")}</Button>}
+            {(rowIds.length + guests > 1) && <Button type="button" variant="ghost" onClick={splitAll}>{t("checkout.splitEqual")}</Button>}
           </div>
         </div>
       )}
