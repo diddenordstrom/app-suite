@@ -236,8 +236,13 @@ describe("api", () => {
     expect(home.week.sessions.length).toBeGreaterThan(0);
     expect(home.fitness.ctl).toBeGreaterThan(10);
 
-    const trends = await get<{ weekly: unknown[]; easy: unknown[]; threshold: { points: unknown[] }; load: { series: { date: string; projected?: boolean }[]; planEnd: string; race: { date: string } } }>("/api/trends");
+    const trends = await get<{ from: string; weekly: unknown[]; wellness: unknown[]; easy: unknown[]; threshold: { points: unknown[] }; load: { series: { date: string; projected?: boolean }[]; planEnd: string; race: { date: string } } }>("/api/trends");
     expect(trends.weekly.length).toBeGreaterThanOrEqual(12);
+    // The window covers at least 90 days, wellness a row per day of it.
+    expect(trends.wellness.length).toBeGreaterThanOrEqual(90);
+    const year = await get<{ from: string; wellness: unknown[] }>("/api/trends?weeks=52");
+    expect(year.wellness).toHaveLength(364);
+    expect(year.from < trends.from).toBe(true);
     expect(trends.easy.length).toBeGreaterThan(5);
     expect(trends.load.series.some((p) => p.projected)).toBe(true);
     // The projection ends where the plan ends (the taper block's last day), not later.

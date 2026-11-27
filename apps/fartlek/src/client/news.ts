@@ -9,6 +9,16 @@ import { api } from "./http";
  */
 export const NEWS: NewsEntry[] = [
   {
+    id: "2026-11-27-statistik",
+    date: "27 november 2026",
+    title: "Nytt i Fartlek: Statistik och Trender på samma sida",
+    items: [
+      "Statistik visar hur tiden gick under en period du väljer: tid i varje zon, kring tröskeln och i målfart. Slå på Jämför för att se en annan period bredvid.",
+      "Trender ligger nu under Statistik → Trender. Kurvorna följer perioden du valt och skuggar den, och överst står periodens värde: formen i slutet, hur tröskeln rörde sig och snittet för HRV och vilopuls.",
+      "Km per vecka och intensitetsfördelningen finns i periodvyn, så de är borta från Trender.",
+    ],
+  },
+  {
     // Its own note, not part of the November one.
     id: "2026-12-gym",
     date: "december 2026",

@@ -5,7 +5,7 @@ import type { MonthStatus, SessionView, WeekStatus, WeekSummary } from "@/shared
 import type { ActivityLoad, PmcPoint } from "@/shared/load";
 import type { AreaTrend, Countdown, Readiness } from "@/shared/recovery";
 import type { ThresholdPoint, ThresholdProposal } from "@/shared/threshold";
-import type { Distribution, EasyGrade, ZoneSecs } from "@/shared/zones";
+import type { EasyGrade, ZoneSecs } from "@/shared/zones";
 import type { ActivityLog, Durability, FuelAdvice } from "@/shared/activitylog";
 import type { CsZones, ThresholdComparison } from "@/shared/criticalspeed";
 import type { Activity, Block, Checkin, Lap, Msg, PainEntry, Race, Threshold, Wellness, Workout } from "@/shared/types";
@@ -110,11 +110,13 @@ export interface CsTest { id: number; date: string; kind: "trials" | "three_min"
 
 export interface TrendsData {
   today: string;
+  /** First day of the window the curves cover. */
+  from: string;
+  /** Km per week; not on Fartlek's pages any more, kept for the portfolio's Fartlek landing. */
   weekly: { weekStart: string; actualKm: number; plannedKm: number | null; runs: number; minutes: number; status: WeekStatus; future: boolean }[];
   load: { series: PmcPoint[]; race: Race | null; planEnd: string | null };
   easy: { id: string; date: string; km: number; hr: number | null; pace: number | null; score: number | null; grade: EasyGrade | null; bandPace: number | null; bandHr: number | null }[];
   threshold: { points: (ThresholdPoint & { activityId: string; name: string; inRange: number | null })[]; estimates: Threshold[]; current: Threshold | null; proposal: ThresholdProposal | null };
-  distribution: (Distribution & { weekStart: string })[];
   cs: { tests: CsTest[]; latest: CsView | null; olderTest: CsTest | null };
   best: BestEffortsData;
   vo2max: Vo2maxData;

@@ -4,11 +4,13 @@
  * difference chip beside each figure, in neutral colours (the page shows change, it does not judge it).
  */
 import { useEffect, useMemo, useRef, useState, type CSSProperties, type KeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from "react";
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
 import { StatsSkeleton } from "../skeletons";
-import { Card, EmptyState, ErrorText, Field, Input, SegmentedControl, Spinner, cn } from "../ui";
+import { Button, Card, EmptyState, ErrorText, Field, Input, SegmentedControl, Spinner, cn, useTour } from "../ui";
+import { trendsTour } from "../guide";
+import { TrendsView } from "./StatsTrends";
 import { blockName, fmtDay } from "../bits";
 import { locale, t, tm, tn } from "../i18n";
 import type { BlocksData } from "../types";
@@ -18,6 +20,8 @@ import { comparePeriods, presetAvailable, PRESETS, type Choice, type Comparison,
 import { BAND_SHARE, type BandSecs, type Period, type RunRow, type StatsResponse } from "@/shared/periodstats";
 
 export type ColorMode = "zone" | "band";
+/** Period: how the time of the period was spent. Trender: curves over months with the period shaded. */
+export type View = "period" | "trends";
 type Filter = "all" | "thr" | "mp" | "over";
 
 const DEFAULT_CHOICE: Choice = { kind: "preset", preset: "month" };
@@ -40,6 +44,9 @@ function savePrefs(p: Prefs) {
 
 export function Stats() {
   const { settings, loaded } = useSettings();
+  // The view lives in the URL, so /trends (redirected here) and links to a Trender card land on it.
+  const [params, setParams] = useSearchParams();
+  const view: View = params.get("view") === "trends" ? "trends" : "period";
   const today = todayIn(settings.timezone);
   const [prefs, setPrefs] = useState(loadPrefs);
   useEffect(() => savePrefs(prefs), [prefs]);
@@ -66,7 +73,8 @@ export function Stats() {
   if (error) return <ErrorText>{error}</ErrorText>;
   if (!data) return <StatsSkeleton />;
   return (
-    <StatsView data={data} cmp={cmp} choice={choice} ctx={ctx} mode={prefs.mode} compare={prefs.compare} loading={loading}
+    <StatsView data={data} cmp={cmp} choice={choice} ctx={ctx} mode={prefs.mode} compare={prefs.compare} loading={loading} view={view}
+      onView={(v) => setParams(v === "trends" ? { view: "trends" } : {}, { replace: true })}
       onMode={(mode) => setPrefs((p) => ({ ...p, mode }))}
       onCompare={(compare) => setPrefs((p) => ({ ...p, compare }))}
       onChoose={(c) => setPrefs((p) => ({ ...p, choice: c }))} />
@@ -187,7 +195,7 @@ function DiffChip({ m, name }: { m: Measure; name: string }) {
 
 // ---- The page --------------------------------------------------------------------------------
 
-export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loading, onMode, onCompare, onChoose }: {
+export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loading, view = "period", onView, onMode, onCompare, onChoose }: {
   data: StatsResponse;
   cmp: Comparison;
   choice: Choice;
@@ -196,6 +204,8 @@ export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loadi
   /** Show period B beside A on every card. */
   compare?: boolean;
   loading?: boolean;
+  view?: View;
+  onView?: (v: View) => void;
   onMode: (m: ColorMode) => void;
   onCompare?: (on: boolean) => void;
   onChoose: (c: Choice) => void;
@@ -205,6 +215,7 @@ export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loadi
   const shortA = labelText(cmp.labelA, today, true), shortB = labelText(cmp.labelB, today, true);
   const sides = { nameA, nameB, shortA, shortB, compare };
   const empty = data.a.runs === 0 && (!compare || data.b.runs === 0);
+  const tour = useTour();
 
   return (
     <div className="mx-auto max-w-6xl space-y-5">
@@ -223,6 +234,10 @@ export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loadi
             {loading && <Spinner className="size-3" />}
           </span>
         </div>
+        <div className="flex flex-wrap items-center gap-2">
+        {view === "trends" && <Button variant="ghost" className="h-9 px-3 text-muted-foreground" onClick={() => tour.start(trendsTour())}>{t("tour.replay")}</Button>}
+        <SegmentedControl aria-label={t("stats.view")} value={view} onChange={(v) => onView?.(v)}
+          options={[{ value: "period", label: t("stats.view.period") }, { value: "trends", label: t("nav.trends") }]} />
         <button type="button" role="switch" aria-checked={compare} onClick={() => onCompare?.(!compare)}
           className={cn("inline-flex h-9 items-center gap-2 rounded-full border px-3 text-[13px] font-medium transition",
             compare ? "border-ring bg-accent text-accent-foreground" : "border-border bg-card text-foreground hover:bg-accent")}>
@@ -231,15 +246,17 @@ export function StatsView({ data, cmp, choice, ctx, mode, compare = false, loadi
           </span>
           {t("stats.compare", { name: shortB })}
         </button>
+        </div>
       </header>
 
-      {data.pending > 0 && (
+      {view === "period" && data.pending > 0 && (
         <Card className="flex items-center gap-2 py-3 text-sm text-muted-foreground" role="status"><Spinner /> {tn("stats.pending", data.pending)}</Card>
       )}
 
       <PeriodCard data={data} cmp={cmp} choice={choice} ctx={ctx} mode={mode} sides={sides} onChoose={onChoose} />
 
-      {empty ? <EmptyState title={t(compare ? "stats.emptyTitle" : "stats.emptyTitleOne")}>{t("stats.emptyText")}</EmptyState> : (
+      {view === "trends" ? <TrendsView today={today} sides={{ a: cmp.a, b: compare ? cmp.b : null, shortA, shortB }} />
+        : empty ? <EmptyState title={t(compare ? "stats.emptyTitle" : "stats.emptyTitleOne")}>{t("stats.emptyText")}</EmptyState> : (
         <>
           <Kpis data={data} sides={sides} />
           <div className="grid gap-4 lg:grid-cols-2">

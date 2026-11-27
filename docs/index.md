@@ -4,6 +4,7 @@
 
 ## Recent activity
 
+- 2026-11-27 · decision · Fartlek Trender view built, /trends redirects ([log/2026-11.md](log/2026-11.md))
 - 2026-11-27 · decision · Fartlek Statistik and Trender become one page with two views ([log/2026-11.md](log/2026-11.md))
 - 2026-11-27 · decision · Fartlek plan calendar: one calmer view, no read mode ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek reads the watch's HR zones from FIT files ([log/2026-11.md](log/2026-11.md))
@@ -11,7 +12,6 @@
 - 2026-11-26 · decision · Fartlek Statistik timeline frame can be dragged ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Fartlek Statistik shows totals first, comparison behind a switch ([log/2026-11.md](log/2026-11.md))
 - 2026-11-26 · decision · Kvitt: add a member without the app ([log/2026-11.md](log/2026-11.md))
-- 2026-11-26 · decision · Kvitt: guests on a shopping trip ([log/2026-11.md](log/2026-11.md))
 
 ## Pages
 

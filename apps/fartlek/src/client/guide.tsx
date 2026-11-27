@@ -41,14 +41,13 @@ export function onboardingTour({ needsGarmin }: { needsGarmin: boolean }): Tour 
   return { id: "onboarding", steps };
 }
 
-/** Trends, top to bottom: the four views most worth knowing (critical speed and HRV explain themselves with ⓘ). */
+/** Statistik's Trender view, top to bottom (HRV and critical speed explain themselves with ⓘ). Started from
+ *  the view itself, so no route: a route with a query string would never match the pathname. */
 export const trendsTour = (): Tour => ({
   id: "trends",
   steps: [
-    s("trends-km", "tKm", { route: "/trends" }),
-    s("trends-load", "tLoad", { route: "/trends" }),
-    s("trends-threshold", "tThreshold", { route: "/trends", optional: true }),
-    s("trends-intensity", "tIntensity", { route: "/trends" }),
+    s("trends-load", "tLoad"),
+    s("trends-threshold", "tThreshold", { optional: true }),
   ],
 });
 

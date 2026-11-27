@@ -183,7 +183,7 @@ export function SameSessionCard({ activityId }: { activityId: string }) {
           {p.tsb != null && t("same.formThatDay", { tsb: sign(Math.round(p.tsb)), prev: prev.tsb != null ? sign(Math.round(prev.tsb)) : "–" })}
           {p.elevGain != null && ` · ${t("same.elev", { m: Math.round(p.elevGain) })}`}
         </span>
-        <Link to="/trends#same" className="text-sm font-semibold text-primary hover:underline">{t("same.allOnTrends")}</Link>
+        <Link to="/stats?view=trends#same" className="text-sm font-semibold text-primary hover:underline">{t("same.allOnTrends")}</Link>
       </div>
     </Card>
   );
