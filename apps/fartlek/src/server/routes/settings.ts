@@ -1,10 +1,11 @@
-import { and, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 import type { Config } from "../config";
 import type { Db } from "../db";
 import * as t from "../db/schema";
 import * as repo from "../repo";
 import { createCipher } from "@homelab/server-kit";
 import { exchangeKey, GarminError } from "../providers/garmin";
+import { watchZonesFromFit } from "../providers/fit";
 import type { SyncRunner } from "../sync";
 import { loadDemoData } from "../seed";
 import { parseSettings } from "../../shared/types";
@@ -22,6 +23,27 @@ export function settingsRoutes(db: Db, config: Config, syncer: SyncRunner) {
     if (!s) throw new BadRequest("invalid settings");
     repo.saveSettings(db, uid(c), s);
     return c.json(s);
+  });
+
+  /**
+   * The watch's HR zones, read from the newest kept FIT file of a run that has them (the activity list from
+   * Garmin only gives time per zone, not the bounds). Null when no kept file holds them, e.g. in the demo.
+   */
+  r.get("/settings/watch-zones", (c) => {
+    const userId = uid(c);
+    const runs = db.select({ id: t.activities.id, date: t.activities.date }).from(t.activities)
+      .innerJoin(t.activityFiles, and(eq(t.activityFiles.userId, t.activities.userId), eq(t.activityFiles.activityId, t.activities.id)))
+      .where(and(eq(t.activities.userId, userId), eq(t.activities.isRun, true)))
+      .orderBy(desc(t.activities.startTimeLocal)).limit(10).all();
+    for (const a of runs) {
+      const fit = repo.getFit(db, userId, a.id);
+      if (!fit) continue;
+      try {
+        const z = watchZonesFromFit(fit);
+        if (z) return c.json({ ...z, date: a.date });
+      } catch { /* a broken file: try the next run */ }
+    }
+    return c.json(null);
   });
 
   /** Guided tours (shared TourProvider): which ones this user has finished or closed. */

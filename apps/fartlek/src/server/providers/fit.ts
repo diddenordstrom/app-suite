@@ -1,6 +1,6 @@
 import { Decoder, Stream as FitStream } from "@garmin/fitsdk";
 import { unzipSync } from "fflate";
-import type { Lap, LapTrigger, Stream } from "../../shared/types";
+import type { Lap, LapTrigger, Stream, ZoneBounds } from "../../shared/types";
 import type { ProviderDetail } from "./types";
 
 /** Garmin's download endpoint returns a ZIP holding `<id>_ACTIVITY.fit`. Accepts a raw FIT too. */
@@ -105,4 +105,29 @@ export function parseFit(bytes: Uint8Array, bucket = 5, opts: { gap?: boolean } 
     if (opts.gap && keys.some((k) => buckets.get(k)!.gap.length)) stream.gap = keys.map((k) => avg(buckets.get(k)!.gap, 2));
   }
   return { laps, stream, fit };
+}
+
+interface TimeInZoneMesg { referenceMesg?: string; hrZoneHighBoundary?: number[] | number; maxHeartRate?: number; thresholdHeartRate?: number }
+
+/** The watch's heart-rate zones as the activity was recorded with them, from the FIT file's time-in-zone message. */
+export interface WatchZones { bounds: ZoneBounds; maxHr: number | null; thresholdHr: number | null }
+
+/**
+ * The watch's zones from a FIT file, or null when it has none. `hr_zone_high_boundary` holds the top of
+ * each zone from zone 0 (below zone 1) up: [z0, z1, z2, z3, z4, z5], so zones 1–4's tops are entries 1–4
+ * (Garmin's defaults for max 195 are 98 / 117 / 137 / 156 / 176 / 195, i.e. 50–100 %).
+ */
+export function watchZonesFromFit(bytes: Uint8Array): WatchZones | null {
+  const decoder = new Decoder(FitStream.fromByteArray(Array.from(extractFit(bytes))));
+  if (!decoder.isFIT()) return null;
+  const { messages } = decoder.read();
+  const all = ((messages.timeInZoneMesgs ?? []) as TimeInZoneMesg[]).filter((m) => Array.isArray(m.hrZoneHighBoundary) && m.hrZoneHighBoundary.length >= 5);
+  const m = all.find((x) => x.referenceMesg === "session") ?? all.at(-1);
+  if (!m) return null;
+  const b = m.hrZoneHighBoundary as number[];
+  const bounds = (b.length >= 6 ? b.slice(1, 5) : b.slice(0, 4)) as ZoneBounds;
+  const ok = bounds.every((v, i) => v >= 40 && v <= 240 && (i === 0 || v > bounds[i - 1]!));
+  if (!ok) return null;
+  const hr = (v: number | undefined) => (v != null && v >= 40 && v <= 240 ? v : null);
+  return { bounds, maxHr: hr(m.maxHeartRate), thresholdHr: hr(m.thresholdHeartRate) };
 }
