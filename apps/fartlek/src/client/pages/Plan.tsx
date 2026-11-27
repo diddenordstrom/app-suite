@@ -2,8 +2,8 @@ import { useEffect, useState, type DragEvent } from "react";
 import { Link } from "react-router-dom";
 import { api, useAction, useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
-import { Badge, BusyButton, Button, Card, ErrorText, Field, Input, Dialog, SegmentedControl, Select, Spinner, cn } from "../ui";
-import { BLOCK_COLOR, OutcomeBadge, StatusBadge, TYPE_COLOR, blockName, fmtDay, skipReason, workoutText } from "../bits";
+import { BusyButton, Button, Card, ErrorText, Field, Input, Dialog, SegmentedControl, Select, Spinner, cn } from "../ui";
+import { BLOCK_COLOR, OutcomeBadge, TYPE_COLOR, activityTypeName, blockName, fmtDay, skipReason, workoutText } from "../bits";
 import { BlockView } from "./Blocks";
 import { blockOn } from "@/shared/blocks";
 import { EASY_SHARE_FLAG } from "@/shared/compliance";
@@ -127,12 +127,13 @@ export function Plan() {
         </div>
         <div className="text-sm font-medium">{title}</div>
       </div>
-      <p className="hidden text-xs text-muted-foreground md:block">{t("plan.dragHint")}</p>
+      <DragHint />
       <ErrorText>{error ?? dragError}</ErrorText>
 
       {data && (
         <div className="space-y-3">
-          <div className="hidden grid-cols-7 gap-1 px-1 text-xs font-medium text-muted-foreground md:grid">
+          <div className="hidden gap-1 px-1 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[10rem_repeat(7,minmax(0,1fr))]">
+            <div />
             {Array.from({ length: 7 }, (_, i) => <div key={i}>{WEEKDAY_SHORT[weekday(addDays(from, i))]}</div>)}
           </div>
           {data.weeks.map((w) => (
@@ -176,6 +177,40 @@ export function Plan() {
   );
 }
 
+function DragHint() {
+  const [seen, setSeen] = useState(() => {
+    try {
+      return localStorage.getItem("fartlek.plan.dragHintSeen") === "1";
+    } catch {
+      return false;
+    }
+  });
+  if (seen) return null;
+  return (
+    <div className="hidden items-center justify-between gap-3 text-xs text-muted-foreground md:flex">
+      <p>{t("plan.dragHint")}</p>
+      <Button variant="ghost" className="h-7 px-2 text-xs" onClick={() => {
+        try {
+          localStorage.setItem("fartlek.plan.dragHintSeen", "1");
+        } catch {
+          // Storage can be blocked (private window); the hint simply hides for this visit.
+        }
+        setSeen(true);
+      }}>{t("common.done")}</Button>
+    </div>
+  );
+}
+
+/** A check mark; with a label it is an image for screen readers, without one it is decoration. */
+function Check({ className, label }: { className: string; label?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} fill="none" stroke="currentColor" strokeWidth="2.6" strokeLinecap="round" strokeLinejoin="round"
+      role={label ? "img" : undefined} aria-label={label} aria-hidden={label ? undefined : true}>
+      <path d="M5 12.5l4.5 4.5L19 7.5" />
+    </svg>
+  );
+}
+
 function WeekRow({ week, data, compact, month, onOpen, onDrop, onCopy, onTarget, onSuggest }: {
   week: WeekSummary; data: PlanData; compact: boolean; month: string | null;
   onOpen: (w: Workout | null, date: string) => void; onDrop: (e: DragEvent, date: string) => void; onCopy: () => void; onTarget: () => void; onSuggest: () => void;
@@ -189,38 +224,52 @@ function WeekRow({ week, data, compact, month, onOpen, onDrop, onCopy, onTarget,
   const block = blockOn(week.weekStart, data.blocks);
   const activities: Activity[] = [...week.sessions.flatMap((s) => (s.activity ? [s.activity] : [])), ...week.extras];
   const linked = new Map(week.sessions.filter((s) => s.activity).map((s) => [s.activity!.id, s]));
+  const met = !!week.targetKm && week.actualKm >= week.targetKm;
 
   return (
-    <Card className="overflow-hidden p-0" style={block ? { borderLeft: `4px solid ${BLOCK_COLOR[block.kind]}` } : undefined}>
-      <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-3 py-2 text-sm">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="font-medium">{t("plan.weekOf", { week: weekNumber(week.weekStart) })}</span>
-          <span className="text-xs text-muted-foreground">{fmtDay(week.weekStart, { day: "numeric", month: "short" })}–{fmtDay(addDays(week.weekStart, 6), { day: "numeric", month: "short" })}</span>
-          {block ? <Badge>{blockName(block)}</Badge> : data.blocks.length > 0 && <span className="text-xs text-muted-foreground">{t("plan.noBlock")}</span>}
-          {week.backoff && <Badge>{t("plan.backoff")}</Badge>}
-          {!week.targetKm && data.skeleton?.[week.weekStart] && (
-            <span className="rounded-full border border-dashed border-border px-2 py-0.5 text-xs text-muted-foreground">{t("road.weekTarget", { km: fmt.dist(data.skeleton[week.weekStart].km, 0) })}</span>
+    <Card className="p-0">
+      {/* No overflow-hidden: the week's ⋯ menu opens past the card's edge. Cells round their own corners instead. */}
+      <div className="md:grid md:grid-cols-[10rem_minmax(0,1fr)]">
+        <div className="flex flex-col gap-1 border-b border-border px-3 py-2 text-xs text-muted-foreground md:border-b-0 md:border-r">
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex min-w-0 flex-col">
+              <span className="font-medium text-foreground">{t("plan.weekOf", { week: weekNumber(week.weekStart) })}</span>
+              <span className="whitespace-nowrap">{fmtDay(week.weekStart, { day: "numeric", month: "short" })}–{fmtDay(addDays(week.weekStart, 6), { day: "numeric", month: "short" })}</span>
+            </div>
+            <MoreMenu className="h-6 w-6" label={t("plan.weekMenu")} items={[
+              ...(canSuggest ? [{ label: t("next.button"), onClick: onSuggest }] : []),
+              { label: t("plan.target"), onClick: onTarget },
+              { label: t("common.copy"), onClick: onCopy },
+            ]} />
+          </div>
+          <div className="tabular-nums">
+            <b className="font-semibold text-foreground">{fmt.num(week.actualKm)}</b>
+            {week.targetKm ? ` / ${fmt.num(week.targetKm)}` : ""} {fmt.unit}
+            {met && <Check className="ml-1 inline size-3.5 align-[-2px] text-success" label={t("plan.targetMet")} />}
+          </div>
+          {week.targetKm ? (
+            <div className="h-1 overflow-hidden rounded-full bg-muted">
+              <div className="h-full rounded-full bg-chart-1" style={{ width: `${Math.min(100, (week.actualKm / week.targetKm) * 100)}%` }} />
+            </div>
+          ) : data.skeleton?.[week.weekStart] && (
+            <span>{t("road.weekTarget", { km: fmt.dist(data.skeleton[week.weekStart].km, 0) })}</span>
           )}
-          <StatusBadge status={week.status} />
+          {(block || data.blocks.length > 0 || week.backoff) && (
+            <div className="flex flex-wrap items-center gap-x-1.5">
+              {block ? (
+                <span className="flex items-center gap-1.5">
+                  <span className="size-[7px] shrink-0 rounded-full" style={{ background: BLOCK_COLOR[block.kind] }} />
+                  {blockName(block)}
+                </span>
+              ) : data.blocks.length > 0 && <span>{t("plan.noBlock")}</span>}
+              {week.backoff && <span>{block || data.blocks.length > 0 ? `· ${t("plan.backoff")}` : t("plan.backoff")}</span>}
+            </div>
+          )}
+          <span className={cn(week.status === "behind" || week.status === "overreaching" ? "text-warning" : undefined)}>{t(`status.${week.status}`)}</span>
+          {week.easyShare != null && week.easyShare < EASY_SHARE_FLAG && (
+            <span className="text-warning">{t("plan.easyShare", { pct: Math.round(week.easyShare * 100) })}</span>
+          )}
         </div>
-        <div className="flex items-center gap-3 text-xs text-muted-foreground">
-          <span className="tabular-nums">
-            {fmt.num(week.actualKm)}{week.targetKm ? ` / ${fmt.num(week.targetKm)}` : ""} {fmt.unit}
-            {week.keyPlanned > 0 && ` · ${t("plan.key", { done: week.keyDone, planned: week.keyPlanned })}`}
-          </span>
-          {week.easyShare != null && (
-            <span className={cn("tabular-nums", week.easyShare < EASY_SHARE_FLAG && "text-warning")}>{t("plan.easyShare", { pct: Math.round(week.easyShare * 100) })}</span>
-          )}
-          {canSuggest && (
-            <button className="inline-flex items-center gap-1 rounded-full bg-signature-soft px-2 py-0.5 font-medium text-signature-foreground hover:underline" onClick={onSuggest}>
-              <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden><path d="M12 3l1.8 4.7L18.5 9.5l-4.7 1.8L12 16l-1.8-4.7L5.5 9.5l4.7-1.8z" /></svg>
-              {t("next.button")}
-            </button>
-          )}
-          <button className="hover:text-foreground hover:underline" onClick={onTarget}>{t("plan.target")}</button>
-          <button className="hover:text-foreground hover:underline" onClick={onCopy}>{t("common.copy")}</button>
-        </div>
-      </div>
       <div className="grid md:grid-cols-7">
         {days.map((d) => {
           const sessions = week.sessions.filter((s) => s.workout.date === d);
@@ -229,7 +278,7 @@ function WeekRow({ week, data, compact, month, onOpen, onDrop, onCopy, onTarget,
           const out = month && d.slice(0, 7) !== month;
           return (
             <div key={d} onDragOver={(e) => e.preventDefault()} onDrop={(e) => onDrop(e, d)}
-              className={cn("group flex min-h-12 gap-2 border-b border-border p-1.5 last:border-b-0 md:block md:min-h-28 md:border-b-0 md:border-r md:last:border-r-0",
+              className={cn("group flex min-h-12 gap-2 border-b border-border p-1.5 last:rounded-b-lg last:border-b-0 md:block md:min-h-28 md:border-b-0 md:last:rounded-bl-none md:last:rounded-tr-lg",
                 out && "bg-muted/40", d === data.today && "bg-signature-soft/60")}>
               <div className="flex w-14 shrink-0 items-start justify-between md:mb-1 md:w-auto">
                 <span className={cn("text-xs", d === data.today ? "font-semibold text-signature-foreground" : "text-muted-foreground")}>
@@ -241,16 +290,13 @@ function WeekRow({ week, data, compact, month, onOpen, onDrop, onCopy, onTarget,
               <div className="min-w-0 flex-1 space-y-1">
                 {races.map((r) => <RaceChip key={r.id} race={r} />)}
                 {sessions.map((s) => <SessionChip key={s.workout.id} s={s} compact={compact} tourPick={s.workout.id === tourSessionId(data)} onOpen={() => onOpen(s.workout, d)} />)}
-                {acts.map((a) => {
-                  const l = linked.get(a.id);
-                  return (
-                    <Link key={a.id} to={`/activities/${encodeURIComponent(a.id)}`}
-                      className="block truncate rounded px-1 text-xs text-muted-foreground hover:bg-accent"
-                      title={l ? t("plan.countsFor", { workout: workoutText(l.workout, (km) => fmt.dist(km)), how: t(`matchedBy.${l.match!.matchedBy}`) }) : t("plan.extraActivity")}>
-                      {l ? "✓" : "+"} {a.isRun ? fmt.dist(a.distanceM / 1000) : a.typeKey.replace(/_/g, " ")} {!compact && <span>· {fmtDuration(a.durationS)}</span>}
-                    </Link>
-                  );
-                })}
+                {acts.filter((a) => !linked.has(a.id)).map((a) => (
+                  <Link key={a.id} to={`/activities/${encodeURIComponent(a.id)}`}
+                    className="block truncate rounded pl-[1.125rem] text-xs text-muted-foreground hover:bg-accent"
+                    title={t("plan.extraActivity")}>
+                    + {a.isRun ? fmt.dist(a.distanceM / 1000) : activityTypeName(a.typeKey)}{!compact && ` · ${fmtDuration(a.durationS)}`}
+                  </Link>
+                ))}
                 {!sessions.length && !acts.length && !races.length && (
                   <button onClick={() => onOpen(null, d)} className="text-xs text-muted-foreground md:hidden">+ {t("plan.add")}</button>
                 )}
@@ -258,6 +304,7 @@ function WeekRow({ week, data, compact, month, onOpen, onDrop, onCopy, onTarget,
             </div>
           );
         })}
+      </div>
       </div>
     </Card>
   );
@@ -286,28 +333,37 @@ function tourSessionId(data: PlanData): number | null {
 
 function SessionChip({ s, compact, tourPick, onOpen }: { s: SessionView; compact: boolean; tourPick: boolean; onOpen: () => void }) {
   const fmt = useFmt();
-  const faded = s.outcome === "dropped" || s.outcome === "skipped";
+  const o = s.outcome;
+  const title = workoutText(s.workout, (km) => fmt.dist(km, km % 1 ? 1 : 0));
+  const struck = o === "dropped" || o === "skipped" || o === "missed";
+  const check = o === "done" ? "text-success" : o === "short" ? "text-warning" : null;
+  // The detail line: what the type colour does not say (short, missed or skipped and why, the linked run, the steps).
+  const parts: string[] = [];
+  if (o === "short") parts.push(t("outcome.short"));
+  if (struck) parts.push(t(`outcome.${o}`));
+  if (struck && s.workout.skipReason) parts.push(skipReason(s.workout.skipReason));
+  if (s.activity) {
+    parts.push(s.activity.isRun ? fmt.dist(s.activity.distanceM / 1000) : activityTypeName(s.activity.typeKey));
+    if (!compact) parts.push(fmtDuration(s.activity.durationS));
+  }
+  if (s.stepSummary && s.stepSummary.workJudged > 0) parts.push(t("pva.summary", { in: s.stepSummary.workIn, total: s.stepSummary.workTotal }));
+  if (!s.activity && s.workout.steps) parts.push(stepsSummaryFor(s.workout.steps, fmt.units) ?? t("steps.label"));
+  if (!compact && s.workout.notes && parts.length === 0) parts.push(s.workout.notes);
+  const detail = parts.join(" · ");
   return (
     <button draggable onDragStart={(e) => { e.dataTransfer.setData("text/workout", String(s.workout.id)); e.dataTransfer.effectAllowed = "copyMove"; }}
       onClick={onOpen}
       data-tour={tourPick ? "plan-session" : undefined}
-      className={cn("block w-full cursor-grab rounded border border-border bg-background px-1.5 py-1 text-left text-xs hover:bg-accent active:cursor-grabbing", faded && "opacity-60 line-through decoration-muted-foreground")}
-      style={{ borderLeft: `3px solid ${TYPE_COLOR[s.workout.type]}` }}>
-      <div className="truncate font-medium">
+      className="-mx-1.5 grid w-full cursor-grab grid-cols-[0.75rem_minmax(0,1fr)] items-center gap-x-1.5 rounded px-1.5 py-1 text-left text-xs hover:bg-accent active:cursor-grabbing">
+      <span className="size-[7px] justify-self-center rounded-full" style={{ background: TYPE_COLOR[s.workout.type] }} />
+      <span className={cn("truncate font-medium", struck && "text-muted-foreground line-through")}>
         {s.spike && <span className="mr-1 text-warning" title={t("plan.spike", { pct: Math.round(s.spike.pct * 100), ref: fmt.dist(s.spike.refKm) })} aria-label={t("plan.spike", { pct: Math.round(s.spike.pct * 100), ref: fmt.dist(s.spike.refKm) })}>▲</span>}
-        {workoutText(s.workout, (km) => fmt.dist(km, km % 1 ? 1 : 0))}
-      </div>
-      {s.workout.steps && <div className="truncate text-muted-foreground">{stepsSummaryFor(s.workout.steps, fmt.units) ?? t("steps.label")}</div>}
-      {s.stepSummary && s.stepSummary.workJudged > 0 && (
-        <span className={cn("mt-0.5 inline-block rounded-full px-1.5 text-[11px] font-medium",
-          s.stepSummary.workIn === s.stepSummary.workTotal ? "bg-success/15 text-success" : "bg-warning/15 text-warning")}>
-          {t("pva.summary", { in: s.stepSummary.workIn, total: s.stepSummary.workTotal })}
-        </span>
-      )}
-      {(!compact || s.outcome === "done" || s.outcome === "short" || s.outcome === "missed") && s.outcome !== "upcoming" && s.outcome !== "rest" && (
-        <div className="mt-0.5 flex items-center gap-1"><OutcomeBadge outcome={s.outcome} />{s.workout.skipReason && <span className="text-muted-foreground">{skipReason(s.workout.skipReason)}</span>}</div>
-      )}
-      {!compact && s.workout.notes && <div className="mt-0.5 truncate text-muted-foreground">{s.workout.notes}</div>}
+        {title}
+      </span>
+      {(check || detail) && (<>
+        {check ? <Check className={cn("size-3 justify-self-center", check)} label={t(`outcome.${o}`)} /> : <span />}
+        {detail && <span className="truncate text-muted-foreground">{detail}</span>}
+      </>)}
     </button>
   );
 }
@@ -438,7 +494,7 @@ function WorkoutDialog({ workout, date, week, onClose, onSaved }: { workout: Wor
                   }}>
                   <option value="__auto">{t("session.auto")}</option>
                   <option value="__none">{t("session.none")}</option>
-                  {weekActs.map((a) => <option key={a.id} value={a.id}>{fmtDay(a.date)} · {a.name} · {a.isRun ? fmt.dist(a.distanceM / 1000) : a.typeKey}</option>)}
+                  {weekActs.map((a) => <option key={a.id} value={a.id}>{fmtDay(a.date)} · {a.name} · {a.isRun ? fmt.dist(a.distanceM / 1000) : activityTypeName(a.typeKey)}</option>)}
                 </Select>
               </Field>
             )}

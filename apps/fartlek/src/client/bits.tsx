@@ -77,6 +77,12 @@ function label(prefix: string, v: string): string {
 }
 export const painArea = (a: string) => label("painArea", a);
 export const skipReason = (r: string) => label("skip", r);
+/** A Garmin activity type key ("trail_running") in the user's language; unknown types show with spaces. */
+export function activityTypeName(typeKey: string): string {
+  const k = `acttype.${typeKey}` as MsgKey;
+  const s = t(k);
+  return s === k ? typeKey.replace(/_/g, " ") : s;
+}
 
 /** The two-arrow sync mark for "Synka" buttons. */
 export function GearIcon({ className = "size-5" }: { className?: string }) {

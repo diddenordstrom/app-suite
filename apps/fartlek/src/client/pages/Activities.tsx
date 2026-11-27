@@ -6,7 +6,7 @@ import { api, useAction, useApi } from "../http";
 import { useFmt, useSettings } from "../prefs";
 import { ActivityListSkeleton, ActivitySkeleton } from "../skeletons";
 import { Badge, BarChart, BusyButton, Button, Card, CardTitle, EmptyState, ErrorText, Field, Input, Select, Spinner, Stat, Textarea } from "../ui";
-import { EasyBadge, fmtDay, painArea } from "../bits";
+import { EasyBadge, activityTypeName, fmtDay, painArea } from "../bits";
 import { t } from "../i18n";
 import type { ActivityDetail, ActivityRow } from "../types";
 import { Curves } from "../curves";
@@ -51,7 +51,7 @@ export function Activities() {
               <li key={a.id} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-3 text-sm">
                 <Link to={`/activities/${encodeURIComponent(a.id)}`} className="min-w-0 basis-full hover:underline sm:flex-1 sm:basis-0">
                   <div className="truncate font-medium">{a.name}</div>
-                  <div className="text-xs text-muted-foreground">{fmtDay(a.date)} · {a.typeKey.replace(/_/g, " ")}</div>
+                  <div className="text-xs text-muted-foreground">{fmtDay(a.date)} · {activityTypeName(a.typeKey)}</div>
                 </Link>
                 <div className="flex flex-wrap items-center gap-x-4 gap-y-1 tabular-nums">
                   {a.isRun && <span className="w-16 text-right">{fmt.dist(a.distanceM / 1000)}</span>}
@@ -106,7 +106,7 @@ export function ActivityPage() {
         <div>
           <Link to="/activities" className="text-sm text-muted-foreground hover:underline">← {t("nav.activities")}</Link>
           <h1 className="text-2xl font-semibold">{a.name}</h1>
-          <p className="text-sm text-muted-foreground">{fmtDay(a.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {a.startTimeLocal.slice(11, 16)} · {a.typeKey.replace(/_/g, " ")}</p>
+          <p className="text-sm text-muted-foreground">{fmtDay(a.date, { weekday: "long", day: "numeric", month: "long", year: "numeric" })} · {a.startTimeLocal.slice(11, 16)} · {activityTypeName(a.typeKey)}</p>
           {data.race && <div className="mt-1.5"><RaceBadge race={data.race} /></div>}
         </div>
         {a.isRun && (
