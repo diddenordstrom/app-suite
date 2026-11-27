@@ -3,7 +3,7 @@ title: Fartlek period stats: time in zone, threshold and target pace over any pe
 summary: A new stats page for a chosen period (day, week, month, block, custom) with time in HR zone, time below / at / above threshold pace (grade-adjusted) and time at the plan's target pace, shown as key figures for one period against another; meant to replace Trends in time
 type: decision
 status: accepted
-updated: 2026-11-26
+updated: 2026-11-27
 ---
 
 # Fartlek period stats: time in zone, threshold and target pace over any period
@@ -61,9 +61,13 @@ A new page, built beside Trends first. Trends stays until the new page covers wh
 2. The Statistik page (`client/pages/Stats.tsx`, route `/stats`, in the menu before Trender), from the design mock "C · rapport med spegel": mirrored header and key figures with the difference as the big number, a thin ribbon of all run time per period, a 12-week timeline where a week or a block can be clicked, mirror cards for zones and for threshold and target pace, day against day mirrored around a line, plan against actual with a tick for the other period, and the run list with filters and a small zone bar per run. Periods of different length are compared over the same number of days from each start ([`shared/periods.ts`](../../apps/fartlek/src/shared/periods.ts)), and the page says so. Built.
 3. Plain totals first, comparison on demand (2026-11-26, after using the page live). The mirrored page answered "what changed?" when the main question is "how much time did I spend at threshold, in each zone, at target pace?", and the differences as the big numbers were hard to read. The page now shows one period with its absolute times and shares as the big figures (run time, distance, runs, longest, time at threshold, time at target pace; a bar per zone and per pace band on one scale, with h:mm and per cent). A "Jämför med …" switch, off by default and remembered per browser, adds the other period to the same cards: a thin lavender bar and a difference chip with the other value beside each figure, day against day mirrored, the plan's tick and the second ribbon. One page with a switch rather than two designs to pick between, so the figures stay where they are and only gain context. Built.
 4. The chosen period's frame on the timeline can be dragged: the body moves it, the edges stretch it, a drag across the weeks draws a new one, and arrow keys (with Shift for the length) do the same from the keyboard. It snaps to whole weeks up to this week; the comparison period follows the usual rule when it is let go. The timeline always runs up to this week, so a period dragged back can be dragged forward again. Built.
-5. Moving the remaining cards over from Trends, then removing Trends.
+5. Moving the remaining cards over from Trends, then removing Trends (settled 2026-11-27, being built). Statistik and Trends answer different questions: "how did I spend my time in this period?" is a sum over the period, "how is this measure changing?" is a curve over months, and a curve cut down to one week says nothing. So they become **one page with two views, Period | Trender**, under one menu item and one period picker, rather than two menu items whose periods compete. `/trends` redirects to `/stats` with the Trender view.
+   - **Dropped, Statistik already shows them:** km per week (the 12-week timeline), intensity distribution (time per zone for the period) and plan followed (plan against actual).
+   - **Curves with the period marked:** HRV, resting HR, threshold pace and HR, and fitness / fatigue / form. The chart shows a longer window with the chosen period shaded (`xBands` on `LineChart`), the comparison period too when the switch is on, and the big number on top is about the period: HRV and resting HR as the period's mean against the other period, threshold pace as its value at the start and end of the period, form as its value at the period's end.
+   - **History, the period at most shaded:** best efforts, critical speed, VO2max, easy pace, durability, fuel and felt effort.
+   - **The window follows the period** instead of Trends' fixed 12 / 26 / 52 weeks: about four times the period's length, at least 12 weeks.
 
 ## Open
 
 - The exact "at" width (3 % or 5 %; 3.5 % for now), tuned on real runs.
-- Whether easy-pace and durability fit a period view or stay on a history page.
+- Easy pace and durability stay curves on the Trender view (2026-11-27); whether either later gets a period figure on top.

@@ -103,7 +103,7 @@ export interface LineSeries {
 }
 
 export function LineChart({
-  series, height = 200, xFormat, yFormat, invert = false, yPad = 0.08, refLines = [], xLines = [], bands = [], legend, directLabels = false, emptyText = tShared("chart.notEnough"),
+  series, height = 200, xFormat, yFormat, invert = false, yPad = 0.08, refLines = [], xLines = [], xBands = [], bands = [], legend, directLabels = false, emptyText = tShared("chart.notEnough"),
 }: {
   series: LineSeries[];
   height?: number;
@@ -115,6 +115,8 @@ export function LineChart({
   refLines?: { y: number; label: string }[];
   /** Vertical markers (events on the x axis), labelled at the top. Dashed and muted unless given a colour ("idag" in signature). */
   xLines?: { x: number; label: string; color?: string }[];
+  /** Shaded x ranges behind the lines (a chosen period), clipped to the data and labelled at the top left. Muted unless given a colour. */
+  xBands?: { from: number; to: number; label?: string; color?: string }[];
   /** Shaded y ranges behind the lines (a goal zone), named in the legend. */
   bands?: { from: number; to: number; color: string; label?: string }[];
   legend?: boolean;
@@ -207,6 +209,17 @@ export function LineChart({
               const top = Math.min(y0, y1), h = Math.abs(y1 - y0);
               return (
                 <rect key={`${b.from}-${b.to}`} x={m.l} y={top} width={Math.max(width - m.l - m.r, 0)} height={h} fill={b.color} fillOpacity={0.14} />
+              );
+            })}
+            {xBands.map((b) => {
+              const lo = Math.max(Math.min(b.from, b.to), geo.x0), hi = Math.min(Math.max(b.from, b.to), geo.x1);
+              if (lo > hi) return null;
+              const x = geo.sx(lo), w = Math.max(geo.sx(hi) - x, 2);
+              return (
+                <g key={`${b.from}-${b.to}`}>
+                  <rect x={x} y={m.t} width={w} height={height - m.t - m.b} fill={b.color ?? "var(--foreground)"} fillOpacity={b.color ? 0.14 : 0.06} />
+                  {b.label && w > 40 && <text x={x + 4} y={m.t + 10} fontSize={10} fill={AXIS}>{b.label}</text>}
+                </g>
               );
             })}
             {xTicks.map((x, i) => (
