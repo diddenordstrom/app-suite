@@ -8,7 +8,7 @@ import { addDays, monthEnd, monthStart, range, daysBetween } from "../../shared/
 import { summarizeMonth } from "../../shared/compliance";
 import { countdown, goalPace, neededThreshold, painTrends, readiness } from "../../shared/recovery";
 import { proposeThreshold, rangeCheck, sessionPoint, thresholdOn, intervalLaps, lapPace } from "../../shared/threshold";
-import { gradeEasy, intensityDistribution, paceInBand } from "../../shared/zones";
+import { gradeEasy, paceInBand } from "../../shared/zones";
 import { compareWithThreshold, csZones } from "../../shared/criticalspeed";
 import { carbsPerHour, durability, fuelAdvice, giScore, srpeLoad } from "../../shared/activitylog";
 import { longestStep } from "../../shared/blocks";
@@ -147,15 +147,19 @@ export function overviewRoutes(db: Db) {
 
   r.get("/trends", (c) => {
     const ctx = ctxFor(db, uid(c));
+    // The window the curves cover, in weeks back from today (Statistik picks it from the chosen period).
     const nWeeks = Math.min(Math.max(Number(c.req.query("weeks")) || 12, 4), 104);
-    const from = addDays(ctx.today, -(nWeeks * 7 - 1));
-    const weeks = weekSummaries(ctx, from, addDays(ctx.today, 28));
+    const span = Math.max(90, nWeeks * 7);
+    const from = addDays(ctx.today, -(span - 1));
 
-    const acts = repo.listActivities(db, ctx.userId, { from: addDays(ctx.today, -Math.max(90, nWeeks * 7)) });
+    // Km per week is on Statistik's period view now; the portfolio's Fartlek landing still draws it from here.
+    const weeks = weekSummaries(ctx, addDays(ctx.today, -(nWeeks * 7 - 1)), addDays(ctx.today, 28));
+
+    const acts = repo.listActivities(db, ctx.userId, { from });
     const metrics = new Map(acts.map((a) => [a.id, runMetrics(ctx, a)]));
-    const runs90 = acts.filter((a) => a.isRun && a.date >= addDays(ctx.today, -90));
+    const runsInWindow = acts.filter((a) => a.isRun);
     const s = ctx.settings;
-    const easyRuns = runs90.filter((a) => !a.thresholdFlag).map((a) => {
+    const easyRuns = runsInWindow.filter((a) => !a.thresholdFlag).map((a) => {
       const m = metrics.get(a.id)!;
       const stream = s.easyLow && s.easyHigh && a.hasDetail ? repo.getStream(db, ctx.userId, a.id) : null;
       const band = stream ? paceInBand(stream, s.easyLow!, s.easyHigh!) : null;
@@ -167,13 +171,7 @@ export function overviewRoutes(db: Db) {
 
     const nextA = repo.listRaces(db, ctx.userId).find((x) => x.date > ctx.today && x.priority === "A" && daysBetween(ctx.today, x.date) <= 200);
     const end = planEnd(ctx);
-    const pmcSeries = loadSeries(ctx, 90, end ?? undefined);
-
-    const distribution = weeks.filter((w) => w.weekStart <= ctx.today).map((w) => {
-      const we = addDays(w.weekStart, 6);
-      const list = acts.filter((a) => a.isRun && a.date >= w.weekStart && a.date <= we).map((a) => metrics.get(a.id)?.zoneSecs ?? null);
-      return { weekStart: w.weekStart, ...intensityDistribution(list) };
-    });
+    const pmcSeries = loadSeries(ctx, span, end ?? undefined);
 
     const logs = repo.logsFor(db, ctx.userId, acts.map((a) => a.id));
     const fuel = acts.flatMap((a) => {
@@ -201,23 +199,24 @@ export function overviewRoutes(db: Db) {
       comparison: thrPace ? compareWithThreshold(best.cs.paceSecPerKm, thrPace) : null,
     };
 
-    const { trends, wellness, checkins } = readinessFor(ctx);
+    const { trends, checkins } = readinessFor(ctx);
+    const wellnessByDay = new Map(repo.listWellness(db, ctx.userId, from).map((w) => [w.date, w]));
     const points = thresholdPoints(ctx);
     const current = thresholdOn(ctx.thresholds, ctx.today);
 
     return c.json({
       today: ctx.today,
+      from,
       weekly: weeks.map((w) => ({ weekStart: w.weekStart, actualKm: w.actualKm, plannedKm: w.targetKm, runs: w.runs, minutes: w.actualMin, status: w.status, future: w.weekStart > ctx.today })),
       load: { series: pmcSeries, race: nextA ?? null, planEnd: end },
       easy: easyRuns,
       threshold: { points, estimates: ctx.thresholds, current, proposal: proposeThreshold(points, current, ctx.today) },
-      distribution,
       cs: { tests: csTests, latest: cs ?? null, olderTest: best.olderTest },
       vo2max: vo2maxView(ctx),
       best: { pending: best.pending, allTime: best.allTime, block: best.block, rolling: best.rolling, gapShare: best.gapShare },
       log: { fuel, fuelAdvice: fuelAdvice(fuel.map((f) => ({ date: f.date, gPerH: f.gPerH, gi: f.gi }))), srpe, durability: durable },
       pain: { trends, entries: repo.listPain(db, ctx.userId, addDays(ctx.today, -90)) },
-      wellness: range(addDays(ctx.today, -34), ctx.today).map((d) => wellness.find((w) => w.date === d) ?? { date: d, hrvWeeklyAvg: null, hrvLastNight: null, hrvBaselineLow: null, restingHr: null, bodyBatteryMax: null, sleepScore: null }),
+      wellness: range(from, ctx.today).map((d) => wellnessByDay.get(d) ?? { date: d, hrvWeeklyAvg: null, hrvLastNight: null, hrvBaselineLow: null, restingHr: null, bodyBatteryMax: null, sleepScore: null }),
       checkins,
     });
   });

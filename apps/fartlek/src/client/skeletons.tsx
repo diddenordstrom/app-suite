@@ -33,11 +33,10 @@ export function HomeSkeleton() {
   );
 }
 
-/** A grid of chart cards. */
+/** A grid of chart cards (Statistik's Trender view, under the period card). */
 export function TrendsSkeleton() {
   return (
     <SkeletonPage className="space-y-4">
-      <SkeletonHeader action />
       <div className="grid gap-4 lg:grid-cols-2">
         {[0, 1, 2, 3].map((i) => <SkeletonCard key={i}><Skeleton className="h-48 w-full" /></SkeletonCard>)}
       </div>

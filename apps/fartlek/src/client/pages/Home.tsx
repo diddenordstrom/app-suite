@@ -161,7 +161,7 @@ export function Home() {
         </Card>
 
         <Card data-tour="home-load" className="md:col-span-2 lg:col-span-2">
-          <CardTitle action={<Link to="/trends" className="text-xs text-muted-foreground hover:underline">{t("nav.trends")} →</Link>}>{t("load.title")}</CardTitle>
+          <CardTitle action={<Link to="/stats?view=trends" className="text-xs text-muted-foreground hover:underline">{t("nav.trends")} →</Link>}>{t("load.title")}</CardTitle>
           {data.fitness ? (
             <>
               {data.loadTrend.length > 7 && (

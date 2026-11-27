@@ -16,12 +16,8 @@ export const en = {
   "tour.planTitle": "Build your weeks in Plan",
   "tour.planBody": "Add sessions by hand, or start a training block towards your race and the weeks fill in for you.",
 
-  "tour.tKmTitle": "Kilometres per week",
-  "tour.tKmBody": "Bars are what you ran, the line what you planned, faded bars planned weeks ahead. A warning shows under the chart when the plan ramps up more than 10% from one week to the next.",
   "tour.tLoadTitle": "Fitness, fatigue, form",
   "tour.tLoadBody": "Fitness (CTL) is your load averaged over 42 days, fatigue (ATL) over 7. Form (TSB) is fitness minus fatigue: negative while you build, positive when you're rested. Dashed lines are where your plan takes you.",
-  "tour.tIntensityTitle": "Intensity distribution",
-  "tour.tIntensityBody": "Time per week in easy (Z1–2), moderate (Z3) and hard (Z4–5) heart-rate zones. Most of it should be easy, roughly 80%.",
   "tour.tThresholdTitle": "Threshold over time",
   "tour.tThresholdBody": "Your threshold pace from each threshold session. Getting faster at the same heart rate means you're getting fitter.",
 };
@@ -43,12 +39,8 @@ export const sv: Record<keyof typeof en, string> = {
   "tour.planTitle": "Bygg veckorna i Plan",
   "tour.planBody": "Lägg in pass för hand, eller starta ett träningsblock mot ditt lopp så fylls veckorna i åt dig.",
 
-  "tour.tKmTitle": "Kilometer per vecka",
-  "tour.tKmBody": "Staplarna är det du sprungit, strecket det du planerat och de bleka staplarna planerade veckor framåt. Ökar planen mer än 10 % från en vecka till nästa varnar Fartlek under grafen.",
   "tour.tLoadTitle": "Kondition, trötthet, form",
   "tour.tLoadBody": "Kondition (CTL) är din belastning i snitt över 42 dagar, trötthet (ATL) över 7. Form (TSB) är kondition minus trötthet: negativ när du bygger, positiv när du är utvilad. Streckat är dit planen tar dig.",
-  "tour.tIntensityTitle": "Intensitetsfördelning",
-  "tour.tIntensityBody": "Tid per vecka i lugna (Z1–2), medel (Z3) och hårda (Z4–5) pulszoner. Det mesta ska vara lugnt, ungefär 80 %.",
   "tour.tThresholdTitle": "Tröskeln över tid",
   "tour.tThresholdBody": "Ditt tröskeltempo från varje tröskelpass. Snabbare på samma puls betyder att du blir bättre.",
 };
